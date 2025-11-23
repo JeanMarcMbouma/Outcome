@@ -8,7 +8,7 @@
     <PackageId>Outcome</PackageId>
     <Version>1.0.0</Version>
     <Authors>Jean</Authors>
-    <Company>YourCompany</Company>
+    <Company>JM Mbouma</Company>
     <Description>A modern C# functional result type with structured errors, async workflows, LINQ support, deconstruction, and Source Link.</Description>
     <PackageTags>outcome result monad functional async linq error</PackageTags>
     <RepositoryUrl>https://github.com/JeanMarcMbouma/Outcome</RepositoryUrl>
