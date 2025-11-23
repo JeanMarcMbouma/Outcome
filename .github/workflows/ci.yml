@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - '**'   # run on all branches
+  pull_request:
+    branches:
+      - '**'   # run on all PRs
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore Outcome.slnx
+
+      - name: Build
+        run: dotnet build Outcome.slnx --configuration Release --no-restore
+
+      - name: Run tests
+        run: dotnet test Outcome.slnx --configuration Release --no-build --verbosity normal
