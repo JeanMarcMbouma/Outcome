@@ -5,6 +5,10 @@ on:
     tags:
       - 'v*.*.*'   # e.g. v1.0.0
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   build-test-pack:
     runs-on: ubuntu-latest
