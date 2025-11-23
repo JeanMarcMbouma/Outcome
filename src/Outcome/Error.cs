@@ -9,5 +9,5 @@
     /// <param name="Severity">
     /// The severity level of this error. Defaults to <see cref="ErrorSeverity.Error"/>.
     /// </param>
-    public sealed record Error<TCode>(TCode Code, string Description, ErrorSeverity Severity = ErrorSeverity.Error);
+    public record Error<TCode>(TCode Code, string Description, ErrorSeverity Severity = ErrorSeverity.Error);
 }

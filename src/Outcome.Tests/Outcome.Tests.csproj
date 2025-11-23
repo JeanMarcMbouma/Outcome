@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Outcome\Outcome.csproj" />
+    <ProjectReference Include="..\Outcome.SourceGenerators\Outcome.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
 </Project>

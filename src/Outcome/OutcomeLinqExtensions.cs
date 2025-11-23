@@ -1,6 +1,4 @@
-﻿using static System.Runtime.InteropServices.JavaScript.JSType;
-
-namespace BbQ.Outcome
+﻿namespace BbQ.Outcome
 {
     /// <summary>
     /// LINQ-style extension methods for working with <see cref="Outcome{T}"/> values.

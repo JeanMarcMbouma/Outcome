@@ -1,4 +1,5 @@
 <Solution>
-  <Project Path="src/Outcome.Tests/Outcome.Tests.csproj" />
-  <Project Path="src/Outcome/Outcome.csproj" />
+  <Project Path="D:/source/Outcome/src/Outcome.SourceGenerators/Outcome.SourceGenerators.csproj" />
+  <Project Path="D:/source/Outcome/src/Outcome.Tests/Outcome.Tests.csproj" />
+  <Project Path="D:/source/Outcome/src/Outcome/Outcome.csproj" />
 </Solution>
