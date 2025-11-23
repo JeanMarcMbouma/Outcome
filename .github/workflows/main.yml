@@ -8,6 +8,7 @@ on:
 jobs:
   build-test-pack:
     runs-on: ubuntu-latest
+    environment: production
 
     steps:
       - name: Checkout repository
