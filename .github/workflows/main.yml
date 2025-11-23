@@ -19,7 +19,7 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Restore dependencies
-        run: dotnet restore Outcome.sln
+        run: dotnet restore Outcome.slnx
 
       - name: Build
         run: dotnet build Outcome.slnx --configuration Release --no-restore
