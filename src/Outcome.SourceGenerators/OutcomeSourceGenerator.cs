@@ -111,6 +111,7 @@ namespace BbQ.Outcome.SourceGenerators
                 {
                     var memberName = enumMember.Identifier.ValueText;
                     var description = ExtractDescription(enumMember);
+                    var severity = ExtractSeverity(enumMember);
                     var propertyName = $"{memberName}Error";
 
                     sb.AppendLine($"        /// <summary>");
@@ -120,7 +121,7 @@ namespace BbQ.Outcome.SourceGenerators
                     sb.AppendLine($"            new(");
                     sb.AppendLine($"                {enumName}.{memberName},");
                     sb.AppendLine($"                \"{description}\",");
-                    sb.AppendLine($"                ErrorSeverity.Error");
+                    sb.AppendLine($"                ErrorSeverity.{severity}");
                     sb.AppendLine($"            );");
                     sb.AppendLine();
                 }
@@ -199,6 +200,47 @@ namespace BbQ.Outcome.SourceGenerators
 
             // Fallback: use member name
             return member.Identifier.ValueText;
+        }
+
+        private static string ExtractSeverity(EnumMemberDeclarationSyntax member)
+        {
+            // Look for ErrorSeverity attribute on the enum member
+            foreach (var attributeList in member.AttributeLists)
+            {
+                foreach (var attribute in attributeList.Attributes)
+                {
+                    var attributeName = GetAttributeName(attribute);
+                    if (attributeName == "ErrorSeverity" || attributeName == "ErrorSeverityAttribute")
+                    {
+                        // Try to extract the severity value from the attribute argument
+                        if (attribute.ArgumentList?.Arguments.Count > 0)
+                        {
+                            var arg = attribute.ArgumentList.Arguments[0];
+                            var argText = arg.Expression.ToString();
+                            
+                            // Handle different formats: ErrorSeverity.Warning, "Warning", Warning
+                            if (argText.Contains("."))
+                            {
+                                // Format: ErrorSeverity.Warning
+                                return argText.Split('.').Last();
+                            }
+                            else if (argText.StartsWith("\"") && argText.EndsWith("\""))
+                            {
+                                // Format: "Warning"
+                                return argText.Trim('"');
+                            }
+                            else
+                            {
+                                // Format: Warning
+                                return argText;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Default to Error if no attribute is specified
+            return "Error";
         }
     }
 }
