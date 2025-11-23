@@ -1,7 +1,6 @@
 // Tests for ErrorExtensions factory methods.
 
 using NUnit.Framework;
-using BbQ.Outcome;
 
 namespace BbQ.Outcome.Tests
 {

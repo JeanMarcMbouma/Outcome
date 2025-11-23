@@ -1,9 +1,6 @@
 // Tests for async LINQ extension methods on Task<Outcome<T>>.
 
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using NUnit.Framework;
-using BbQ.Outcome;
 
 namespace BbQ.Outcome.Tests
 {
@@ -31,7 +28,7 @@ namespace BbQ.Outcome.Tests
         public async Task SelectAsync_ErrorOutcome_ShouldPropagateError()
         {
             // Arrange
-            var outcome = Task.FromResult(Outcome<int>.FromErrors(new List<object> { "Error1" }));
+            var outcome = Task.FromResult(Outcome<int>.FromErrors(["Error1"]));
 
             // Act
             var result = await outcome.Select(x => x * 2);
@@ -61,7 +58,7 @@ namespace BbQ.Outcome.Tests
         public async Task SelectManyAsync_ErrorOutcome_ShouldPropagateError()
         {
             // Arrange
-            var outcome = Task.FromResult(Outcome<int>.FromErrors(new List<object> { "Error1" }));
+            var outcome = Task.FromResult(Outcome<int>.FromErrors(["Error1"]));
 
             // Act
             var result = await outcome.SelectMany(
@@ -103,7 +100,7 @@ namespace BbQ.Outcome.Tests
         public async Task WhereAsync_ErrorOutcome_ShouldPropagateError()
         {
             // Arrange
-            var outcome = Task.FromResult(Outcome<int>.FromErrors(new List<object> { "Error1" }));
+            var outcome = Task.FromResult(Outcome<int>.FromErrors(["Error1"]));
 
             // Act
             var result = await outcome.Where(x => x > 0);

@@ -1,9 +1,6 @@
 // Tests for async extension methods on Outcome<T>.
 // These test MapAsync, BindAsync, and CombineAsync.
 
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using NUnit.Framework;
 using BbQ.Outcome;
 
@@ -100,7 +97,7 @@ namespace BbQ.Outcome.Tests
             var task3 = Task.FromResult(Outcome<int>.From(3));
 
             // Act
-            var result = await Outcome<int>.CombineAsync(task1, task2, task3);
+            var result = await Outcome<int>.CombineAsync([task1, task2, task3]);
 
             // Assert
             Assert.That(result.IsSuccess, Is.True);
@@ -112,11 +109,11 @@ namespace BbQ.Outcome.Tests
         {
             // Arrange
             var task1 = Task.FromResult(Outcome<int>.From(1));
-            var task2 = Task.FromResult(Outcome<int>.FromErrors(new List<object> { "Error1" }));
-            var task3 = Task.FromResult(Outcome<int>.FromErrors(new List<object> { "Error2" }));
+            var task2 = Task.FromResult(Outcome<int>.FromErrors(["Error1"]));
+            var task3 = Task.FromResult(Outcome<int>.FromErrors(["Error2"]));
 
             // Act
-            var result = await Outcome<int>.CombineAsync(task1, task2, task3);
+            var result = await Outcome<int>.CombineAsync([task1, task2, task3]);
 
             // Assert
             Assert.That(result.IsError, Is.True);

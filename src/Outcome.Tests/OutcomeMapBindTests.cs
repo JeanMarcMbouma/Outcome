@@ -1,9 +1,7 @@
 // Tests for Map and Bind extension methods on Outcome<T>.
 // These test functor and monadic operations.
 
-using System.Collections.Generic;
 using NUnit.Framework;
-using BbQ.Outcome;
 
 namespace BbQ.Outcome.Tests
 {
@@ -67,7 +65,7 @@ namespace BbQ.Outcome.Tests
             var result = outcome.Bind(x => 
                 x > 10 
                     ? Outcome<int>.From(x) 
-                    : Outcome<int>.FromErrors(new List<object> { "Too small" })
+                    : Outcome<int>.FromErrors(["Too small"])
             );
 
             // Assert

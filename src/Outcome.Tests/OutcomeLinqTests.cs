@@ -1,8 +1,6 @@
 // Tests for LINQ extension methods (Select, SelectMany, Where) on Outcome<T>.
 
-using System.Collections.Generic;
 using NUnit.Framework;
-using BbQ.Outcome;
 
 namespace BbQ.Outcome.Tests
 {
@@ -62,7 +60,7 @@ namespace BbQ.Outcome.Tests
         public void SelectMany_ErrorInFirstOutcome_ShouldPropagateError()
         {
             // Arrange
-            var outcome1 = Outcome<int>.FromErrors(new List<object> { "Error1" });
+            var outcome1 = Outcome<int>.FromErrors(["Error1"]);
             var outcome2 = Outcome<int>.From(3);
 
             // Act
@@ -106,7 +104,7 @@ namespace BbQ.Outcome.Tests
         public void Where_ErrorOutcome_ShouldPropagateError()
         {
             // Arrange
-            var outcome = Outcome<int>.FromErrors(new List<object> { "Error1" });
+            var outcome = Outcome<int>.FromErrors(["Error1"]);
 
             // Act
             var result = outcome.Where(x => x > 0);

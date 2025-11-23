@@ -1,10 +1,7 @@
 // Tests for the core Outcome<T> struct covering basic functionality,
 // error handling, and implicit conversions.
 
-using System;
-using System.Collections.Generic;
 using NUnit.Framework;
-using BbQ.Outcome;
 
 namespace BbQ.Outcome.Tests
 {
@@ -61,7 +58,7 @@ namespace BbQ.Outcome.Tests
         {
             // Arrange & Act
             var successOutcome = Outcome<int>.From(42);
-            var errorOutcome = Outcome<int>.FromErrors(new List<object> { "error" });
+            var errorOutcome = Outcome<int>.FromErrors(["error"]);
 
             // Assert
             Assert.That(successOutcome.IsSuccess, Is.True);
@@ -99,7 +96,7 @@ namespace BbQ.Outcome.Tests
         public void ToString_ErrorOutcome_ShouldShowErrors()
         {
             // Arrange
-            var outcome = Outcome<int>.FromErrors(new List<object> { "Error1" });
+            var outcome = Outcome<int>.FromErrors(["Error1"]);
 
             // Act
             var result = outcome.ToString();
