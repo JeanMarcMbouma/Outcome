@@ -35,5 +35,5 @@ Output:
 
 ## 📦 Installation
 ```
-dotnet add package Outcome
+dotnet add package BbQ.Outcome
 ```
