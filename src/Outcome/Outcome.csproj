@@ -1,0 +1,39 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Multi-target frameworks -->
+    <TargetFrameworks>net8.0</TargetFrameworks>
+
+    <!-- Package metadata -->
+    <PackageId>Outcome</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Jean</Authors>
+    <Company>YourCompany</Company>
+    <Description>A modern C# functional result type with structured errors, async workflows, LINQ support, deconstruction, and Source Link.</Description>
+    <PackageTags>outcome result monad functional async linq error</PackageTags>
+    <RepositoryUrl>https://github.com/JeanMarcMbouma/Outcome</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/JeanMarcMbouma/Outcome</PackageProjectUrl>
+    <RepositoryType>git</RepositoryType>
+    <LicenseExpression>MIT</LicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+
+    <!-- Build settings -->
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+
+    <!-- Source Link settings -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Source Link package -->
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+    <!-- Include README in the NuGet package -->
+    <None Include="../../README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+</Project>
