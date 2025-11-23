@@ -1,11 +1,11 @@
 // Tests for async LINQ extension methods on Task<Outcome<T>>.
 
-using Outcome;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using NUnit.Framework;
+using BbQ.Outcome;
 
-namespace Outcome.Tests
+namespace BbQ.Outcome.Tests
 {
     /// <summary>
     /// Tests for async LINQ extension methods on Task<Outcome<T>>.

@@ -1,4 +1,4 @@
-﻿namespace Outcome
+﻿namespace BbQ.Outcome
 {
     /// <summary>
     /// Represents a structured error with a code, description, and severity level.

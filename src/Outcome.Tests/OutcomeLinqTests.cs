@@ -1,10 +1,10 @@
 // Tests for LINQ extension methods (Select, SelectMany, Where) on Outcome<T>.
 
-using Outcome;
 using System.Collections.Generic;
 using NUnit.Framework;
+using BbQ.Outcome;
 
-namespace Outcome.Tests
+namespace BbQ.Outcome.Tests
 {
     /// <summary>
     /// Tests for LINQ extension methods (Select, SelectMany, Where) on Outcome<T>.

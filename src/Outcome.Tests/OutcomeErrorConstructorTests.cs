@@ -1,11 +1,11 @@
 // Tests for error constructor extension methods on Outcome<T>.
 // These test FromError, FromErrors, Validation, and Critical methods.
 
-using Outcome;
 using System.Collections.Generic;
 using NUnit.Framework;
+using BbQ.Outcome;
 
-namespace Outcome.Tests
+namespace BbQ.Outcome.Tests
 {
     /// <summary>
     /// Tests for error constructor extension methods on Outcome<T>.

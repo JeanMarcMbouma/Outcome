@@ -1,4 +1,4 @@
-﻿namespace Outcome
+﻿namespace BbQ.Outcome
 {
     /// <summary>
     /// A discriminated union (result type) that represents either a successful value of type <typeparam name="T"/>

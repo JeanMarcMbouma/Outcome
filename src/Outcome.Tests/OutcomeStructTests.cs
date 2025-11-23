@@ -1,12 +1,12 @@
 // Tests for the core Outcome<T> struct covering basic functionality,
 // error handling, and implicit conversions.
 
-using Outcome;
 using System;
 using System.Collections.Generic;
 using NUnit.Framework;
+using BbQ.Outcome;
 
-namespace Outcome.Tests
+namespace BbQ.Outcome.Tests
 {
     /// <summary>
     /// Tests for the core Outcome<T> struct covering basic functionality,

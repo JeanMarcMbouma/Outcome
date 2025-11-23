@@ -1,4 +1,4 @@
-﻿namespace Outcome
+﻿namespace BbQ.Outcome
 {
     /// <summary>
     /// Defines the severity level of an error in the outcome system.

@@ -1,12 +1,12 @@
 // Tests for Combine extension method on Outcome<T>.
 // These test aggregating multiple outcomes.
 
-using Outcome;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using BbQ.Outcome;
 
-namespace Outcome.Tests
+namespace BbQ.Outcome.Tests
 {
     /// <summary>
     /// Tests for Combine extension method on Outcome<T>.

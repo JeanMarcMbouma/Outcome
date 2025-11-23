@@ -1,11 +1,11 @@
 // Tests for Map and Bind extension methods on Outcome<T>.
 // These test functor and monadic operations.
 
-using Outcome;
 using System.Collections.Generic;
 using NUnit.Framework;
+using BbQ.Outcome;
 
-namespace Outcome.Tests
+namespace BbQ.Outcome.Tests
 {
     /// <summary>
     /// Tests for Map and Bind extension methods on Outcome<T>.

@@ -1,4 +1,4 @@
-﻿namespace Outcome
+﻿namespace BbQ.Outcome
 {
     /// <summary>
     /// Static convenience extensions for constructing <see cref="Error{TCode}"/> instances

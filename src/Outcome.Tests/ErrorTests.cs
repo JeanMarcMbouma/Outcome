@@ -1,9 +1,9 @@
 // Tests for Error and ErrorSeverity types.
 
-using Outcome;
 using NUnit.Framework;
+using BbQ.Outcome;
 
-namespace Outcome.Tests
+namespace BbQ.Outcome.Tests
 {
     /// <summary>
     /// Tests for Error and ErrorSeverity types.

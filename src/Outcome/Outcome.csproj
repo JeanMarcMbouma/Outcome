@@ -5,7 +5,7 @@
     <TargetFrameworks>net8.0</TargetFrameworks>
 
     <!-- Package metadata -->
-    <PackageId>Outcome</PackageId>
+    <PackageId>BbQ.Outcome</PackageId>
     <Version>1.0.0</Version>
     <Authors>Jean</Authors>
     <Company>JM Mbouma</Company>
@@ -21,12 +21,15 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
+    <RootNamespace>BbQ.Outcome</RootNamespace>
 
     <!-- Source Link settings -->
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Title>BbQ.Outcome&lt;T&gt;</Title>
   </PropertyGroup>
 
   <ItemGroup>

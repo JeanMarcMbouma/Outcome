@@ -1,4 +1,6 @@
-﻿namespace Outcome
+﻿using BbQ.Outcome;
+
+namespace BbQ.Outcome
 {
     /// <summary>
     /// Extension methods that provide functional composition patterns for <see cref="Outcome{T}"/> values.

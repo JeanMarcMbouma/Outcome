@@ -1,11 +1,11 @@
 // Tests for Match and Switch extension methods on Outcome<T>.
 // These test pattern matching and side-effect execution.
 
-using Outcome;
 using System.Collections.Generic;
 using NUnit.Framework;
+using BbQ.Outcome;
 
-namespace Outcome.Tests
+namespace BbQ.Outcome.Tests
 {
     /// <summary>
     /// Tests for Match and Switch extension methods on Outcome<T>.
