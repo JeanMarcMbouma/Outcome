@@ -39,9 +39,12 @@ jobs:
         id: login
         with:
           user: ${{ secrets.NUGET_USER }}
-    
+          
+      - name: Add NuGet source
+        run: dotnet nuget add source https://api.nuget.org/v3/index.json --name nuget.org --store-password-in-clear-text --username ${{ secrets.NUGET_USER }} --password ${{ steps.login.outputs.NUGET_API_KEY }}
+      
       - name: Publish to NuGet
-        run: dotnet nuget push ./artifacts/*.nupkg --api-key ${{steps.login.outputs.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json
+        run: dotnet nuget push ./artifacts/*.nupkg --source nuget.org
 
       - name: Publish Symbols
-        run: dotnet nuget push ./artifacts/*.snupkg --api-key ${{steps.login.outputs.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json
+        run: dotnet nuget push ./artifacts/*.snupkg --source nuget.org
