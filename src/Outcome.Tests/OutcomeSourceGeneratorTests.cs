@@ -1,6 +1,7 @@
 // Tests for the QbqOutcome source generator.
 
 using NUnit.Framework;
+using BbQ.Outcome;
 
 namespace BbQ.Outcome.Tests
 {
@@ -82,10 +83,16 @@ namespace BbQ.Outcome.Tests
             // Arrange & Act
             var validationError = TestErrorCodeErrors.ValidationErrorError;
             var internalError = TestErrorCodeErrors.InternalErrorError;
+            var outcome = internalError.ToOutcome<int>();
 
+            int state = outcome.Match(
+                onSuccess: _ => 1,
+                onError: errors => 0);
             // Assert - should use the specified severity from the attribute
             Assert.That(validationError.Severity, Is.EqualTo(ErrorSeverity.Validation));
             Assert.That(internalError.Severity, Is.EqualTo(ErrorSeverity.Critical));
+            Assert.That(outcome.IsSuccess, Is.False);
+            Assert.That(state, Is.EqualTo(0));
         }
     }
 }

@@ -1,4 +1,6 @@
-﻿namespace BbQ.Outcome
+﻿using static System.Runtime.InteropServices.JavaScript.JSType;
+
+namespace BbQ.Outcome
 {
     /// <summary>
     /// Represents a structured error with a code, description, and severity level.
@@ -9,5 +11,17 @@
     /// <param name="Severity">
     /// The severity level of this error. Defaults to <see cref="ErrorSeverity.Error"/>.
     /// </param>
-    public record Error<TCode>(TCode Code, string Description, ErrorSeverity Severity = ErrorSeverity.Error);
+    public sealed record Error<TCode>(TCode Code, string Description, ErrorSeverity Severity = ErrorSeverity.Error)
+    {
+        
+        /// <summary>
+        /// Converts this error to an <see cref="Outcome{T}"/> with the specified type.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        public Outcome<T> ToOutcome<T>()
+        {
+            return Outcome<T>.FromError(new Error<TCode>(Code, Description, Severity));
+        }
+    }
 }
