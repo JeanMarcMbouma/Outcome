@@ -22,10 +22,10 @@ jobs:
         run: dotnet restore Outcome.sln
 
       - name: Build
-        run: dotnet build Outcome.sln --configuration Release --no-restore
+        run: dotnet build Outcome.slnx --configuration Release --no-restore
 
       - name: Run tests
-        run: dotnet test Outcome.sln --configuration Release --no-build --verbosity normal
+        run: dotnet test Outcome.slnx --configuration Release --no-build --verbosity normal
 
       - name: Pack NuGet
         run: dotnet pack src/Outcome/Outcome.csproj --configuration Release --no-build -o ./artifacts
