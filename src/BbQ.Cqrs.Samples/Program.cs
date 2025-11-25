@@ -23,6 +23,6 @@ static class Program
         Debug.Assert(!ok);
         Debug.Assert(errors!.OfType<Error<AppError>>().Any(e => e.Code == AppError.Transient));
 
-        Console.WriteLine($"Errors: {string.Join(", ", errors!.Select(e => e))}");
+        Console.WriteLine($"Errors: {string.Join(", ", errors!)}");
     }
 }
