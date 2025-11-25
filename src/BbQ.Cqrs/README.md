@@ -444,5 +444,5 @@ public class GetUserByIdQueryHandler : IRequestHandler<GetUserByIdQuery, Outcome
 
 ## ?? Learn More
 
-- [BbQ.Outcome Documentation](../Outcome/README_Outcome.md) - Functional error handling
+- [BbQ.Outcome Documentation](../Outcome/README.md) - Functional error handling
 - [Strongly Typed Errors Guide](../../STRONGLY_TYPED_ERRORS.md) - Best practices

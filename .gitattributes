@@ -3,6 +3,9 @@
 ###############################################################################
 * text=auto
 
+# Enforce UTF-8 encoding for markdown files to preserve emoji and special characters
+*.md text working-tree-encoding=UTF-8
+
 ###############################################################################
 # Set default behavior for command prompt diff.
 #
