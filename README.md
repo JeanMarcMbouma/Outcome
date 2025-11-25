@@ -220,126 +220,448 @@ The `ErrorSeverity` enum provides the following levels:
 
 BbQ.Cqrs provides a lightweight, extensible CQRS implementation that integrates seamlessly with `Outcome` for error handling.
 
-### Core Components
+### Quick Start
 
-- **`IMediator`**: The central dispatcher for commands and queries
-- **`ICommand<TResult>`**: Contract for command handlers that produce a result
-- **`IPipelineBehavior<TRequest, TResponse>`**: Extensible middleware for cross-cutting concerns
-
-### Example: Using CQRS with Outcome
+Register the mediator with your dependency injection container:
 
 ```csharp
-// Define a command with an Outcome result
+// Program.cs
+services.AddBbQMediator(
+    typeof(CreateUserCommandHandler).Assembly,  // Your handlers assembly
+    typeof(Program).Assembly  // Or current assembly if handlers are local
+);
+```
+
+The `AddBbQMediator()` method automatically:
+1. Registers `IMediator` as a singleton
+2. Scans assemblies for all `IRequestHandler<,>` implementations
+3. Registers handlers with scoped lifetime
+4. Registers the built-in `LoggingBehavior` as the outermost pipeline behavior
+
+### Core Components
+
+- **`IMediator`**: The central dispatcher for sending commands and queries through the pipeline
+- **`IRequest<TResponse>`**: Base marker for all requests (implemented by `ICommand<>` and `IQuery<>`)
+- **`ICommand<TResponse>`**: Marker for state-modifying operations (create, update, delete)
+- **`IQuery<TResponse>`**: Marker for read-only operations (should be idempotent)
+- **`IRequestHandler<TRequest, TResponse>`**: Handles a specific request and produces a response
+- **`IPipelineBehavior<TRequest, TResponse>`**: Cross-cutting concern middleware (logging, validation, caching, etc.)
+
+### Detailed Example: Creating a Domain with CQRS + Outcome
+
+#### 1. Define Error Codes with Source Generator
+
+```csharp
+[QbqOutcome]
+public enum UserErrorCode
+{
+    [System.ComponentModel.Description("Email is already in use")]
+    [ErrorSeverity(ErrorSeverity.Validation)]
+    EmailAlreadyExists,
+
+    [System.ComponentModel.Description("User not found")]
+    [ErrorSeverity(ErrorSeverity.Error)]
+    NotFound,
+
+    [System.ComponentModel.Description("Invalid email format")]
+    [ErrorSeverity(ErrorSeverity.Validation)]
+    InvalidEmail,
+
+    [System.ComponentModel.Description("Internal server error")]
+    [ErrorSeverity(ErrorSeverity.Critical)]
+    InternalError
+}
+```
+
+#### 2. Define Commands and Queries
+
+```csharp
+// Commands (state-modifying operations)
 public class CreateUserCommand : ICommand<Outcome<User>>
 {
     public string Email { get; set; }
     public string Name { get; set; }
 }
 
-// Define an error enum for the domain
-[QbqOutcome]
-public enum UserErrorCode
+public class UpdateUserCommand : ICommand<Outcome<User>>
 {
-    [Description("Email is already in use")]
-    [ErrorSeverity(ErrorSeverity.Validation)]
-    EmailAlreadyExists,
-
-    [Description("Invalid email format")]
-    [ErrorSeverity(ErrorSeverity.Validation)]
-    InvalidEmail
+    public Guid UserId { get; set; }
+    public string Name { get; set; }
 }
 
-// Implement the handler
-public class CreateUserCommandHandler : ICommand<CreateUserCommand, Outcome<User>>
+public class DeleteUserCommand : ICommand<Outcome<Unit>>
+{
+    public Guid UserId { get; set; }
+}
+
+// Queries (read-only operations)
+public class GetUserByIdQuery : IQuery<Outcome<User>>
+{
+    public Guid UserId { get; set; }
+}
+
+public class GetAllUsersQuery : IQuery<IEnumerable<User>>
+{
+}
+```
+
+#### 3. Implement Handlers
+
+```csharp
+// Command Handler
+public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, Outcome<User>>
 {
     private readonly IUserRepository _repository;
     private readonly IValidator<CreateUserCommand> _validator;
 
-    public async Task<Outcome<User>> Handle(CreateUserCommand request, CancellationToken cancellationToken)
+    public CreateUserCommandHandler(
+        IUserRepository repository,
+        IValidator<CreateUserCommand> validator)
     {
-        // Validation using pipeline behavior
-        var user = new User { Email = request.Email, Name = request.Name };
-        
-        if (await _repository.ExistsByEmailAsync(user.Email, cancellationToken))
+        _repository = repository;
+        _validator = validator;
+    }
+
+    public async Task<Outcome<User>> Handle(CreateUserCommand request, CancellationToken ct)
+    {
+        // Validate the request
+        var validationResult = await _validator.ValidateAsync(request, ct);
+        if (!validationResult.IsValid)
+        {
+            return UserErrorCodeErrors.InvalidEmailError.ToOutcome<User>();
+        }
+
+        // Check if email already exists
+        if (await _repository.ExistsByEmailAsync(request.Email, ct))
         {
             return UserErrorCodeErrors.EmailAlreadyExistsError.ToOutcome<User>();
         }
 
-        await _repository.AddAsync(user, cancellationToken);
-        return Outcome<User>.From(user);
+        // Create and persist the user
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Email = request.Email,
+            Name = request.Name,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        try
+        {
+            await _repository.AddAsync(user, ct);
+            return Outcome<User>.From(user);
+        }
+        catch (Exception ex)
+        {
+            // Log exception...
+            return UserErrorCodeErrors.InternalErrorError.ToOutcome<User>();
+        }
     }
 }
 
-// Use the mediator
-var command = new CreateUserCommand { Email = "user@example.com", Name = "John Doe" };
-var outcome = await mediator.Send(command);
+// Query Handler
+public class GetUserByIdQueryHandler : IRequestHandler<GetUserByIdQuery, Outcome<User>>
+{
+    private readonly IUserRepository _repository;
 
-var (success, user, errors) = outcome;
-if (success)
-{
-    Console.WriteLine($"User created: {user.Name}");
-}
-else
-{
-    Console.WriteLine($"Failed: {string.Join("; ", errors.Select(e => e.Description))}");
+    public GetUserByIdQueryHandler(IUserRepository repository)
+    {
+        _repository = repository;
+    }
+
+    public async Task<Outcome<User>> Handle(GetUserByIdQuery request, CancellationToken ct)
+    {
+        var user = await _repository.GetByIdAsync(request.UserId, ct);
+        
+        if (user == null)
+        {
+            return UserErrorCodeErrors.NotFoundError.ToOutcome<User>();
+        }
+
+        return Outcome<User>.From(user);
+    }
 }
 ```
 
-### Pipeline Behaviors
-
-Extend command processing with custom behaviors:
+#### 4. Use in Your Application
 
 ```csharp
-public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+[ApiController]
+[Route("api/[controller]")]
+public class UsersController : ControllerBase
 {
-    private readonly ILogger<LoggingBehavior<TRequest, TResponse>> _logger;
+    private readonly IMediator _mediator;
 
-    public async Task<TResponse> Handle(TRequest request, Func<Task<TResponse>> next)
+    public UsersController(IMediator mediator)
     {
-        _logger.LogInformation("Processing {RequestType}", typeof(TRequest).Name);
-        var result = await next();
-        _logger.LogInformation("Completed {RequestType}", typeof(TRequest).Name);
+        _mediator = mediator;
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> CreateUser(CreateUserRequest request, CancellationToken ct)
+    {
+        var command = new CreateUserCommand 
+        { 
+            Email = request.Email, 
+            Name = request.Name 
+        };
+
+        var result = await _mediator.Send(command, ct);
+
+        return result.Match(
+            onSuccess: user => CreatedAtAction(nameof(GetUser), new { id = user.Id }, user),
+            onError: errors => BadRequest(new 
+            { 
+                errors = errors.Select(e => new { e.Code, e.Description, e.Severity })
+            })
+        );
+    }
+
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetUser(Guid id, CancellationToken ct)
+    {
+        var query = new GetUserByIdQuery { UserId = id };
+        var result = await _mediator.Send(query, ct);
+
+        return result.Match(
+            onSuccess: user => Ok(user),
+            onError: errors => NotFound(new { errors })
+        );
+    }
+}
+```
+
+### Creating Custom Pipeline Behaviors
+
+Pipeline behaviors wrap handlers to implement cross-cutting concerns. They execute in registration order (first registered = outermost).
+
+#### Validation Behavior
+
+```csharp
+public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : IRequest<TResponse>
+{
+    private readonly IValidator<TRequest> _validator;
+
+    public ValidationBehavior(IValidator<TRequest> validator)
+    {
+        _validator = validator;
+    }
+
+    public async Task<TResponse> Handle(
+        TRequest request,
+        CancellationToken ct,
+        Func<TRequest, CancellationToken, Task<TResponse>> next)
+    {
+        var validationResult = await _validator.ValidateAsync(request, ct);
+        if (!validationResult.IsValid)
+        {
+            // If TResponse is Outcome<T>, convert validation errors
+            if (typeof(TResponse).IsGenericType && 
+                typeof(TResponse).GetGenericTypeDefinition().Name.Contains("Outcome"))
+            {
+                // Throw or return error outcome
+                throw new ValidationException(validationResult.Errors);
+            }
+        }
+
+        return await next(request, ct);
+    }
+}
+
+// Register it
+services.AddBbQMediator(typeof(Program).Assembly);
+services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+```
+
+#### Caching Behavior for Queries
+
+```csharp
+public class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : IRequest<TResponse>, ICacheable
+{
+    private readonly IMemoryCache _cache;
+
+    public CachingBehavior(IMemoryCache cache)
+    {
+        _cache = cache;
+    }
+
+    public async Task<TResponse> Handle(
+        TRequest request,
+        CancellationToken ct,
+        Func<TRequest, CancellationToken, Task<TResponse>> next)
+    {
+        var cacheKey = $"{typeof(TRequest).Name}_{request.GetCacheKey()}".ToLowerInvariant();
+
+        if (_cache.TryGetValue(cacheKey, out TResponse cachedResult))
+        {
+            return cachedResult;
+        }
+
+        var result = await next(request, ct);
+        _cache.Set(cacheKey, result, TimeSpan.FromMinutes(5));
         return result;
     }
 }
 
-public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-    where TRequest : IValidatable
+// Mark queries as cacheable
+public class GetUserByIdQuery : IQuery<Outcome<User>>, ICacheable
 {
-    private readonly IValidator<TRequest> _validator;
+    public Guid UserId { get; set; }
+    public string GetCacheKey() => UserId.ToString();
+}
+```
 
-    public async Task<TResponse> Handle(TRequest request, Func<Task<TResponse>> next)
+#### Performance Monitoring Behavior
+
+```csharp
+public class PerformanceBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : IRequest<TResponse>
+{
+    private readonly ILogger<PerformanceBehavior<TRequest, TResponse>> _logger;
+
+    public PerformanceBehavior(ILogger<PerformanceBehavior<TRequest, TResponse>> logger)
     {
-        var validationResult = await _validator.ValidateAsync(request);
-        if (!validationResult.IsValid)
+        _logger = logger;
+    }
+
+    public async Task<TResponse> Handle(
+        TRequest request,
+        CancellationToken ct,
+        Func<TRequest, CancellationToken, Task<TResponse>> next)
+    {
+        var timer = Stopwatch.StartNew();
+        var response = await next(request, ct);
+        timer.Stop();
+
+        if (timer.ElapsedMilliseconds > 1000)
         {
-            // Return validation errors as Outcome
-            var errors = validationResult.Errors
-                .Select(e => new { e.PropertyName, e.ErrorMessage })
-                .ToList();
-            // Handle as appropriate for your application
+            _logger.LogWarning(
+                "Long-running request: {RequestType} took {ElapsedMilliseconds}ms",
+                typeof(TRequest).Name,
+                timer.ElapsedMilliseconds);
         }
-        return await next();
+
+        return response;
     }
 }
 ```
 
-### Dependency Injection
+### Behavior Registration Order (Execution Order)
 
-Register CQRS in your service collection:
+The order you register behaviors determines their execution order. **First registered = outermost = executes first**:
 
 ```csharp
-services.AddCqrs();
-services.AddPipelineBehavior<LoggingBehavior<,>>();
-services.AddPipelineBehavior<ValidationBehavior<,>>();
+services.AddBbQMediator(typeof(Program).Assembly);
+
+// These execute in this order:
+services.AddScoped(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));      // 1st (outermost)
+services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));   // 2nd
+services.AddScoped(typeof(IPipelineBehavior<,>), typeof(PerformanceBehavior<,>));  // 3rd
+services.AddScoped(typeof(IPipelineBehavior<,>), typeof(CachingBehavior<,>));      // 4th (innermost)
+// Then the handler executes at the terminal
+```
+
+This execution flow means:
+- Logging wraps everything
+- Validation happens before performance checks
+- Caching prevents handler execution if hit
+- Handler is the innermost
+
+### Unit Testing with CQRS
+
+Use `TestMediator` and `StubHandler` for isolated handler testing:
+
+```csharp
+[TestFixture]
+public class CreateUserCommandHandlerTests
+{
+    private Mock<IUserRepository> _mockRepository;
+    private Mock<IValidator<CreateUserCommand>> _mockValidator;
+    private CreateUserCommandHandler _handler;
+
+    [SetUp]
+    public void Setup()
+    {
+        _mockRepository = new Mock<IUserRepository>();
+        _mockValidator = new Mock<IValidator<CreateUserCommand>>();
+        _handler = new CreateUserCommandHandler(_mockRepository.Object, _mockValidator.Object);
+    }
+
+    [Test]
+    public async Task Handle_WithValidRequest_CreatesUser()
+    {
+        // Arrange
+        var command = new CreateUserCommand { Email = "test@example.com", Name = "Test" };
+        var validationResult = new ValidationResult(); // Valid
+        _mockValidator
+            .Setup(x => x.ValidateAsync(command, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(validationResult);
+
+        // Act
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        Assert.That(result.IsSuccess, Is.True);
+        _mockRepository.Verify(r => r.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Test]
+    public async Task Handle_WithExistingEmail_ReturnsError()
+    {
+        // Arrange
+        var command = new CreateUserCommand { Email = "existing@example.com", Name = "Test" };
+        _mockRepository
+            .Setup(r => r.ExistsByEmailAsync(command.Email, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        // Act
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        Assert.That(result.IsError, Is.True);
+        Assert.That(result.Errors.First().Code, Is.EqualTo(UserErrorCode.EmailAlreadyExists));
+    }
+}
+
+[TestFixture]
+public class ValidationBehaviorTests
+{
+    [Test]
+    public async Task Handle_WithInvalidRequest_ShortCircuits()
+    {
+        // Arrange
+        var request = new CreateUserCommand { Email = "invalid" };
+        var handler = new StubHandler<CreateUserCommand, Outcome<User>>(
+            async (req, ct) => throw new InvalidOperationException("Handler should not be called")
+        );
+
+        var mockValidator = new Mock<IValidator<CreateUserCommand>>();
+        mockValidator
+            .Setup(v => v.ValidateAsync(request, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ValidationResult(new[] { new ValidationFailure("Email", "Invalid") }));
+
+        var behavior = new ValidationBehavior<CreateUserCommand, Outcome<User>>(mockValidator.Object);
+        var mediator = new TestMediator<CreateUserCommand, Outcome<User>>(handler, new[] { behavior });
+
+        // Act & Assert
+        Assert.ThrowsAsync<ValidationException>(async () => 
+            await mediator.Send(request, CancellationToken.None)
+        );
+    }
+}
 ```
 
 ### Benefits
 
-- **Separation of Concerns**: Clear distinction between commands (write operations) and queries (read operations)
-- **Composability**: Chain multiple behaviors for logging, validation, caching, etc.
-- **Type Safety**: Strongly-typed request/response handling
-- **Testability**: Easy to mock and test individual handlers and behaviors
-- **Error Handling**: Seamless integration with `Outcome` for comprehensive error management
+- **Separation of Concerns**: Clean distinction between commands (writes) and queries (reads)
+- **Composability**: Stack multiple behaviors for logging, validation, caching, authorization, etc.
+- **Type Safety**: Compile-time type checking throughout the pipeline
+- **Testability**: Easy to test handlers in isolation with `TestMediator` and `StubHandler`
+- **Error Handling**: Seamless integration with `Outcome<T>` for comprehensive error management
+- **Extensibility**: Add custom behaviors without modifying existing code
+- **Performance**: Built-in performance monitoring and caching capabilities
+- **Documentation**: Comprehensive XML documentation on all interfaces and classes
 
 ---
