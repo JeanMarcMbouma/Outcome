@@ -94,5 +94,15 @@ namespace BbQ.Outcome.Tests
             Assert.That(outcome.IsSuccess, Is.False);
             Assert.That(state, Is.EqualTo(0));
         }
+
+        [Test]
+        public void SourceGenerator_ShouldUseCustomDescriptionWhenSpecified()
+        {
+            // Arrange & Act
+            var validationError = TestErrorCodeErrors.ValidationErrorError;
+            
+            // Assert - should use the specified severity from the attribute
+            Assert.That(validationError.Description, Is.EqualTo("A validation error occurred."));
+        }
     }
 }

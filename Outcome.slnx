@@ -1,4 +1,8 @@
 <Solution>
+  <Folder Name="/CQRS/">
+    <Project Path="src/BbQ.Cqrs/BbQ.Cqrs.csproj" Id="d8fb3d6e-fb6c-45bf-baf1-a158981e15ec" />
+    <Project Path="src/BqQ.Cqrs.Samples/BqQ.Cqrs.Samples.csproj" Id="6910d174-aec7-41da-bdd1-33675adcc14d" />
+  </Folder>
   <Project Path="src/Outcome.SourceGenerators/Outcome.SourceGenerators.csproj" />
   <Project Path="src/Outcome.Tests/Outcome.Tests.csproj" />
   <Project Path="src/Outcome/Outcome.csproj" />

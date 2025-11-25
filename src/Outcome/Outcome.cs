@@ -8,7 +8,7 @@
     /// to construct a failure outcome. The <see cref="IsSuccess"/> property indicates which case you're in.
     /// </summary>
     /// <typeparam name="T">The type of the successful value.</typeparam>
-    public readonly struct Outcome<T>
+    public readonly struct Outcome<T> : IOutcome<T>
     {
         private readonly T? _value;
         private readonly IReadOnlyList<object?> _errors;
