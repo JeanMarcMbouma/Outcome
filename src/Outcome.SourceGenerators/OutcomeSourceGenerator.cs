@@ -187,7 +187,7 @@ namespace BbQ.Outcome.SourceGenerators
                 {
                     var text = trivia.ToString();
                     // Simple extraction: look for summary tags
-                    var lines = text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+                    var lines = text.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
                     var summaryLines = new List<string>();
                     var inSummary = false;
 

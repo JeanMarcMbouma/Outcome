@@ -66,7 +66,7 @@ public sealed class TestMediator<TRequest, TResponse>
         IEnumerable<BbQ.Cqrs.IPipelineBehavior<TRequest, TResponse>> behaviors)
     {
         _handler = handler;
-        _behaviors = behaviors ?? Enumerable.Empty<BbQ.Cqrs.IPipelineBehavior<TRequest, TResponse>>();
+        _behaviors = behaviors ?? [];
     }
 
     /// <summary>

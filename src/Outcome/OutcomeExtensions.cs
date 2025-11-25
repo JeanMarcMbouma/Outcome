@@ -329,7 +329,7 @@ namespace BbQ.Outcome
             public IEnumerable<Error<TCode>> GetErrors<TCode>()
             {
                 if (outcome.IsSuccess)
-                    return Enumerable.Empty<Error<TCode>>();
+                    return [];
 
                 return outcome.Errors.OfType<Error<TCode>>();
             }
