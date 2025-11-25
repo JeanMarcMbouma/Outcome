@@ -84,7 +84,7 @@ namespace BbQ.Outcome.Tests
             // Arrange & Act
             var validationError = TestErrorCodeErrors.ValidationErrorError;
             var internalError = TestErrorCodeErrors.InternalErrorError;
-            var outcome = internalError.ToOutcome<int>();
+            var outcome = Outcome<int>.FromError(internalError);
 
             int state = outcome.Match(
                 onSuccess: _ => 1,

@@ -14,13 +14,13 @@ public sealed class RenameUserHandler
         var (found, id, name) = await _repo.FindAsync(request.Id, ct);
         if (!found)
         {
-            return new Error<AppError>(AppError.UserNotFound, $"User '{request.Id}' not found").ToOutcome<Unit>();
+            return Outcome<Unit>.FromError(new Error<AppError>(AppError.UserNotFound, $"User '{request.Id}' not found"));
         }
 
         var trimmed = request.NewName?.Trim();
         if (string.IsNullOrWhiteSpace(trimmed))
         {
-            return new Error<AppError>(AppError.InvalidName, "New name must be non-empty").ToOutcome<Unit>();
+            return Outcome<Unit>.FromError(new Error<AppError>(AppError.InvalidName, "New name must be non-empty"));
         }
 
         await _repo.SaveAsync((id, trimmed!), ct);

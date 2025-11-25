@@ -8,6 +8,21 @@ public interface IRequestValidator<TRequest>
     Task<(bool IsValid, string Description)> ValidateAsync(TRequest request, CancellationToken ct);
 }
 
+
+public sealed class RenameUserValidator : IRequestValidator<RenameUser>
+{
+    public Task<(bool IsValid, string Description)> ValidateAsync(RenameUser request, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.NewName))
+            return Task.FromResult((false, "New name must be non-empty"));
+
+        if (request.NewName.Length > 50)
+            return Task.FromResult((false, "New name must be at most 50 characters"));
+
+        return Task.FromResult((true, string.Empty));
+    }
+}
+
 public sealed class ValidationBehavior<TRequest, TResponse, TPayload>
     : IPipelineBehavior<TRequest, TResponse>
     where TRequest : IRequest<TResponse>
@@ -26,7 +41,7 @@ public sealed class ValidationBehavior<TRequest, TResponse, TPayload>
         if (!result.IsValid)
         {
             // Construct Outcome<TPayload> failure directly with your API (no reflection)
-            var failure = new Error<AppError>(AppError.InvalidName, result.Description).ToOutcome<TPayload>() as IOutcome<TPayload>;
+            var failure = Outcome<TPayload>.FromError(new Error<AppError>(AppError.InvalidName, result.Description)) as IOutcome<TPayload>;
             return (TResponse)failure;
         }
 

@@ -10,6 +10,7 @@ namespace BbQ.Outcome
     /// - Combine: Aggregating multiple outcomes
     /// - Async variants (MapAsync, BindAsync, CombineAsync) for async workflows
     /// - Error constructors: Convenience methods for creating error outcomes
+    /// - Strongly-typed error access: Methods to retrieve errors as specific types
     /// </summary>
     public static class OutcomeExtensions
     {
