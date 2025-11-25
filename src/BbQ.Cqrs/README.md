@@ -1,8 +1,8 @@
-# BbQ.Cqrs
+﻿# BbQ.Cqrs
 
 A lightweight, extensible CQRS (Command Query Responsibility Segregation) implementation that integrates seamlessly with `Outcome` for comprehensive error handling.
 
-## ? Features
+## ✨ Features
 
 - **Type-safe mediator** for commands and queries with compile-time checking
 - **Pipeline behaviors** for cross-cutting concerns (logging, validation, caching)
@@ -11,13 +11,13 @@ A lightweight, extensible CQRS (Command Query Responsibility Segregation) implem
 - **Comprehensive documentation** on all interfaces and classes with XML comments
 - **Seamless integration** with `Outcome<T>` for advanced error management
 
-## ?? Installation
+## 💾 Installation
 
 ```bash
 dotnet add package BbQ.Cqrs
 ```
 
-## ?? Quick Start
+## 🚀 Quick Start
 
 ### 1. Register the Mediator
 
@@ -108,7 +108,7 @@ public class UsersController : ControllerBase
 
 ---
 
-## ?? Core Components
+## 🧩 Core Components
 
 ### IMediator
 The central dispatcher for sending commands and queries through the pipeline.
@@ -176,7 +176,7 @@ public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
 
 ---
 
-## ?? Error Handling with Outcome
+## 🔁 Error Handling with Outcome
 
 Define error codes with the source generator:
 
@@ -219,7 +219,7 @@ public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, Outco
 
 ---
 
-## ?? Pipeline Behaviors
+## 🧭 Pipeline Behaviors
 
 Behaviors execute in registration order: **first registered = outermost = executes first**.
 
@@ -339,7 +339,7 @@ services.AddScoped(typeof(IPipelineBehavior<,>), typeof(CachingBehavior<,>));   
 
 ---
 
-## ?? Unit Testing
+## 🧪 Unit Testing
 
 Use `TestMediator` and `StubHandler` for isolated handler testing:
 
@@ -412,7 +412,7 @@ public class ValidationBehaviorTests
 
 ---
 
-## ?? Integration with Outcome
+## 🔗 Integration with Outcome
 
 Commands and queries typically return `Outcome<T>` for comprehensive error handling:
 
@@ -442,7 +442,7 @@ public class GetUserByIdQueryHandler : IRequestHandler<GetUserByIdQuery, Outcome
 
 ---
 
-## ?? Learn More
+## 📚 Learn More
 
 - [BbQ.Outcome Documentation](../Outcome/README.md) - Functional error handling
 - [Strongly Typed Errors Guide](../../STRONGLY_TYPED_ERRORS.md) - Best practices

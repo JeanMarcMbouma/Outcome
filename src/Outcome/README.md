@@ -1,9 +1,9 @@
-# Outcome
+﻿# Outcome
 
 A modern C# functional result type inspired by [ErrorOr](https://github.com/amantinband/error-or).  
-It builds on the excellent foundation of ErrorOr by adding **async workflows, LINQ query syntax, deconstruction, Source Link, and multi-targeting** � making error-aware programming feel like a first-class citizen in modern .NET.
+It builds on the excellent foundation of ErrorOr by adding **async workflows, LINQ query syntax, deconstruction, Source Link, and multi-targeting** — making error-aware programming feel like a first-class citizen in modern .NET.
 
-## ? Why Outcome?
+## ❓ Why Outcome?
 
 ErrorOr pioneered the idea of replacing exceptions with a discriminated union of either a value or errors.  
 Outcome takes this idea further:
@@ -17,7 +17,7 @@ Outcome takes this idea further:
 - **Source Link enabled**: Step directly into source when debugging NuGet packages.
 - **Source generator support**: Auto-generate `Error<T>` helper properties from enums with the `[QbqOutcome]` attribute.
 
-## ?? Example
+## 💡 Example
 
 ```csharp
 var query =
@@ -34,12 +34,12 @@ Console.WriteLine(ok
 Output:
 > Result: 10
 
-## ?? Installation
+## 💾 Installation
 ```
 dotnet add package BbQ.Outcome
 ```
 
-## ?? Source Generator: Error Helper Properties
+## 🧩 Source Generator: Error Helper Properties
 
 The `[QbqOutcome]` attribute enables automatic generation of `Error<TCode>` helper properties for enums. This eliminates boilerplate and keeps error definitions DRY.
 
@@ -214,7 +214,7 @@ The `ErrorSeverity` enum provides the following levels:
 
 ---
 
-## ?? Common Patterns
+## 🔁 Common Patterns
 
 ### Async Pipelines with Bind
 
@@ -268,7 +268,7 @@ else
 
 ---
 
-## ?? Integration with CQRS
+## 🔗 Integration with CQRS
 
 When using **BbQ.Cqrs**, combine Outcome with commands and queries for comprehensive error handling:
 
@@ -305,7 +305,7 @@ public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, Outco
 
 ---
 
-## ?? Learn More
+## 📚 Learn More
 
 - [Strongly Typed Errors Guide](../../STRONGLY_TYPED_ERRORS.md) - Best practices for error handling
 - [BbQ.Cqrs Documentation](../BbQ.Cqrs/README.md) - Using Outcome with CQRS
