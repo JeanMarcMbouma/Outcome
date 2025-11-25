@@ -17,7 +17,7 @@ A modern C# functional result type for error-aware programming.
 dotnet add package BbQ.Outcome
 ```
 
-[?? Full Documentation ?](./src/Outcome/README.md)
+[?? Full Documentation ??](./src/Outcome/README.md)
 
 ### [BbQ.Cqrs](./src/BbQ.Cqrs/README.md)
 A lightweight, extensible CQRS implementation that integrates seamlessly with Outcome.
@@ -32,7 +32,7 @@ A lightweight, extensible CQRS implementation that integrates seamlessly with Ou
 dotnet add package BbQ.Cqrs
 ```
 
-[?? Full Documentation ?](./src/BbQ.Cqrs/README.md)
+[?? Full Documentation ??](./src/BbQ.Cqrs/README.md)
 
 ## ?? Quick Start
 
@@ -123,7 +123,7 @@ public class GetUserQueryHandler : IRequestHandler<GetUserQuery, Outcome<User>>
 }
 ```
 
-## ?? Key Features
+## ? Key Features
 
 | Feature | Outcome | CQRS |
 |---------|---------|------|
