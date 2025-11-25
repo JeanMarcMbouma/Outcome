@@ -22,5 +22,7 @@ static class Program
         var (ok, _, errors) = outcome;
         Debug.Assert(!ok);
         Debug.Assert(errors!.OfType<Error<AppError>>().Any(e => e.Code == AppError.Transient));
+
+        Console.WriteLine($"Errors: {string.Join(", ", errors!.Select(e => e))}");
     }
 }

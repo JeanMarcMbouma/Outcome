@@ -119,10 +119,10 @@ namespace BbQ.Outcome.SourceGenerators
                     sb.AppendLine($"        /// Creates an Error for the {memberName} enum value.");
                     sb.AppendLine($"        /// </summary>");
                     sb.AppendLine($"        public static Error<{enumName}> {propertyName} =>");
-                    sb.AppendLine($"            new(");
-                    sb.AppendLine($"                {enumName}.{memberName},");
-                    sb.AppendLine($"                \"{description}\",");
-                    sb.AppendLine($"                ErrorSeverity.{severity}");
+                    sb.AppendLine($"            new Error<{enumName}>(");
+                    sb.AppendLine($"                Code: {enumName}.{memberName},");
+                    sb.AppendLine($"                Description: \"{description}\",");
+                    sb.AppendLine($"                Severity: ErrorSeverity.{severity}");
                     sb.AppendLine($"            );");
                     sb.AppendLine();
                 }
@@ -154,7 +154,32 @@ namespace BbQ.Outcome.SourceGenerators
 
         private static string ExtractDescription(EnumMemberDeclarationSyntax member)
         {
-            // Try to extract description from XML documentation
+            // First, try to extract description from [Description] attribute
+            foreach (var attributeList in member.AttributeLists)
+            {
+                foreach (var attribute in attributeList.Attributes)
+                {
+                    var attributeName = GetAttributeName(attribute);
+                    if (attributeName == "Description" || attributeName == "DescriptionAttribute")
+                    {
+                        // Try to extract the description value from the attribute argument
+                        if (attribute.ArgumentList?.Arguments.Count > 0)
+                        {
+                            var arg = attribute.ArgumentList.Arguments[0];
+                            var argText = arg.Expression.ToString();
+                            
+                            // Remove quotes if it's a string literal
+                            if (argText.StartsWith("\"") && argText.EndsWith("\""))
+                            {
+                                return argText.Substring(1, argText.Length - 2);
+                            }
+                            return argText;
+                        }
+                    }
+                }
+            }
+
+            // Fall back to extracting description from XML documentation
             var leadingTrivia = member.GetLeadingTrivia();
             foreach (var trivia in leadingTrivia)
             {
@@ -190,7 +215,15 @@ namespace BbQ.Outcome.SourceGenerators
 
                     if (summaryLines.Count > 0)
                     {
-                        return string.Join(" ", summaryLines).Trim();
+                        var description = string.Join(" ", summaryLines).Trim();
+                        // Escape special characters for C# string literals
+                        description = description
+                            .Replace("\\", "\\\\")
+                            .Replace("\"", "\\\"")
+                            .Replace("\r", "\\r")
+                            .Replace("\n", "\\n")
+                            .Replace("\t", "\\t");
+                        return description;
                     }
                 }
             }

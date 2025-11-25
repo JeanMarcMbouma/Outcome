@@ -15,6 +15,7 @@ namespace BbQ.Outcome.Tests
         /// A validation error occurred.
         /// </summary>
         [ErrorSeverity(ErrorSeverity.Validation)]
+        [System.ComponentModel.Description("A validation error occurred.")]
         ValidationError,
 
         /// <summary>
