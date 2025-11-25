@@ -1,4 +1,5 @@
 ﻿using BbQ.Outcome;
+using System.ComponentModel;
 
 namespace BbQ.CQRS.Samples;
 
@@ -15,5 +16,6 @@ public enum AppError
     /// A transient error that may succeed if retried
     /// </summary>
     [ErrorSeverity(ErrorSeverity.Error)]
+    [Description("A transient error that may succeed if retried")]
     Transient
 }
