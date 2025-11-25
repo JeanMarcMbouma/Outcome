@@ -438,19 +438,6 @@ public class GetUserByIdQueryHandler : IRequestHandler<GetUserByIdQuery, Outcome
         return Outcome<User>.From(user);
     }
 }
-
-// In controller
-[HttpGet("{id}")]
-public async Task<IActionResult> GetUser(Guid id, CancellationToken ct)
-{
-    var query = new GetUserByIdQuery { UserId = id };
-    var result = await _mediator.Send(query, ct);
-
-    return result.Match(
-        onSuccess: user => Ok(user),
-        onError: errors => NotFound(new { errors })
-    );
-}
 ```
 
 ---

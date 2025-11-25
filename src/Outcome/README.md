@@ -193,7 +193,7 @@ The `ErrorSeverity` enum provides the following levels:
 
 ### Benefits
 
-- **Zero boilerplate**: No manual `Error<TCode>` construction.
+- **Zero boilerplate**: No manual `Error<T>` construction.
 - **Documentation-driven**: Descriptions are extracted from XML doc comments (`<summary>` tags) or `[Description]` attributes.
 - **Flexibility**: Choose between explicit `[Description]` attributes or self-documenting XML comments.
 - **Severity control**: Customize error severity per enum member with `[ErrorSeverity(...)]`.
@@ -302,8 +302,6 @@ public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, Outco
     }
 }
 ```
-
-See [BbQ.Cqrs documentation](../BbQ.Cqrs/README.md) for more details on integration.
 
 ---
 
