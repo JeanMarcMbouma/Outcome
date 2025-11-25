@@ -1,8 +1,8 @@
-# BbQ Libraries - Functional Result Types & CQRS
+﻿# BbQ Libraries - Functional Result Types & CQRS
 
 A comprehensive suite of modern C# libraries for functional error handling and command-query responsibility segregation patterns.
 
-## ?? Packages
+## 📦 Packages
 
 ### [BbQ.Outcome](./src/Outcome/README.md)
 A modern C# functional result type for error-aware programming.
@@ -17,7 +17,7 @@ A modern C# functional result type for error-aware programming.
 dotnet add package BbQ.Outcome
 ```
 
-[?? Full Documentation ??](./src/Outcome/README.md)
+[📖 Full Documentation 📖](./src/Outcome/README.md)
 
 ### [BbQ.Cqrs](./src/BbQ.Cqrs/README.md)
 A lightweight, extensible CQRS implementation that integrates seamlessly with Outcome.
@@ -32,9 +32,9 @@ A lightweight, extensible CQRS implementation that integrates seamlessly with Ou
 dotnet add package BbQ.Cqrs
 ```
 
-[?? Full Documentation ??](./src/BbQ.Cqrs/README.md)
+[📖 Full Documentation 📖](./src/BbQ.Cqrs/README.md)
 
-## ?? Quick Start
+## 🚀 Quick Start
 
 ### Using Outcome
 ```csharp
@@ -80,7 +80,7 @@ services.AddBbQMediator(typeof(Program).Assembly);
 var result = await mediator.Send(new CreateUserCommand { Email = "test@example.com", Name = "Test" });
 ```
 
-## ?? Installation
+## 💾 Installation
 
 ```bash
 # Core error handling
@@ -90,7 +90,7 @@ dotnet add package BbQ.Outcome
 dotnet add package BbQ.Cqrs
 ```
 
-## ?? Integration
+## 🔗 Integration
 
 These libraries work best together:
 
@@ -123,29 +123,29 @@ public class GetUserQueryHandler : IRequestHandler<GetUserQuery, Outcome<User>>
 }
 ```
 
-## ? Key Features
+## ✨ Key Features
 
 | Feature | Outcome | CQRS |
 |---------|---------|------|
-| Structured error handling | ? | ? |
-| Async composition | ? | ? |
-| Source-generated error helpers | ? | ? |
-| LINQ integration | ? | - |
-| Mediator pattern | - | ? |
-| Pipeline behaviors | - | ? |
-| Type-safe commands/queries | - | ? |
-| Test utilities | - | ? |
+| Structured error handling | ✅ | ✅ |
+| Async composition | ✅ | ✅ |
+| Source-generated error helpers | ✅ | ✅ |
+| LINQ integration | ✅ | - |
+| Mediator pattern | - | ✅ |
+| Pipeline behaviors | - | ✅ |
+| Type-safe commands/queries | - | ✅ |
+| Test utilities | - | ✅ |
 
-## ?? Documentation
+## 📚 Documentation
 
 - **[BbQ.Outcome Documentation](./src/Outcome/README.md)** - Complete guide to using Outcome for functional error handling
 - **[BbQ.Cqrs Documentation](./src/BbQ.Cqrs/README.md)** - Complete guide to CQRS pattern implementation
 - **[Strongly Typed Errors Guide](./STRONGLY_TYPED_ERRORS.md)** - Best practices for error handling patterns
 
-## ?? Contributing
+## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-## ?? License
+## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
