@@ -1,0 +1,48 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+
+    <PackageId>BbQ.Cqrs</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Jean</Authors>
+    <Company>JM Mbouma</Company>
+    <Description>A lightweight mediatior implementation.</Description>
+    <PackageTags>cqrs mediator</PackageTags>
+    <RepositoryUrl>https://github.com/JeanMarcMbouma/Outcome</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/JeanMarcMbouma/Outcome</PackageProjectUrl>
+    <RepositoryType>git</RepositoryType>
+    <LicenseExpression>MIT</LicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+
+    <!-- Build settings -->
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>BbQ.Cqrs</RootNamespace>
+
+    <!-- Source Link settings -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Title>BbQ.Cqrs</Title>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.0" />
+    <PackageReference Include="Scrutor" Version="7.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Outcome.SourceGenerators\Outcome.SourceGenerators.csproj"  OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
+    <ProjectReference Include="..\Outcome\Outcome.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Include README in the NuGet package -->
+    <None Include="../../README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+</Project>

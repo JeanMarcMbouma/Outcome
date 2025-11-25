@@ -15,6 +15,7 @@ namespace BbQ.Outcome.Tests
         /// A validation error occurred.
         /// </summary>
         [ErrorSeverity(ErrorSeverity.Validation)]
+        [System.ComponentModel.Description("A validation error occurred.")]
         ValidationError,
 
         /// <summary>
@@ -93,6 +94,16 @@ namespace BbQ.Outcome.Tests
             Assert.That(internalError.Severity, Is.EqualTo(ErrorSeverity.Critical));
             Assert.That(outcome.IsSuccess, Is.False);
             Assert.That(state, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void SourceGenerator_ShouldUseCustomDescriptionWhenSpecified()
+        {
+            // Arrange & Act
+            var validationError = TestErrorCodeErrors.ValidationErrorError;
+            
+            // Assert - should use the specified severity from the attribute
+            Assert.That(validationError.Description, Is.EqualTo("A validation error occurred."));
         }
     }
 }
