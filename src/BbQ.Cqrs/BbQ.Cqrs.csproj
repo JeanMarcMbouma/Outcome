@@ -37,12 +37,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Outcome.SourceGenerators\Outcome.SourceGenerators.csproj"  OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
-    <ProjectReference Include="..\Outcome\Outcome.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
     <!-- Include README in the NuGet package -->
-    <None Include="../../README.md" Pack="true" PackagePath="" />
+    <None Include="README.md" Pack="true" PackagePath="" />
   </ItemGroup>
 </Project>

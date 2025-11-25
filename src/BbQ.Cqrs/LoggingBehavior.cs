@@ -1,5 +1,4 @@
-﻿using BbQ.Outcome;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 
 namespace BbQ.Cqrs;
 
