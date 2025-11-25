@@ -10,6 +10,7 @@ namespace BbQ.Outcome
     /// - Combine: Aggregating multiple outcomes
     /// - Async variants (MapAsync, BindAsync, CombineAsync) for async workflows
     /// - Error constructors: Convenience methods for creating error outcomes
+    /// - Strongly-typed error access: Methods to retrieve errors as specific types
     /// </summary>
     public static class OutcomeExtensions
     {
@@ -296,6 +297,106 @@ namespace BbQ.Outcome
             {
                 var error = new Error<TCode>(code, description, ErrorSeverity.Critical);
                 return Outcome<T>.FromErrors([error]);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Extension methods for accessing strongly-typed errors from <see cref="Outcome{T}"/> instances.
+    /// Provides convenient methods to filter and retrieve errors of a specific type.
+    /// </summary>
+    public static class OutcomeErrorExtensions
+    {
+        extension<T>(Outcome<T> outcome)
+        {
+            /// <summary>
+            /// Gets all errors of a specific type from the outcome.
+            /// Filters the error collection to return only errors matching the specified error code type.
+            /// </summary>
+            /// <typeparam name="T">The outcome's success value type.</typeparam>
+            /// <typeparam name="TCode">The error code type to filter by.</typeparam>
+            /// <param name="outcome">The outcome to extract errors from.</param>
+            /// <returns>An enumerable of strongly-typed errors matching the specified code type.</returns>
+            /// <example>
+            /// <code>
+            /// var appErrors = outcome.GetErrors&lt;Unit, AppError&gt;();
+            /// foreach (var error in appErrors)
+            /// {
+            ///     Console.WriteLine($"Error: {error.Code} - {error.Description}");
+            /// }
+            /// </code>
+            /// </example>
+            public IEnumerable<Error<TCode>> GetErrors<TCode>()
+            {
+                if (outcome.IsSuccess)
+                    return Enumerable.Empty<Error<TCode>>();
+
+                return outcome.Errors.OfType<Error<TCode>>();
+            }
+
+            /// <summary>
+            /// Gets the first error of a specific type from the outcome, or null if none exists.
+            /// Useful for handling a single error from a known type.
+            /// </summary>
+            /// <typeparam name="T">The outcome's success value type.</typeparam>
+            /// <typeparam name="TCode">The error code type to retrieve.</typeparam>
+            /// <param name="outcome">The outcome to extract an error from.</param>
+            /// <returns>The first strongly-typed error, or null if no errors of that type exist.</returns>
+            /// <example>
+            /// <code>
+            /// var error = outcome.GetError&lt;int, AppError&gt;();
+            /// if (error != null)
+            /// {
+            ///     Console.WriteLine($"Error: {error.Code} - {error.Description}");
+            /// }
+            /// </code>
+            /// </example>
+            public Error<TCode>? GetError<TCode>()
+            {
+                return outcome.GetErrors<T, TCode>().FirstOrDefault();
+            }
+
+            /// <summary>
+            /// Checks if the outcome contains any errors of a specific type.
+            /// </summary>
+            /// <typeparam name="T">The outcome's success value type.</typeparam>
+            /// <typeparam name="TCode">The error code type to check for.</typeparam>
+            /// <param name="outcome">The outcome to check.</param>
+            /// <returns>True if the outcome contains at least one error of the specified type; otherwise, false.</returns>
+            /// <example>
+            /// <code>
+            /// if (outcome.HasErrors&lt;Unit, AppError&gt;())
+            /// {
+            ///     var errors = outcome.GetErrors&lt;Unit, AppError&gt;();
+            ///     // Handle errors
+            /// }
+            /// </code>
+            /// </example>
+            public bool HasErrors<TCode>()
+            {
+                return outcome.GetErrors<T, TCode>().Any();
+            }
+
+            /// <summary>
+            /// Gets errors of a specific type that match a predicate condition.
+            /// Useful for filtering errors by code or other properties.
+            /// </summary>
+            /// <typeparam name="T">The outcome's success value type.</typeparam>
+            /// <typeparam name="TCode">The error code type to filter.</typeparam>
+            /// <param name="outcome">The outcome to extract errors from.</param>
+            /// <param name="predicate">A function to filter errors by.</param>
+            /// <returns>An enumerable of strongly-typed errors matching the predicate.</returns>
+            /// <example>
+            /// <code>
+            /// var validationErrors = outcome.GetErrors&lt;int, AppError&gt;(
+            ///     e => e.Severity == ErrorSeverity.Validation
+            /// );
+            /// </code>
+            /// </example>
+            public IEnumerable<Error<TCode>> GetErrors<TCode>(
+                Func<Error<TCode>, bool> predicate)
+            {
+                return outcome.GetErrors<T, TCode>().Where(predicate);
             }
         }
     }

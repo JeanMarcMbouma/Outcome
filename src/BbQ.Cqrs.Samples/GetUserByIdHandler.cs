@@ -14,7 +14,7 @@ public sealed class GetUserByIdHandler
         var (found, id, name) = await _repo.FindAsync(request.Id, ct);
         if (!found)
         {
-           return new Error<AppError>(AppError.UserNotFound, $"User '{request.Id}' not found").ToOutcome<UserDto>();
+           return Outcome<UserDto>.FromError(new Error<AppError>(AppError.UserNotFound, $"User '{request.Id}' not found"));
         }
 
         return new UserDto(id, name);

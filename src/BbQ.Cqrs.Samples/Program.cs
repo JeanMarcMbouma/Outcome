@@ -10,7 +10,7 @@ static class Program
     static async Task Main()
     {
         var handler = new BbQ.Cqrs.Testing.StubHandler<GetUserById, Outcome<UserDto>>(
-        async (req, ct) => AppErrorErrors.TransientError.ToOutcome<UserDto>());
+        async (req, ct) => Outcome<UserDto>.FromError(AppErrorErrors.TransientError));
 
         var retry = new RetryBehavior<GetUserById, Outcome<UserDto>, UserDto>(maxAttempts: 2);
         var mediator = new TestMediator<GetUserById, Outcome<UserDto>>(handler, new[] { retry });

@@ -26,7 +26,7 @@ public sealed class ValidationBehavior<TRequest, TResponse, TPayload>
         if (!result.IsValid)
         {
             // Construct Outcome<TPayload> failure directly with your API (no reflection)
-            var failure = new Error<AppError>(AppError.InvalidName, result.Description).ToOutcome<TPayload>() as IOutcome<TPayload>;
+            var failure = Outcome<TPayload>.FromError(new Error<AppError>(AppError.InvalidName, result.Description)) as IOutcome<TPayload>;
             return (TResponse)failure;
         }
 
