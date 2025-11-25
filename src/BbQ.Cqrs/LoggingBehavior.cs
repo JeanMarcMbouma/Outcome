@@ -2,7 +2,7 @@
 using BbQ.Outcome;
 using Microsoft.Extensions.Logging;
 
-namespace BqQ.Cqrs;
+namespace BbQ.Cqrs;
 
 public sealed class LoggingBehavior<TRequest, TResponse>(ILogger<LoggingBehavior<TRequest, TResponse>> log)
     : IPipelineBehavior<TRequest, TResponse>

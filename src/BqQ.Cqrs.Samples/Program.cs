@@ -3,7 +3,7 @@ using BbQ.Cqrs.Testing;
 using BbQ.Outcome;
 using System.Diagnostics;
 
-namespace BqQ.CQRS.Samples;
+namespace BbQ.CQRS.Samples;
 
 static class Program
 {

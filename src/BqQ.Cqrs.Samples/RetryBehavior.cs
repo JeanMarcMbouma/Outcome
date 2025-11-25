@@ -1,7 +1,7 @@
 ﻿using BbQ.Cqrs;
 using BbQ.Outcome;
 
-namespace BqQ.CQRS.Samples;
+namespace BbQ.CQRS.Samples;
 
 // A retry behavior that only wraps commands and respects transient errors
 public sealed class RetryBehavior<TRequest, TResponse, TPayload>

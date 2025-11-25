@@ -1,7 +1,7 @@
 ﻿using BbQ.Cqrs;
 using BbQ.Outcome;
 
-namespace BqQ.CQRS.Samples;
+namespace BbQ.CQRS.Samples;
 
 public sealed class GetUserByIdHandler
     : IRequestHandler<GetUserById, Outcome<UserDto>>

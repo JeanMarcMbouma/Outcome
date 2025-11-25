@@ -1,4 +1,4 @@
-﻿namespace BqQ.CQRS.Samples;
+﻿namespace BbQ.CQRS.Samples;
 
 // -------------------
 // Example handlers

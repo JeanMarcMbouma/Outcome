@@ -1,7 +1,7 @@
 ﻿// -------------------------------
 // Core contracts (Outcome-centric)
 // -------------------------------
-using BqQ.Cqrs;
+using BbQ.Cqrs;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace BbQ.Cqrs;

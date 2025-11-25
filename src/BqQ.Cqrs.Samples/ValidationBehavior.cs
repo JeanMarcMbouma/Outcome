@@ -1,7 +1,7 @@
 ﻿using BbQ.Cqrs;
 using BbQ.Outcome;
 
-namespace BqQ.CQRS.Samples;
+namespace BbQ.CQRS.Samples;
 
 public interface IRequestValidator<TRequest>
 {

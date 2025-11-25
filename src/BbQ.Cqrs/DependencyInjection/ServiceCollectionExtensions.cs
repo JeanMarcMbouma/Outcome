@@ -1,4 +1,4 @@
-﻿using BqQ.Cqrs;
+﻿using BbQ.Cqrs;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace BbQ.Cqrs.DependencyInjection;

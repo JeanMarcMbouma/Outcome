@@ -2,7 +2,7 @@
 using BbQ.Outcome;
 using Microsoft.Extensions.Logging;
 
-namespace BqQ.CQRS.Samples;
+namespace BbQ.CQRS.Samples;
 
 // -------------------
 // Example behaviors
