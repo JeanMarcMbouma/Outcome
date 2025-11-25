@@ -55,7 +55,7 @@ public sealed class StronglyTypedErrorExample
         // AFTER: Clean, strongly-typed access
         
         // Get all errors of a specific type
-        var appErrors = outcome.GetErrors<string, AppError>();
+        var appErrors = outcome.GetErrors<AppError>();
         Console.WriteLine($"Found {appErrors.Count()} AppError instances");
         
         foreach (var error in appErrors)
@@ -64,20 +64,20 @@ public sealed class StronglyTypedErrorExample
         }
 
         // Get the first error of a type (or null)
-        var firstAppError = outcome.GetError<string, AppError>();
+        var firstAppError = outcome.GetError<AppError>();
         if (firstAppError != null)
         {
             Console.WriteLine($"First AppError: {firstAppError.Code}");
         }
 
         // Check if errors of a type exist
-        if (outcome.HasErrors<string, AppError>())
+        if (outcome.HasErrors<AppError>())
         {
             Console.WriteLine("This outcome contains AppError instances");
         }
 
         // Filter errors by predicate
-        var validationErrors = outcome.GetErrors<string, AppError>(
+        var validationErrors = outcome.GetErrors<AppError>(
             e => e.Severity == ErrorSeverity.Validation || 
                  e.Code == AppError.InvalidName
         );
@@ -88,7 +88,7 @@ public sealed class StronglyTypedErrorExample
             onSuccess: value => $"Success: {value}",
             onError: errors =>
             {
-                var appErrorList = outcome.GetErrors<string, AppError>();
+                var appErrorList = outcome.GetErrors<AppError>();
                 if (appErrorList.Any())
                 {
                     return $"Application errors: {string.Join("; ", appErrorList.Select(e => e.Description))}";

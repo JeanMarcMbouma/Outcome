@@ -16,8 +16,8 @@ namespace BbQ.Outcome.Tests
             var outcome = Outcome<int>.FromErrors([stringError, intError]);
 
             // Act
-            var stringErrors = outcome.GetErrors<int, string>();
-            var intErrors = outcome.GetErrors<int, int>();
+            var stringErrors = outcome.GetErrors<string>();
+            var intErrors = outcome.GetErrors<int>();
 
             // Assert
             Assert.That(stringErrors.Count(), Is.EqualTo(1));
@@ -35,7 +35,7 @@ namespace BbQ.Outcome.Tests
             var outcome = Outcome<int>.FromErrors([error1, error2]);
 
             // Act
-            var retrieved = outcome.GetError<int, string>();
+            var retrieved = outcome.GetError<string>();
 
             // Assert
             Assert.That(retrieved, Is.EqualTo(error1));
@@ -49,7 +49,7 @@ namespace BbQ.Outcome.Tests
             var outcome = Outcome<int>.FromErrors([error]);
 
             // Act
-            var retrieved = outcome.GetError<int, int>();
+            var retrieved = outcome.GetError<int>();
 
             // Assert
             Assert.That(retrieved, Is.Null);
@@ -63,7 +63,7 @@ namespace BbQ.Outcome.Tests
             var outcome = Outcome<int>.FromErrors([error]);
 
             // Act
-            var hasErrors = outcome.HasErrors<int, string>();
+            var hasErrors = outcome.HasErrors<string>();
 
             // Assert
             Assert.That(hasErrors, Is.True);
@@ -77,7 +77,7 @@ namespace BbQ.Outcome.Tests
             var outcome = Outcome<int>.FromErrors([error]);
 
             // Act
-            var hasErrors = outcome.HasErrors<int, int>();
+            var hasErrors = outcome.HasErrors<int>();
 
             // Assert
             Assert.That(hasErrors, Is.False);
@@ -93,7 +93,7 @@ namespace BbQ.Outcome.Tests
             var outcome = Outcome<int>.FromErrors([error1, error2, error3]);
 
             // Act
-            var validationErrors = outcome.GetErrors<int, string>(
+            var validationErrors = outcome.GetErrors<string>(
                 e => e.Severity == ErrorSeverity.Validation
             );
 
@@ -110,7 +110,7 @@ namespace BbQ.Outcome.Tests
             var outcome = Outcome<int>.From(42);
 
             // Act
-            var errors = outcome.GetErrors<int, string>();
+            var errors = outcome.GetErrors<string>();
 
             // Assert
             Assert.That(errors.Count(), Is.EqualTo(0));
@@ -125,8 +125,8 @@ namespace BbQ.Outcome.Tests
             var outcome = Outcome<string>.FromError(appError);
 
             // Act - Easy, strongly-typed access
-            var userErrors = outcome.GetErrors<string, AppError>();
-            var userNotFoundErrors = outcome.GetErrors<string, AppError>(
+            var userErrors = outcome.GetErrors<AppError>();
+            var userNotFoundErrors = outcome.GetErrors<AppError>(
                 e => e.Code == AppError.UserNotFound
             );
 

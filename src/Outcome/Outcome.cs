@@ -87,6 +87,95 @@
         public static implicit operator Outcome<T>(T value) => new(value);
 
         /// <summary>
+        /// Gets all errors of a specific type from the outcome.
+        /// Filters the error collection to return only errors matching the specified error code type.
+        /// </summary>
+        /// <typeparam name="T">The outcome's success value type.</typeparam>
+        /// <typeparam name="TCode">The error code type to filter by.</typeparam>
+        /// <param name="outcome">The outcome to extract errors from.</param>
+        /// <returns>An enumerable of strongly-typed errors matching the specified code type.</returns>
+        /// <example>
+        /// <code>
+        /// var appErrors = outcome.GetErrors&lt;Unit, AppError&gt;();
+        /// foreach (var error in appErrors)
+        /// {
+        ///     Console.WriteLine($"Error: {error.Code} - {error.Description}");
+        /// }
+        /// </code>
+        /// </example>
+        public IEnumerable<Error<TCode>> GetErrors<TCode>()
+        {
+            if (IsSuccess)
+                return [];
+
+            return Errors.OfType<Error<TCode>>();
+        }
+
+        /// <summary>
+        /// Gets the first error of a specific type from the outcome, or null if none exists.
+        /// Useful for handling a single error from a known type.
+        /// </summary>
+        /// <typeparam name="T">The outcome's success value type.</typeparam>
+        /// <typeparam name="TCode">The error code type to retrieve.</typeparam>
+        /// <param name="outcome">The outcome to extract an error from.</param>
+        /// <returns>The first strongly-typed error, or null if no errors of that type exist.</returns>
+        /// <example>
+        /// <code>
+        /// var error = outcome.GetError&lt;int, AppError&gt;();
+        /// if (error != null)
+        /// {
+        ///     Console.WriteLine($"Error: {error.Code} - {error.Description}");
+        /// }
+        /// </code>
+        /// </example>
+        public Error<TCode>? GetError<TCode>()
+        {
+            return GetErrors<TCode>().FirstOrDefault();
+        }
+
+        /// <summary>
+        /// Checks if the outcome contains any errors of a specific type.
+        /// </summary>
+        /// <typeparam name="T">The outcome's success value type.</typeparam>
+        /// <typeparam name="TCode">The error code type to check for.</typeparam>
+        /// <param name="outcome">The outcome to check.</param>
+        /// <returns>True if the outcome contains at least one error of the specified type; otherwise, false.</returns>
+        /// <example>
+        /// <code>
+        /// if (outcome.HasErrors&lt;Unit, AppError&gt;())
+        /// {
+        ///     var errors = outcome.GetErrors&lt;Unit, AppError&gt;();
+        ///     // Handle errors
+        /// }
+        /// </code>
+        /// </example>
+        public bool HasErrors<TCode>()
+        {
+            return GetErrors<TCode>().Any();
+        }
+
+        /// <summary>
+        /// Gets errors of a specific type that match a predicate condition.
+        /// Useful for filtering errors by code or other properties.
+        /// </summary>
+        /// <typeparam name="T">The outcome's success value type.</typeparam>
+        /// <typeparam name="TCode">The error code type to filter.</typeparam>
+        /// <param name="outcome">The outcome to extract errors from.</param>
+        /// <param name="predicate">A function to filter errors by.</param>
+        /// <returns>An enumerable of strongly-typed errors matching the predicate.</returns>
+        /// <example>
+        /// <code>
+        /// var validationErrors = outcome.GetErrors&lt;int, AppError&gt;(
+        ///     e => e.Severity == ErrorSeverity.Validation
+        /// );
+        /// </code>
+        /// </example>
+        public IEnumerable<Error<TCode>> GetErrors<TCode>(
+            Func<Error<TCode>, bool> predicate)
+        {
+            return GetErrors<TCode>().Where(predicate);
+        }
+        /// <summary>
         /// Returns a human-readable string representation of the outcome.
         /// Success outcomes display "Success: {value}"; failure outcomes display "Error: [error1, error2, ...]".
         /// </summary>
