@@ -32,16 +32,21 @@ public interface IMediator
     /// The request is passed through all registered IPipelineBehavior implementations
     /// in registration order, with the handler invoked at the end of the chain.
     /// </remarks>
-    Task<TResponse> Send<TRequest, TResponse>(TRequest request, CancellationToken ct = default)
-        where TRequest : IRequest<TResponse>;
+    Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken ct = default);
 
     /// <summary>
     /// Sends a fire-and-forget request through the pipeline.
     /// </summary>
     /// <remarks>
-    /// The request is passed through all registered IPipelineBehavior implementations
-    /// in registration order, with the handler invoked at the end of the chain.
+    /// The request must implement IRequest (fire-and-forget variant).
+    /// The handler must implement IRequestHandler&lt;TRequest&gt; (single type parameter).
+    /// 
+    /// The request is passed through all registered IPipelineBehavior&lt;TRequest, Unit&gt; 
+    /// implementations in registration order, with the handler invoked at the end of the chain.
+    /// 
+    /// Unlike the generic Send method, this overload does not return a response value.
+    /// It is useful for operations like sending emails, publishing events, or executing 
+    /// commands where the return value is not important.
     /// </remarks>
-    Task Send<TRequest>(TRequest request, CancellationToken ct = default)
-        where TRequest : IRequest;
+    Task Send(IRequest request, CancellationToken ct = default);
 }

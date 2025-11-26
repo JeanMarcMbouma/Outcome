@@ -4,6 +4,7 @@ using BbQ.Cqrs.Testing;
 using BbQ.Outcome;
 using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
+using System.Reflection;
 
 namespace BbQ.CQRS.Samples;
 
@@ -230,9 +231,8 @@ static class Program
 
         // Setup: Create a handler that implements the non-generic IRequestHandler
         var services = new ServiceCollection();
-        services.AddBbQMediator();
+        services.AddBbQMediator(Assembly.GetExecutingAssembly()!);
         services.AddTransient<IUserRepository, FakeUserRepository>();
-        services.AddTransient<IRequestHandler<SendUserNotificationCommand>, SendUserNotificationHandler>();
         services.AddTransient<IUserRepository, FakeUserRepository>();
         services.AddTransient<INotificationService, FakeNotificationService>();
 

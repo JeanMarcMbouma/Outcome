@@ -1,6 +1,7 @@
 ﻿// The core mediator implementation that coordinates the CQRS pipeline
 using BbQ.Cqrs;
 using Microsoft.Extensions.DependencyInjection;
+using System.Collections.Concurrent;
 
 namespace BbQ.Cqrs;
 
@@ -36,6 +37,10 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator
 {
     private readonly IServiceProvider _sp = sp;
 
+    private readonly ConcurrentDictionary<(Type Req, Type Res),
+        Func<object, CancellationToken, Task>> _dispatchCache = new();
+
+
     /// <summary>
     /// Sends a request through the CQRS pipeline and returns a response.
     /// </summary>
@@ -55,29 +60,49 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator
     /// If no handler is registered, GetRequiredService() throws InvalidOperationException.
     /// If no behaviors are registered, the request goes directly to the handler.
     /// </remarks>
-    public Task<TResponse> Send<TRequest, TResponse>(TRequest request, CancellationToken ct = default)
-        where TRequest : IRequest<TResponse>
+    public async Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken ct = default)
     {
         // Resolve strongly-typed handler - throws if not registered
-        var handler = _sp.GetRequiredService<IRequestHandler<TRequest, TResponse>>();
+        var key = (request.GetType(), typeof(TResponse));
 
-        // Resolve all behaviors for this request/response pair in registration order
-        // Microsoft DI preserves registration order
-        var behaviors = _sp.GetServices<IPipelineBehavior<TRequest, TResponse>>();
-
-        // Start with the handler as the terminal of the pipeline
-        Func<TRequest, CancellationToken, Task<TResponse>> terminal =
-            (req, token) => handler.Handle(req, token);
-
-        // Compose behaviors in reverse order so first registered is outermost
-        foreach (var behavior in behaviors.Reverse())
+        var dispatcher = _dispatchCache.GetOrAdd(key, k =>
         {
-            var next = terminal;
-            terminal = (req, token) => behavior.Handle(req, token, next);
-        }
+            var (reqType, resType) = k;
 
-        // Execute the fully composed pipeline
-        return terminal(request, ct);
+            // Resolve handler
+            var handlerType = typeof(IRequestHandler<,>).MakeGenericType(reqType, resType);
+            var handleMethod = handlerType.GetMethod("Handle")!;
+
+            Func<object, CancellationToken, Task<TResponse>> terminal = (req, token) =>
+            {
+                var handler = _sp.GetRequiredService(handlerType);
+                return (Task<TResponse>)handleMethod.Invoke(handler, [req, token])!;
+            };
+
+            // Resolve behaviors (outermost first, wrap inner)
+            var behaviorType = typeof(IPipelineBehavior<,>).MakeGenericType(reqType, resType);
+            var behaviors = _sp.GetServices(behaviorType).Reverse().ToArray();
+
+            Func<object, CancellationToken, Task<TResponse>> pipeline = terminal;
+            foreach (var b in behaviors)
+            {
+                var method = behaviorType.GetMethod("Handle")!;
+                var next = pipeline;
+                pipeline = (req, token) =>
+                    (Task<TResponse>)method.Invoke(b,
+                    [
+                            req,
+                            token,
+                            new Func<object, CancellationToken, Task<TResponse>>(next)
+                    ])!;
+            }
+
+            return pipeline;
+        });
+
+        var resultObj = await (Task<TResponse>)dispatcher(request!, ct);
+        return resultObj;
+
     }
 
     /// <summary>
@@ -89,41 +114,61 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator
     /// <returns>A task that completes when the handler finishes executing</returns>
     /// <remarks>
     /// Process:
-    /// 1. Resolves the handler with GetRequiredService()
-    /// 2. Resolves all behaviors with GetServices()
-    /// 3. Composes behaviors in reverse order with a Unit-returning terminal
+    /// 1. Resolves the handler implementing IRequestHandler&lt;TRequest&gt; (single type parameter)
+    /// 2. Resolves all behaviors as IPipelineBehavior&lt;TRequest, Unit&gt; (Unit as response type)
+    /// 3. Composes behaviors in reverse order with a Task-returning terminal
     /// 4. Invokes the composed pipeline with the request
-    /// 5. Discards the Unit result before returning
+    /// 5. Returns the task without unwrapping any response value
+    /// 
+    /// Important: The handler is resolved as IRequestHandler&lt;TRequest&gt; (fire-and-forget style),
+    /// but behaviors are resolved as IPipelineBehavior&lt;TRequest, Unit&gt; to work with the
+    /// fully generic pipeline infrastructure. The Unit type parameter in behaviors is for framework
+    /// consistency but is not exposed to handlers, which have no return type.
     /// 
     /// This overload is useful for operations that don't need to return a value,
     /// such as sending emails, publishing events, or executing background jobs.
     /// If no handler is registered, GetRequiredService() throws InvalidOperationException.
     /// </remarks>
-    public Task Send<TRequest>(TRequest request, CancellationToken ct = default) where TRequest : IRequest
+    public Task Send(IRequest request, CancellationToken ct = default)
     {
         // Resolve strongly-typed handler - throws if not registered
-        var handler = _sp.GetRequiredService<IRequestHandler<TRequest>>();
+        var key = (request.GetType(), typeof(Unit));
 
-        // Resolve all behaviors for this request/response pair in registration order
-        // Microsoft DI preserves registration order
-        var behaviors = _sp.GetServices<IPipelineBehavior<TRequest, Unit>>();
+        var dispatcher = _dispatchCache.GetOrAdd(key, k =>
+        {
+            var (reqType, resType) = k;
 
-        // Start with the handler as the terminal of the pipeline
-        Func<TRequest, CancellationToken, Task<Unit>> terminal =
-            (req, token) =>
+            // Resolve handler
+            var handlerType = typeof(IRequestHandler<>).MakeGenericType(reqType);
+            var handleMethod = handlerType.GetMethod("Handle")!;
+
+            Func<object, CancellationToken, Task> terminal = (req, token) =>
             {
-                handler.Handle(req, token);
-                return Task.FromResult(Unit.Value);
+                var handler = _sp.GetRequiredService(handlerType);
+                return (Task)handleMethod.Invoke(handler, [req, token])!;
             };
 
-        // Compose behaviors in reverse order so first registered is outermost
-        foreach (var behavior in behaviors.Reverse())
-        {
-            var next = terminal;
-            terminal = (req, token) => behavior.Handle(req, token, next);
-        }
+            // Resolve behaviors (outermost first, wrap inner)
+            var behaviorType = typeof(IPipelineBehavior<,>).MakeGenericType(reqType, resType);
+            var behaviors = _sp.GetServices(behaviorType).Reverse().ToArray();
 
-        // Execute the fully composed pipeline
-        return terminal(request, ct);
+            Func<object, CancellationToken, Task> pipeline = terminal;
+            foreach (var b in behaviors)
+            {
+                var method = behaviorType.GetMethod("Handle")!;
+                var next = pipeline;
+                pipeline = (req, token) =>
+                    (Task)method.Invoke(b,
+                    [
+                            req,
+                            token,
+                            new Func<object, CancellationToken, Task>(next)
+                    ])!;
+            }
+
+            return pipeline;
+        });
+
+        return dispatcher(request!, ct);
     }
 }

@@ -113,9 +113,15 @@ public class UsersController : ControllerBase
 ### IMediator
 The central dispatcher for sending commands and queries through the pipeline.
 
+**Generic Send (with response):**
 ```csharp
-Task<TResponse> Send<TRequest, TResponse>(TRequest request, CancellationToken ct = default)
+Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken ct = default)
     where TRequest : IRequest<TResponse>;
+```
+
+**Fire-and-forget Send (no response):**
+```csharp
+Task Send(IRequest request, CancellationToken ct = default);
 ```
 
 ### ICommand<TResponse>
@@ -138,8 +144,19 @@ public class GetUserByIdQuery : IQuery<Outcome<User>>
 }
 ```
 
+### IRequest (Fire-and-Forget)
+Marker interface for operations that don't return a meaningful value. Useful for notifications, events, or background tasks.
+
+```csharp
+public class SendUserNotificationCommand : IRequest
+{
+    public string UserId { get; set; }
+    public string Message { get; set; }
+}
+```
+
 ### IRequestHandler<TRequest, TResponse>
-Implements the actual logic for handling a request.
+Implements the actual logic for handling a request with a response.
 
 ```csharp
 public class GetUserByIdQueryHandler : IRequestHandler<GetUserByIdQuery, Outcome<User>>
@@ -150,6 +167,22 @@ public class GetUserByIdQueryHandler : IRequestHandler<GetUserByIdQuery, Outcome
         return user == null 
             ? UserErrorsErrors.NotFoundError.ToOutcome<User>()
             : Outcome<User>.From(user);
+    }
+}
+```
+
+### IRequestHandler<TRequest> (Fire-and-Forget)
+Implements logic for fire-and-forget operations with no return value.
+
+```csharp
+public class SendUserNotificationHandler : IRequestHandler<SendUserNotificationCommand>
+{
+    private readonly INotificationService _notificationService;
+
+    public async Task Handle(SendUserNotificationCommand request, CancellationToken ct)
+    {
+        await _notificationService.SendAsync(request.UserId, request.Message, ct);
+        // No return value needed
     }
 }
 ```
@@ -215,6 +248,98 @@ public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, Outco
         return Outcome<User>.From(user);
     }
 }
+```
+
+---
+
+## 🔥 Fire-and-Forget Commands
+
+For operations that don't return a meaningful value (notifications, events, background tasks), use the fire-and-forget pattern with `IRequest` and `IRequestHandler<TRequest>`.
+
+### Define a Fire-and-Forget Command
+
+```csharp
+public class SendUserNotificationCommand : IRequest
+{
+    public string UserId { get; set; }
+    public string Message { get; set; }
+
+    public SendUserNotificationCommand(string userId, string message)
+    {
+        UserId = userId;
+        Message = message;
+    }
+}
+```
+
+### Implement a Fire-and-Forget Handler
+
+```csharp
+public class SendUserNotificationHandler : IRequestHandler<SendUserNotificationCommand>
+{
+    private readonly INotificationService _notificationService;
+
+    public SendUserNotificationHandler(INotificationService notificationService)
+    {
+        _notificationService = notificationService;
+    }
+
+    public async Task Handle(SendUserNotificationCommand request, CancellationToken ct)
+    {
+        await _notificationService.SendAsync(request.UserId, request.Message, ct);
+        // No return value needed - just perform the side effect
+    }
+}
+```
+
+### Use Fire-and-Forget Commands
+
+```csharp
+[ApiController]
+[Route("api/[controller]")]
+public class NotificationsController : ControllerBase
+{
+    private readonly IMediator _mediator;
+
+    public NotificationsController(IMediator mediator)
+    {
+        _mediator = mediator;
+    }
+
+    [HttpPost("send")]
+    public async Task<IActionResult> SendNotification(
+        string userId, 
+        string message, 
+        CancellationToken ct)
+    {
+        // Send the command - no response value to check
+        await _mediator.Send(new SendUserNotificationCommand(userId, message), ct);
+        
+        // Just return success
+        return Ok();
+    }
+}
+```
+
+### Benefits
+
+- **Cleaner API**: No need to return `Unit` or dummy values
+- **Clear Intent**: Developers immediately see this is a fire-and-forget operation
+- **Type-Safe**: `IRequest` (non-generic) clearly indicates void-like behavior
+- **Composable**: Works seamlessly with pipeline behaviors
+- **Testable**: Can be tested with `TestMediator`
+
+### Behaviors with Fire-and-Forget
+
+Fire-and-forget commands work with all behaviors, just like regular commands:
+
+```csharp
+// Register behaviors that work with fire-and-forget commands
+services.AddBbQMediator(typeof(Program).Assembly);
+
+// Behaviors for IPipelineBehavior<SendUserNotificationCommand, Unit> apply to fire-and-forget
+services.AddScoped(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
+services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 ```
 
 ---
