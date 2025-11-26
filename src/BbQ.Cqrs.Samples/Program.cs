@@ -263,29 +263,6 @@ static class Program
     }
 
     /// <summary>
-    /// Adapter to convert IRequestHandler&lt;TRequest&gt; to IRequestHandler&lt;TRequest, Unit&gt;
-    /// 
-    /// This allows fire-and-forget handlers to work with the generic TestMediator pipeline.
-    /// The handler's result (void) is converted to Unit for the pipeline.
-    /// </summary>
-    private class FireAndForgetHandlerAdapter<TRequest> : IRequestHandler<TRequest, Unit>
-        where TRequest : IRequest
-    {
-        private readonly IRequestHandler<TRequest> _innerHandler;
-
-        public FireAndForgetHandlerAdapter(IRequestHandler<TRequest> innerHandler)
-        {
-            _innerHandler = innerHandler;
-        }
-
-        public async Task<Unit> Handle(TRequest request, CancellationToken ct)
-        {
-            await _innerHandler.Handle(request, ct);
-            return Unit.Value;
-        }
-    }
-
-    /// <summary>
     /// Fake repository for testing
     /// </summary>
     class FakeUserRepository : IUserRepository

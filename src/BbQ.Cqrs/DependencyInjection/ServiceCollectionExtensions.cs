@@ -57,12 +57,12 @@ public static class ServiceCollectionExtensions
 
             // Scan and register all request handlers from the provided assemblies
             services.Scan(s => s.FromAssemblies(assemblies)
-                .AddClasses(c => c.AssignableTo(typeof(IRequestHandler<>)))
+                .AddClasses(c => c.AssignableTo(typeof(IRequestHandler<>)), false)
                 .AsImplementedInterfaces()
                 .WithScopedLifetime());
 
             services.Scan(s => s.FromAssemblies(assemblies)
-                .AddClasses(c => c.AssignableTo(typeof(IRequestHandler<,>)))
+                .AddClasses(c => c.AssignableTo(typeof(IRequestHandler<,>)), false)
                 .AsImplementedInterfaces()
                 .WithScopedLifetime());
 
