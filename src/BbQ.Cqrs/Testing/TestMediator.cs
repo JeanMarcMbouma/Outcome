@@ -47,10 +47,10 @@ namespace BbQ.Cqrs.Testing;
 /// </code>
 /// </remarks>
 public sealed class TestMediator<TRequest, TResponse>
-    where TRequest : BbQ.Cqrs.IRequest<TResponse>
+    where TRequest : IRequest<TResponse>
 {
-    private readonly BbQ.Cqrs.IRequestHandler<TRequest, TResponse> _handler;
-    private readonly IEnumerable<BbQ.Cqrs.IPipelineBehavior<TRequest, TResponse>> _behaviors;
+    private readonly IRequestHandler<TRequest, TResponse> _handler;
+    private readonly IEnumerable<IPipelineBehavior<TRequest, TResponse>> _behaviors;
 
     /// <summary>
     /// Creates a test mediator with a specific handler and optional behaviors.
@@ -62,8 +62,8 @@ public sealed class TestMediator<TRequest, TResponse>
     /// If behaviors is null or empty, requests go directly to the handler.
     /// </remarks>
     public TestMediator(
-        BbQ.Cqrs.IRequestHandler<TRequest, TResponse> handler,
-        IEnumerable<BbQ.Cqrs.IPipelineBehavior<TRequest, TResponse>> behaviors)
+        IRequestHandler<TRequest, TResponse> handler,
+        IEnumerable<IPipelineBehavior<TRequest, TResponse>> behaviors)
     {
         _handler = handler;
         _behaviors = behaviors ?? [];

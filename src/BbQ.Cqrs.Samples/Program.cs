@@ -1,6 +1,8 @@
 ﻿using BbQ.Cqrs;
+using BbQ.Cqrs.DependencyInjection;
 using BbQ.Cqrs.Testing;
 using BbQ.Outcome;
+using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
 
 namespace BbQ.CQRS.Samples;
@@ -13,6 +15,7 @@ namespace BbQ.CQRS.Samples;
 /// 2. CommandWithValidation - Command with validation behavior
 /// 3. ErrorHandling - Strongly-typed error access and patterns
 /// 4. AdvancedBehaviors - Retry logic for transient errors
+/// 5. FireAndForget - Fire-and-forget command pattern (new approach)
 /// 
 /// Each scenario is self-contained and can be run independently.
 /// </summary>
@@ -27,6 +30,7 @@ static class Program
         await Scenario02_CommandWithValidation();
         await Scenario03_ErrorHandling();
         await Scenario04_RetryBehavior();
+        await Scenario05_FireAndForgetCommand();
     }
 
     /// <summary>
@@ -206,6 +210,79 @@ static class Program
         );
 
         Console.WriteLine();
+    }
+
+    /// <summary>
+    /// Scenario 5: Fire-and-Forget Command Pattern (IRequest without TResponse)
+    /// 
+    /// Demonstrates:
+    /// - Fire-and-forget command definition (IRequest without type parameter)
+    /// - Fire-and-forget handler implementation (IRequestHandler without TResponse)
+    /// - Operations with no meaningful return value
+    /// - Ideal for notifications, events, and background tasks
+    /// 
+    /// This is the new approach that uses Unit type internally to support
+    /// void-like operations in a fully generic pipeline.
+    /// </summary>
+    static async Task Scenario05_FireAndForgetCommand()
+    {
+        Console.WriteLine("--- Scenario 5: Fire-and-Forget Command (New Approach) ---");
+
+        // Setup: Create a handler that implements the non-generic IRequestHandler
+        var services = new ServiceCollection();
+        services.AddBbQMediator();
+        services.AddTransient<IUserRepository, FakeUserRepository>();
+        services.AddTransient<IRequestHandler<SendUserNotificationCommand>, SendUserNotificationHandler>();
+        services.AddTransient<IUserRepository, FakeUserRepository>();
+        services.AddTransient<INotificationService, FakeNotificationService>();
+
+        // Create an adapter that wraps the non-generic handler to work with TestMediator
+        // TestMediator<TRequest, TResponse> expects IRequestHandler<TRequest, TResponse>
+        // For fire-and-forget, we adapt IRequestHandler<TRequest> -> IRequestHandler<TRequest, Unit>
+        var mediator = services.BuildServiceProvider()
+            .GetRequiredService<IMediator>();
+
+        // Execute: Send notification command (fire and forget)
+        Console.WriteLine("Sending notification to user (fire-and-forget)...");
+        var command = new SendUserNotificationCommand("456", "Welcome to the system!");
+        
+        // No return value - the Task completes when the handler finishes
+        await mediator.Send(command);
+
+        Console.WriteLine("✓ Notification command sent (result is Unit, discarded)");
+        Console.WriteLine();
+
+        // Explanation
+        Console.WriteLine("Benefits of fire-and-forget pattern:");
+        Console.WriteLine("  • Cleaner API - no need to return Unit or dummy value");
+        Console.WriteLine("  • Clear intent - developer knows there's no meaningful return");
+        Console.WriteLine("  • Type-safe - IRequest (non-generic) clearly indicates void-like");
+        Console.WriteLine("  • Composable - still works with pipeline behaviors");
+        Console.WriteLine("  • Testable - TestMediator supports fire-and-forget commands");
+        Console.WriteLine();
+    }
+
+    /// <summary>
+    /// Adapter to convert IRequestHandler&lt;TRequest&gt; to IRequestHandler&lt;TRequest, Unit&gt;
+    /// 
+    /// This allows fire-and-forget handlers to work with the generic TestMediator pipeline.
+    /// The handler's result (void) is converted to Unit for the pipeline.
+    /// </summary>
+    private class FireAndForgetHandlerAdapter<TRequest> : IRequestHandler<TRequest, Unit>
+        where TRequest : IRequest
+    {
+        private readonly IRequestHandler<TRequest> _innerHandler;
+
+        public FireAndForgetHandlerAdapter(IRequestHandler<TRequest> innerHandler)
+        {
+            _innerHandler = innerHandler;
+        }
+
+        public async Task<Unit> Handle(TRequest request, CancellationToken ct)
+        {
+            await _innerHandler.Handle(request, ct);
+            return Unit.Value;
+        }
     }
 
     /// <summary>

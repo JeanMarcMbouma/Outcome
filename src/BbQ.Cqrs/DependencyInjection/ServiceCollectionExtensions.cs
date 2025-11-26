@@ -40,6 +40,7 @@ public static class ServiceCollectionExtensions
         /// You can add custom behaviors after calling this method:
         /// <code>
         /// services.AddBbQMediator(/* assemblies */);
+        /// services.AddScoped(typeof(IPipelineBehavior&lt;,&gt;), typeof(LoggingBehavior&lt;,&gt;));
         /// services.AddScoped(typeof(IPipelineBehavior&lt;,&gt;), typeof(ValidationBehavior&lt;,&gt;));
         /// services.AddScoped(typeof(IPipelineBehavior&lt;,&gt;), typeof(CachingBehavior&lt;,&gt;));
         /// </code>
@@ -60,10 +61,10 @@ public static class ServiceCollectionExtensions
                 .AsImplementedInterfaces()
                 .WithScopedLifetime());
 
+
             // Register behaviors in order (outermost to innermost)
             // The LoggingBehavior is registered as the outermost behavior
             // to capture the full request/response cycle
-            services.AddScoped(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
 
             return services;
         }

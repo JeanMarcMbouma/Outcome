@@ -22,3 +22,40 @@ namespace BbQ.Cqrs;
 /// </code>
 /// </remarks>
 public interface IRequest<TResponse> { }
+
+/// <summary>
+/// Marker interface for requests that don't return a meaningful value (void-like).
+/// 
+/// This is a convenience interface that simplifies defining fire-and-forget operations
+/// that have no meaningful return value. It aliases IRequest&lt;Unit&gt;.
+/// </summary>
+/// <remarks>
+/// Use IRequest for operations where you don't care about the return value,
+/// such as sending emails, publishing events, or updating caches.
+/// 
+/// The handler for IRequest implements IRequestHandler&lt;TRequest&gt;
+/// (without TResponse) and doesn't need to return anything meaningful.
+/// 
+/// Example:
+/// <code>
+/// // A fire-and-forget command
+/// public class SendNotificationCommand : IRequest
+/// {
+///     public string UserId { get; set; }
+///     public string Message { get; set; }
+/// }
+/// 
+/// // Handler just performs the action, no return value
+/// public class SendNotificationHandler : IRequestHandler&lt;SendNotificationCommand&gt;
+/// {
+///     public async Task Handle(SendNotificationCommand request, CancellationToken ct)
+///     {
+///         await _notificationService.SendAsync(request.UserId, request.Message, ct);
+///     }
+/// }
+/// 
+/// // Send the command (result is discarded)
+/// await mediator.Send(new SendNotificationCommand { ... });
+/// </code>
+/// </remarks>
+public interface IRequest : IRequest<Unit>;

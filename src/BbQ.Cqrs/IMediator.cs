@@ -34,4 +34,14 @@ public interface IMediator
     /// </remarks>
     Task<TResponse> Send<TRequest, TResponse>(TRequest request, CancellationToken ct = default)
         where TRequest : IRequest<TResponse>;
+
+    /// <summary>
+    /// Sends a fire-and-forget request through the pipeline.
+    /// </summary>
+    /// <remarks>
+    /// The request is passed through all registered IPipelineBehavior implementations
+    /// in registration order, with the handler invoked at the end of the chain.
+    /// </remarks>
+    Task Send<TRequest>(TRequest request, CancellationToken ct = default)
+        where TRequest : IRequest;
 }

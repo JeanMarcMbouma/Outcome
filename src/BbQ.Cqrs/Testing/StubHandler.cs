@@ -36,8 +36,8 @@ namespace BbQ.Cqrs.Testing;
 /// </code>
 /// </remarks>
 public sealed class StubHandler<TRequest, TResponse>
-    : BbQ.Cqrs.IRequestHandler<TRequest, TResponse>
-    where TRequest : BbQ.Cqrs.IRequest<TResponse>
+    : IRequestHandler<TRequest, TResponse>
+    where TRequest : IRequest<TResponse>
 {
     private readonly Func<TRequest, CancellationToken, Task<TResponse>> _impl;
 

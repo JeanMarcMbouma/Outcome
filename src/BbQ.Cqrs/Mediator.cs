@@ -79,4 +79,51 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator
         // Execute the fully composed pipeline
         return terminal(request, ct);
     }
+
+    /// <summary>
+    /// Sends a fire-and-forget request (void-like) through the CQRS pipeline.
+    /// </summary>
+    /// <typeparam name="TRequest">The request type</typeparam>
+    /// <param name="request">The request to send</param>
+    /// <param name="ct">Cancellation token for async operations</param>
+    /// <returns>A task that completes when the handler finishes executing</returns>
+    /// <remarks>
+    /// Process:
+    /// 1. Resolves the handler with GetRequiredService()
+    /// 2. Resolves all behaviors with GetServices()
+    /// 3. Composes behaviors in reverse order with a Unit-returning terminal
+    /// 4. Invokes the composed pipeline with the request
+    /// 5. Discards the Unit result before returning
+    /// 
+    /// This overload is useful for operations that don't need to return a value,
+    /// such as sending emails, publishing events, or executing background jobs.
+    /// If no handler is registered, GetRequiredService() throws InvalidOperationException.
+    /// </remarks>
+    public Task Send<TRequest>(TRequest request, CancellationToken ct = default) where TRequest : IRequest
+    {
+        // Resolve strongly-typed handler - throws if not registered
+        var handler = _sp.GetRequiredService<IRequestHandler<TRequest>>();
+
+        // Resolve all behaviors for this request/response pair in registration order
+        // Microsoft DI preserves registration order
+        var behaviors = _sp.GetServices<IPipelineBehavior<TRequest, Unit>>();
+
+        // Start with the handler as the terminal of the pipeline
+        Func<TRequest, CancellationToken, Task<Unit>> terminal =
+            (req, token) =>
+            {
+                handler.Handle(req, token);
+                return Task.FromResult(Unit.Value);
+            };
+
+        // Compose behaviors in reverse order so first registered is outermost
+        foreach (var behavior in behaviors.Reverse())
+        {
+            var next = terminal;
+            terminal = (req, token) => behavior.Handle(req, token, next);
+        }
+
+        // Execute the fully composed pipeline
+        return terminal(request, ct);
+    }
 }

@@ -68,3 +68,68 @@ public interface IRequestHandler<TRequest, TResponse>
     /// </remarks>
     Task<TResponse> Handle(TRequest request, CancellationToken ct);
 }
+
+/// <summary>
+/// Handler contract for fire-and-forget requests that don't return a meaningful value.
+/// 
+/// Implements the IRequest (without TResponse) pattern for operations
+/// like sending notifications, publishing events, or executing commands
+/// where the return value is not important.
+/// </summary>
+/// <typeparam name="TRequest">The request type, must implement IRequest</typeparam>
+/// <remarks>
+/// Implementation guidelines:
+/// - Use this for operations that don't need a return value (void-like)
+/// - Each request type should have exactly one handler
+/// - Handlers should be registered with the service container (AddBbQMediator)
+/// - The Handle method doesn't need to return a value; the framework handles Unit internally
+/// 
+/// Example handler:
+/// <code>
+/// public class SendEmailCommandHandler : IRequestHandler&lt;SendEmailCommand&gt;
+/// {
+///     private readonly IEmailService _emailService;
+///     
+///     public SendEmailCommandHandler(IEmailService emailService)
+///     {
+///         _emailService = emailService;
+///     }
+///     
+///     public async Task Handle(SendEmailCommand request, CancellationToken ct)
+///     {
+///         // Perform the action without returning a meaningful result
+///         await _emailService.SendAsync(request.Email, request.Subject, request.Body, ct);
+///         // No return value needed
+///     }
+/// }
+/// 
+/// // Usage in a controller or service
+/// public class UserService
+/// {
+///     private readonly IMediator _mediator;
+///     
+///     public async Task RegisterUserAsync(string email, CancellationToken ct)
+///     {
+///         // ... create user ...
+///         
+///         // Send notification (fire-and-forget)
+///         await _mediator.Send(new SendWelcomeEmailCommand { Email = email }, ct);
+///     }
+/// }
+/// </code>
+/// </remarks>
+public interface IRequestHandler<TRequest>
+    where TRequest: IRequest
+{
+    /// <summary>
+    /// Handles the request without returning a meaningful value.
+    /// </summary>
+    /// <param name="request">The request to process</param>
+    /// <param name="ct">Cancellation token for async operations</param>
+    /// <remarks>
+    /// This method is called at the end of the pipeline after all behaviors
+    /// have been executed. It should perform its side effects without
+    /// needing to return data to the caller.
+    /// </remarks>
+    Task Handle(TRequest request, CancellationToken ct);
+}
