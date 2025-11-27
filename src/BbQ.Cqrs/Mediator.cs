@@ -73,11 +73,11 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator
             var handlerType = typeof(IRequestHandler<,>).MakeGenericType(reqType, resType);
             var handleMethod = handlerType.GetMethod("Handle")!;
 
-            Func<object, CancellationToken, Task<TResponse>> terminal = (req, token) =>
+            Task<TResponse> terminal(object req, CancellationToken token)
             {
                 var handler = _sp.GetRequiredService(handlerType);
                 return (Task<TResponse>)handleMethod.Invoke(handler, [req, token])!;
-            };
+            }
 
             // Resolve behaviors (outermost first, wrap inner)
             var behaviorType = typeof(IPipelineBehavior<,>).MakeGenericType(reqType, resType);
@@ -142,27 +142,28 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator
             var handlerType = typeof(IRequestHandler<>).MakeGenericType(reqType);
             var handleMethod = handlerType.GetMethod("Handle")!;
 
-            Func<object, CancellationToken, Task> terminal = (req, token) =>
+            Task<Unit> terminal(object req, CancellationToken token)
             {
                 var handler = _sp.GetRequiredService(handlerType);
-                return (Task)handleMethod.Invoke(handler, [req, token])!;
-            };
+                handleMethod.Invoke(handler, [req, token]);
+                return Task.FromResult(Unit.Value);
+            }
 
             // Resolve behaviors (outermost first, wrap inner)
             var behaviorType = typeof(IPipelineBehavior<,>).MakeGenericType(reqType, resType);
             var behaviors = _sp.GetServices(behaviorType).Reverse().ToArray();
 
-            Func<object, CancellationToken, Task> pipeline = terminal;
+            Func<object, CancellationToken, Task<Unit>> pipeline = terminal;
             foreach (var b in behaviors)
             {
                 var method = behaviorType.GetMethod("Handle")!;
                 var next = pipeline;
                 pipeline = (req, token) =>
-                    (Task)method.Invoke(b,
+                    (Task<Unit>)method.Invoke(b,
                     [
                             req,
                             token,
-                            new Func<object, CancellationToken, Task>(next)
+                            new Func<object, CancellationToken, Task<Unit>>(next)
                     ])!;
             }
 

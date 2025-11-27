@@ -10,11 +10,12 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\BbQ.Cqrs\BbQ.Cqrs.csproj" />
-    <ProjectReference Include="..\Outcome.SourceGenerators\Outcome.SourceGenerators.csproj"  OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
+    <ProjectReference Include="..\Outcome.SourceGenerators\Outcome.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
 
     <ProjectReference Include="..\Outcome\Outcome.csproj" />
   </ItemGroup>

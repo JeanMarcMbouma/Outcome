@@ -3,6 +3,7 @@ using BbQ.Cqrs.DependencyInjection;
 using BbQ.Cqrs.Testing;
 using BbQ.Outcome;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Reflection;
 
@@ -235,6 +236,8 @@ static class Program
         services.AddTransient<IUserRepository, FakeUserRepository>();
         services.AddTransient<IUserRepository, FakeUserRepository>();
         services.AddTransient<INotificationService, FakeNotificationService>();
+        services.AddLogging(builder => builder.AddConsole());
+        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
 
         // Create an adapter that wraps the non-generic handler to work with TestMediator
         // TestMediator<TRequest, TResponse> expects IRequestHandler<TRequest, TResponse>
@@ -248,6 +251,7 @@ static class Program
         
         // No return value - the Task completes when the handler finishes
         await mediator.Send(command);
+        var user = await mediator.Send(new GetUserById("456"));
 
         Console.WriteLine("✓ Notification command sent (result is Unit, discarded)");
         Console.WriteLine();
