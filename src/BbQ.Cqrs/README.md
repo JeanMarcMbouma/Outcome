@@ -6,7 +6,7 @@ A lightweight, extensible CQRS (Command Query Responsibility Segregation) implem
 
 - **Type-safe mediator** for commands and queries with compile-time checking
 - **Pipeline behaviors** for cross-cutting concerns (logging, validation, caching)
-- **Built-in logging behavior** to track all request/response flows
+- **Extensible behavior pipeline** with customizable middleware support
 - **Test utilities** with `TestMediator` and `StubHandler` for isolated testing
 - **Comprehensive documentation** on all interfaces and classes with XML comments
 - **Seamless integration** with `Outcome<T>` for advanced error management
@@ -31,9 +31,9 @@ services.AddBbQMediator(
 
 The `AddBbQMediator()` method automatically:
 - Registers `IMediator` as a singleton
-- Scans assemblies for all `IRequestHandler<,>` implementations
-- Registers handlers with scoped lifetime
-- Registers the built-in `LoggingBehavior`
+- Scans assemblies for all `IRequestHandler<,>` and `IRequestHandler<>` implementations
+- Registers handlers with scoped lifetime by default
+- You can customize the handler lifetime by passing a `ServiceLifetime` parameter
 
 ### 2. Define Commands and Queries
 
@@ -334,10 +334,10 @@ public class NotificationsController : ControllerBase
 Fire-and-forget commands work with all behaviors, just like regular commands:
 
 ```csharp
-// Register behaviors that work with fire-and-forget commands
+// Register the mediator and handlers
 services.AddBbQMediator(typeof(Program).Assembly);
 
-// Behaviors for IPipelineBehavior<SendUserNotificationCommand, Unit> apply to fire-and-forget
+// Register behaviors for both fire-and-forget and regular requests
 services.AddScoped(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
 services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 ```
@@ -350,11 +350,13 @@ Behaviors execute in registration order: **first registered = outermost = execut
 
 ### Built-in: LoggingBehavior
 
-Automatically registered by `AddBbQMediator()`:
+To use logging behavior, register it explicitly:
 
 ```csharp
 services.AddBbQMediator(typeof(Program).Assembly);
-// LoggingBehavior is already included
+
+// Add logging behavior
+services.AddScoped(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
 ```
 
 ### Custom: ValidationBehavior

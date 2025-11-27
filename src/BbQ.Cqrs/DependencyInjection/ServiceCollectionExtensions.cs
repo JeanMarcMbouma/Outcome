@@ -16,30 +16,29 @@ public static class ServiceCollectionExtensions
     {
 
         /// <summary>
-        /// Registers the BbQ CQRS mediator and all handlers/behaviors in the specified assemblies.
+        /// Registers the BbQ CQRS mediator and all handlers in the specified assemblies.
         /// </summary>
         /// <param name="services">The service collection to register with</param>
-        /// <param name="assemblies">Assemblies to scan for handlers and behaviors</param>
+        /// <param name="handlersLifeTime">The lifetime to use for handler instances</param>
+        /// <param name="assemblies">Assemblies to scan for handlers</param>
         /// <returns>The service collection for chaining</returns>
         /// <remarks>
         /// This method:
         /// 1. Registers IMediator as a singleton (single instance for the application)
-        /// 2. Scans the provided assemblies for all classes implementing IRequestHandler&lt;,&gt;
-        /// 3. Registers each handler with its implemented interfaces
-        /// 4. Uses scoped lifetime for handlers (one per request in web apps)
-        /// 5. Registers the built-in LoggingBehavior
+        /// 2. Scans the provided assemblies for all classes implementing IRequestHandler&lt;&gt;
+        /// 3. Scans the provided assemblies for all classes implementing IRequestHandler&lt;,&gt;
+        /// 4. Registers each handler with its implemented interfaces
+        /// 5. Uses the specified lifetime for handlers (scoped by default - one per request in web apps)
         /// 
-        /// Example usage:
+        /// Pipeline behaviors must be registered separately. Example usage:
         /// <code>
         /// services.AddBbQMediator(
+        ///     ServiceLifetime.Scoped,
         ///     typeof(CreateUserCommandHandler).Assembly,
         ///     typeof(GetUserByIdQueryHandler).Assembly
         /// );
-        /// </code>
         /// 
-        /// You can add custom behaviors after calling this method:
-        /// <code>
-        /// services.AddBbQMediator(/* assemblies */);
+        /// // Add custom behaviors
         /// services.AddScoped(typeof(IPipelineBehavior&lt;,&gt;), typeof(LoggingBehavior&lt;,&gt;));
         /// services.AddScoped(typeof(IPipelineBehavior&lt;,&gt;), typeof(ValidationBehavior&lt;,&gt;));
         /// services.AddScoped(typeof(IPipelineBehavior&lt;,&gt;), typeof(CachingBehavior&lt;,&gt;));
@@ -49,7 +48,7 @@ public static class ServiceCollectionExtensions
         /// - First registered = outermost (executes first, before behaviors registered later)
         /// - Last registered = innermost (executes last, just before the handler)
         /// </remarks>
-        public IServiceCollection AddBbQMediator(
+        public IServiceCollection AddBbQMediator(ServiceLifetime handlersLifeTime,
             params System.Reflection.Assembly[] assemblies)
         {
             // Register the mediator as singleton
@@ -59,19 +58,52 @@ public static class ServiceCollectionExtensions
             services.Scan(s => s.FromAssemblies(assemblies)
                 .AddClasses(c => c.AssignableTo(typeof(IRequestHandler<>)), false)
                 .AsImplementedInterfaces()
-                .WithScopedLifetime());
+                .WithLifetime(handlersLifeTime));
 
             services.Scan(s => s.FromAssemblies(assemblies)
                 .AddClasses(c => c.AssignableTo(typeof(IRequestHandler<,>)), false)
                 .AsImplementedInterfaces()
-                .WithScopedLifetime());
-
-
-            // Register behaviors in order (outermost to innermost)
-            // The LoggingBehavior is registered as the outermost behavior
-            // to capture the full request/response cycle
+                .WithLifetime(handlersLifeTime));
 
             return services;
+        }
+
+        /// <summary>
+        /// Registers the BbQ CQRS mediator and all handlers in the specified assemblies.
+        /// </summary>
+        /// <param name="services">The service collection to register with</param>
+        /// <param name="assemblies">Assemblies to scan for handlers</param>
+        /// <returns>The service collection for chaining</returns>
+        /// <remarks>
+        /// This method:
+        /// 1. Registers IMediator as a singleton (single instance for the application)
+        /// 2. Scans the provided assemblies for all classes implementing IRequestHandler&lt;&gt;
+        /// 3. Scans the provided assemblies for all classes implementing IRequestHandler&lt;,&gt;
+        /// 4. Registers each handler with its implemented interfaces
+        /// 5. Uses the specified lifetime for handlers (scoped by default - one per request in web apps)
+        /// 
+        /// Pipeline behaviors must be registered separately. Example usage:
+        /// <code>
+        /// services.AddBbQMediator(
+        ///     typeof(CreateUserCommandHandler).Assembly,
+        ///     typeof(GetUserByIdQueryHandler).Assembly
+        /// );
+        /// 
+        /// // Add custom behaviors
+        /// services.AddScoped(typeof(IPipelineBehavior&lt;,&gt;), typeof(LoggingBehavior&lt;,&gt;));
+        /// services.AddScoped(typeof(IPipelineBehavior&lt;,&gt;), typeof(ValidationBehavior&lt;,&gt;));
+        /// services.AddScoped(typeof(IPipelineBehavior&lt;,&gt;), typeof(CachingBehavior&lt;,&gt;));
+        /// </code>
+        /// 
+        /// Behavior registration order affects execution:
+        /// - First registered = outermost (executes first, before behaviors registered later)
+        /// - Last registered = innermost (executes last, just before the handler)
+        /// </remarks>
+        public IServiceCollection AddBbQMediator(params System.Reflection.Assembly[] assemblies)
+        {
+            // Default to scoped lifetime for handlers (typical for web applications)
+            // where each HTTP request should have its own handler instance
+            return services.AddBbQMediator(ServiceLifetime.Scoped, assemblies);
         }
     }
 }
