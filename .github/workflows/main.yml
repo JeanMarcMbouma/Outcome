@@ -43,6 +43,9 @@ jobs:
       - name: Pack NuGet Outcome
         run: dotnet pack src/Outcome/Outcome.csproj --configuration Release --no-build -o ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
       
+      - name: Pack NuGet SourceGenerators
+        run: dotnet pack src/Outcome.SourceGenerators/Outcome.SourceGenerators.csproj --configuration Release --no-build -o ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
+      
       - name: Pack NuGet Cqrs
         run: dotnet pack src/BbQ.Cqrs/BbQ.Cqrs.csproj --configuration Release --no-build -o ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
       
