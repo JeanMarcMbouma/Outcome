@@ -12,6 +12,11 @@
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <IncludeBuildOutput>true</IncludeBuildOutput>
     
+    <!-- Critical: Output analyzer to the correct NuGet package path -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
+    
     <!-- Package metadata -->
     <PackageId>BbQ.Outcome.SourceGenerators</PackageId>
     <Version>1.0.0</Version>
@@ -24,6 +29,7 @@
     <RepositoryType>git</RepositoryType>
     <LicenseExpression>MIT</LicenseExpression>
     <Title>BbQ.Outcome Source Generators</Title>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     
     <!-- Source Link settings -->
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
@@ -44,6 +50,11 @@
   <ItemGroup>
     <!-- Include README in the NuGet package -->
     <None Include="README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+  <!-- Ensure analyzer is included in the correct NuGet package structure -->
+  <ItemGroup>
+    <None Include="$(OutputPath)Outcome.SourceGenerators.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
   </ItemGroup>
 
 </Project>
