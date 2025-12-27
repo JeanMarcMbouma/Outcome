@@ -3,7 +3,7 @@ using BbQ.Cqrs.DependencyInjection;
 using BbQ.Outcome;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace BbQ.CQRS.Samples;
+namespace BbQ.Cqrs.Samples;
 
 /// <summary>
 /// Demonstrates how to use ICommandDispatcher and IQueryDispatcher
