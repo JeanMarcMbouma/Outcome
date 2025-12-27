@@ -23,6 +23,7 @@ public sealed class RenameUserValidator : IRequestValidator<RenameUser>
     }
 }
 
+[Behavior(Order = 2)]
 public sealed class ValidationBehavior<TRequest, TResponse, TPayload>
     : IPipelineBehavior<TRequest, TResponse>
     where TRequest : IRequest<TResponse>

@@ -4,6 +4,7 @@ using BbQ.Outcome;
 namespace BbQ.CQRS.Samples;
 
 // A retry behavior that only wraps commands and respects transient errors
+[Behavior(Order = 3)]
 public sealed class RetryBehavior<TRequest, TResponse, TPayload>
     : IPipelineBehavior<TRequest, TResponse>
     where TRequest : IRequest<TResponse>
