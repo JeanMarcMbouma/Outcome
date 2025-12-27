@@ -60,7 +60,7 @@ public static class DispatcherSample
         Console.WriteLine("• Clear separation of concerns at the API level");
         Console.WriteLine("• Better discoverability and documentation");
         Console.WriteLine("• Type safety with compile-time checking");
-        Console.WriteLine("• No reflection, scanning, or magic - just dependency injection");
+        Console.WriteLine("• No runtime scanning or magic – uses dependency injection with minimal reflection only to build and cache pipelines on first use");
 
         serviceProvider.Dispose();
     }
