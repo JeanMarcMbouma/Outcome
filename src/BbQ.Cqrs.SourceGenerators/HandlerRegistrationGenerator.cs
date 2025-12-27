@@ -160,11 +160,31 @@ namespace BbQ.Cqrs.SourceGenerators
                 order = orderValue;
             }
 
+            // Determine if the behavior is generic
+            bool isGeneric = classSymbol.IsGenericType;
+            string behaviorTypeName;
+            
+            if (isGeneric)
+            {
+                // For generic types, we need the open generic type definition
+                // e.g., "BbQ.Cqrs.LoggingBehavior<,>" instead of "BbQ.Cqrs.LoggingBehavior<TRequest, TResponse>"
+                var namespaceName = classSymbol.ContainingNamespace.ToDisplayString();
+                var typeName = classSymbol.Name;
+                var arity = classSymbol.Arity;
+                var typeParams = string.Join(",", Enumerable.Repeat(string.Empty, arity));
+                behaviorTypeName = $"{namespaceName}.{typeName}<{typeParams}>";
+            }
+            else
+            {
+                behaviorTypeName = classSymbol.ToDisplayString();
+            }
+
             return new BehaviorInfo
             {
-                BehaviorTypeName = classSymbol.ToDisplayString(),
+                BehaviorTypeName = behaviorTypeName,
                 Order = order,
-                Namespace = classSymbol.ContainingNamespace.ToDisplayString()
+                Namespace = classSymbol.ContainingNamespace.ToDisplayString(),
+                IsGeneric = isGeneric
             };
         }
 
@@ -291,6 +311,7 @@ namespace BbQ.Cqrs.SourceGenerators
             public string BehaviorTypeName { get; set; } = string.Empty;
             public int Order { get; set; }
             public string Namespace { get; set; } = string.Empty;
+            public bool IsGeneric { get; set; }
         }
     }
 }

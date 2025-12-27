@@ -21,6 +21,7 @@ namespace BbQ.Cqrs;
 /// Handled CreateUserCommand -> Success: User { Id=..., Email=... }
 /// </code>
 /// </remarks>
+[Behavior(Order = 1)]
 public sealed class LoggingBehavior<TRequest, TResponse>(ILogger<LoggingBehavior<TRequest, TResponse>> log)
     : IPipelineBehavior<TRequest, TResponse>
     where TRequest : IRequest<TResponse>
