@@ -24,6 +24,7 @@ A lightweight, extensible CQRS implementation that integrates seamlessly with Ou
 
 - **Type-safe mediator** for commands and queries
 - **Pipeline behaviors** for cross-cutting concerns (logging, validation, caching)
+- **Source generators** for automatic handler and behavior registration
 - **Test utilities** with `TestMediator` and `StubHandler`
 - **Comprehensive documentation** on all interfaces and classes
 - **Seamless integration** with `Outcome<T>` for error handling

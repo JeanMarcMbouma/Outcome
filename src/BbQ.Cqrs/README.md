@@ -10,6 +10,75 @@ A lightweight, extensible CQRS (Command Query Responsibility Segregation) implem
 - **Test utilities** with `TestMediator` and `StubHandler` for isolated testing
 - **Comprehensive documentation** on all interfaces and classes with XML comments
 - **Seamless integration** with `Outcome<T>` for advanced error management
+- **Source generators** for automatic handler and behavior registration (opt-in via attributes)
+
+## 🔧 Source Generators
+
+BbQ.Cqrs includes Roslyn source generators that can automatically detect and register your handlers and behaviors, reducing boilerplate code.
+
+### Automatic Handler Registration
+
+The source generator automatically detects all handlers implementing `IRequestHandler<,>` and `IRequestHandler<>` and generates extension methods to register them:
+
+```csharp
+// The generator creates methods like:
+services.AddYourAssemblyNameHandlers();  // Registers all detected handlers
+```
+
+All handlers implementing `ICommand<T>` or `IQuery<T>` are automatically detected without needing attributes.
+
+### Opt-in Attributes
+
+Mark your commands, queries, and behaviors with attributes for better tooling support:
+
+```csharp
+// Mark commands
+[Command]
+public class CreateUserCommand : ICommand<Outcome<User>>
+{
+    public string Email { get; set; }
+}
+
+// Mark queries  
+[Query]
+public class GetUserByIdQuery : IQuery<Outcome<User>>
+{
+    public Guid UserId { get; set; }
+}
+
+// Mark behaviors with execution order
+[Behavior(Order = 1)]  // Lower numbers execute first (outermost)
+public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : IRequest<TResponse>
+{
+    // Implementation...
+}
+```
+
+### Behavior Registration with Order
+
+Behaviors marked with `[Behavior(Order = ...)]` are automatically registered in the specified order:
+
+```csharp
+[Behavior(Order = 1)]  // Executes first (outermost)
+public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse> { }
+
+[Behavior(Order = 2)]  // Executes second
+public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse> { }
+
+[Behavior(Order = 3)]  // Executes third (closest to handler)
+public class RetryBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse> { }
+```
+
+Then register them:
+
+```csharp
+services.AddYourAssemblyNameBehaviors();  // Registers behaviors in order
+// Or register everything at once:
+services.AddYourAssemblyNameCqrs();  // Registers both handlers and behaviors
+```
+
+**Note:** Only behaviors with the `[Behavior]` attribute are automatically registered by the generator.
 
 ## 💾 Installation
 
