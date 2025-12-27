@@ -115,7 +115,7 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator
                     [
                         req,
                         token,
-                        next
+                        new Func<object, CancellationToken, Task<TResponse>>(next)
                     ])!;
             }
 

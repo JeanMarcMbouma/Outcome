@@ -13,8 +13,7 @@ namespace BbQ.Cqrs;
 /// - Executing the handler
 /// - Returning the result
 /// 
-/// This dispatcher operates without reflection, scanning, or magic.
-/// It acts as a thin orchestrator over the query pipeline.
+/// This interface defines a thin orchestrator over the query pipeline.
 /// </summary>
 /// <remarks>
 /// Queries represent read-only operations that do not modify state.
@@ -49,12 +48,13 @@ public interface IQueryDispatcher
     /// <returns>A task containing the response from the query handler</returns>
     /// <remarks>
     /// The query is passed through all registered IPipelineBehavior implementations
-    /// in registration order, with the handler invoked at the end of the chain.
+    /// in reverse registration order (last registered executes first), with the handler
+    /// invoked at the end of the chain.
     /// 
     /// Process:
     /// 1. Resolves the handler for the query type
     /// 2. Builds the pipeline with all registered behaviors
-    /// 3. Executes behaviors in order
+    /// 3. Executes behaviors in reverse registration order (last registered executes first)
     /// 4. Invokes the handler
     /// 5. Returns the result
     /// </remarks>

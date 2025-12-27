@@ -13,8 +13,11 @@ namespace BbQ.Cqrs;
 /// 3. Executes the pipeline with the handler as the terminal
 /// 4. Returns the response from the handler
 /// 
-/// This implementation operates without reflection at runtime - all types
-/// are resolved through dependency injection at compile-time.
+/// This implementation uses reflection during the first dispatch of each
+/// command/response type pair to build and cache the pipeline. Subsequent
+/// dispatches reuse the cached pipeline without additional reflection
+/// overhead, while handlers and behaviors are still resolved via
+/// dependency injection.
 /// </summary>
 /// <remarks>
 /// The dispatcher uses dependency injection to resolve:
@@ -79,7 +82,7 @@ internal sealed class CommandDispatcher(IServiceProvider sp) : ICommandDispatche
                 return (Task<TResponse>)handleMethod.Invoke(handler, [cmd, token])!;
             }
 
-            // Resolve behaviors (outermost first, wrap inner)
+            // Resolve behaviors and reverse order (last registered becomes outermost)
             var behaviorType = typeof(IPipelineBehavior<,>).MakeGenericType(cmdType, resType);
             var behaviors = _sp.GetServices(behaviorType).Reverse().ToArray();
 
@@ -100,8 +103,7 @@ internal sealed class CommandDispatcher(IServiceProvider sp) : ICommandDispatche
             return pipeline;
         });
 
-        var resultObj = await (Task<TResponse>)dispatcher(command!, ct);
-        return resultObj;
+        return await (Task<TResponse>)dispatcher(command, ct);
     }
 
     /// <summary>

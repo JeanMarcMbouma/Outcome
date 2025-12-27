@@ -119,11 +119,11 @@ public class CountingQueryHandler : IRequestHandler<TestQuery, Outcome<string>>
 
     public Task<Outcome<string>> Handle(TestQuery request, CancellationToken ct)
     {
-        _callCount++;
-        return Task.FromResult(Outcome<string>.From($"Query result {_callCount} for: {request.Id}"));
+        var currentCount = System.Threading.Interlocked.Increment(ref _callCount);
+        return Task.FromResult(Outcome<string>.From($"Query result {currentCount} for: {request.Id}"));
     }
 
-    public static void Reset() => _callCount = 0;
+    public static void Reset() => System.Threading.Interlocked.Exchange(ref _callCount, 0);
 }
 
 public class QueryTestBehavior1 : IPipelineBehavior<TestQuery, Outcome<string>>
