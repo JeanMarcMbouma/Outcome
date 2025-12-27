@@ -40,4 +40,11 @@
     <!-- Include README in the NuGet package -->
     <None Include="README.md" Pack="true" PackagePath="" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- Reference to source generator -->
+    <ProjectReference Include="..\BbQ.Cqrs.SourceGenerators\BbQ.Cqrs.SourceGenerators.csproj" 
+                      OutputItemType="Analyzer" 
+                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
 </Project>

@@ -10,6 +10,94 @@ A lightweight, extensible CQRS (Command Query Responsibility Segregation) implem
 - **Test utilities** with `TestMediator` and `StubHandler` for isolated testing
 - **Comprehensive documentation** on all interfaces and classes with XML comments
 - **Seamless integration** with `Outcome<T>` for advanced error management
+- **Source generators** for automatic handler and behavior registration (opt-in via attributes)
+
+## 🔧 Source Generators
+
+BbQ.Cqrs includes Roslyn source generators that can automatically detect and register your handlers and behaviors, reducing boilerplate code.
+
+### Important: Register IMediator First
+
+**Always call `AddBbQMediator()` before using the generated registration methods** to ensure `IMediator` is registered:
+
+```csharp
+// Option 1: Use assembly scanning for everything (uses reflection)
+services.AddBbQMediator(typeof(Program).Assembly);
+
+// Option 2: Register IMediator only, then use source generators (recommended)
+services.AddBbQMediator(Array.Empty<Assembly>());  // Just register IMediator
+services.AddYourAssemblyNameHandlers();  // Use generated method - compile-time, no reflection
+services.AddYourAssemblyNameBehaviors(); // Use generated method
+```
+
+**Important Note on Assembly Scanning:**
+When you pass assemblies to `AddBbQMediator()`, it uses reflection-based assembly scanning to discover and register handlers. This approach:
+- Uses runtime reflection, which is slower than compile-time source generation
+- Should be used sparingly, primarily when reusing queries and handlers from external libraries
+- For your own application code, prefer using source generators (generated `AddXxxHandlers()` methods) for better performance and compile-time safety
+
+**Recommended Pattern:**
+```csharp
+// For your application's handlers (preferred - uses source generators)
+services.AddBbQMediator(Array.Empty<Assembly>());  // Register IMediator only
+services.AddMyAppHandlers();  // Use generated method - compile-time, no reflection
+services.AddMyAppBehaviors();  // Use generated method for behaviors
+
+// For library handlers (when needed - uses reflection)
+services.AddBbQMediator(typeof(SharedLibrary).Assembly);  // Assembly scanning for libraries
+```
+
+The generated methods support customizable lifetimes:
+
+```csharp
+// Customize handler and behavior lifetimes
+services.AddBbQMediator(typeof(Program).Assembly);
+services.AddYourAssemblyNameHandlers(ServiceLifetime.Transient);
+services.AddYourAssemblyNameBehaviors(ServiceLifetime.Singleton);
+
+// Or use the combined method
+services.AddBbQMediator(typeof(Program).Assembly);
+services.AddYourAssemblyNameCqrs(
+    handlersLifetime: ServiceLifetime.Scoped,
+    behaviorsLifetime: ServiceLifetime.Scoped
+);
+```
+
+### Automatic Handler Registration
+
+The source generator automatically detects all handlers implementing `IRequestHandler<,>` and `IRequestHandler<>` and generates extension methods to register them:
+
+```csharp
+// The generator creates methods like:
+services.AddYourAssemblyNameHandlers();  // Registers all detected handlers
+```
+
+All handlers for requests implementing `ICommand<T>` or `IQuery<T>` are automatically detected without needing attributes.
+
+### Behavior Registration with Order
+
+Mark your behaviors with the `[Behavior]` attribute to enable automatic registration in the specified order:
+
+```csharp
+[Behavior(Order = 1)]  // Executes first (outermost)
+public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse> { }
+
+[Behavior(Order = 2)]  // Executes second
+public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse> { }
+
+[Behavior(Order = 3)]  // Executes third (closest to handler)
+public class RetryBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse> { }
+```
+
+Then register them:
+
+```csharp
+services.AddYourAssemblyNameBehaviors();  // Registers behaviors in order
+// Or register everything at once:
+services.AddYourAssemblyNameCqrs();  // Registers both handlers and behaviors
+```
+
+**Note:** Only behaviors with the `[Behavior]` attribute are automatically registered by the generator.
 
 ## 💾 Installation
 
