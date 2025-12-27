@@ -48,15 +48,19 @@ public interface ICommandDispatcher
     /// <returns>A task containing the response from the command handler</returns>
     /// <remarks>
     /// The command is passed through all registered IPipelineBehavior implementations
-    /// in reverse registration order (last registered executes first), with the handler
-    /// invoked at the end of the chain.
+    /// in registration order. First registered behavior becomes outermost, creating:
+    /// - FIFO (First In, First Out) order before handler execution
+    /// - LIFO (Last In, First Out) order after handler execution
+    /// 
+    /// This means behaviors wrap like nested function calls:
+    /// Behavior1 → Behavior2 → Handler → Behavior2 → Behavior1
     /// 
     /// Process:
     /// 1. Resolves the handler for the command type
     /// 2. Builds the pipeline with all registered behaviors
-    /// 3. Executes behaviors in reverse registration order (last registered executes first)
+    /// 3. Executes behaviors in registration order (first registered executes first)
     /// 4. Invokes the handler
-    /// 5. Returns the result
+    /// 5. Returns through behaviors in reverse order (first registered returns last)
     /// </remarks>
     Task<TResponse> Dispatch<TResponse>(ICommand<TResponse> command, CancellationToken ct = default);
 

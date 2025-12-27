@@ -102,6 +102,7 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator
             }
 
             // Resolve behaviors (outermost first, wrap inner)
+            // First registered becomes outermost: FIFO before handler, LIFO after handler
             var behaviorType = typeof(IPipelineBehavior<,>).MakeGenericType(reqType, resType);
             var behaviors = _sp.GetServices(behaviorType).Reverse().ToArray();
 
@@ -171,6 +172,7 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator
             }
 
             // Resolve behaviors (outermost first, wrap inner)
+            // First registered becomes outermost: FIFO before handler, LIFO after handler
             var behaviorType = typeof(IPipelineBehavior<,>).MakeGenericType(reqType, resType);
             var behaviors = _sp.GetServices(behaviorType).Reverse().ToArray();
 

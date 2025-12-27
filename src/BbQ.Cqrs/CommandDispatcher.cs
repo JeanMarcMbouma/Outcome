@@ -82,7 +82,8 @@ internal sealed class CommandDispatcher(IServiceProvider sp) : ICommandDispatche
                 return (Task<TResponse>)handleMethod.Invoke(handler, [cmd, token])!;
             }
 
-            // Resolve behaviors and reverse order (last registered becomes outermost)
+            // Resolve behaviors in registration order (first registered becomes outermost)
+            // This creates FIFO order before handler, LIFO order after handler
             var behaviorType = typeof(IPipelineBehavior<,>).MakeGenericType(cmdType, resType);
             var behaviors = _sp.GetServices(behaviorType).Reverse().ToArray();
 

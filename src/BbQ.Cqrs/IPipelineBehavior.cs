@@ -13,14 +13,20 @@ namespace BbQ.Cqrs;
 /// <typeparam name="TRequest">The request type, must implement IRequest&lt;TResponse&gt;</typeparam>
 /// <typeparam name="TResponse">The response type</typeparam>
 /// <remarks>
-/// Pipeline execution order:
-/// 1. First registered behavior executes first
+/// Pipeline execution order (FIFO before handler, LIFO after handler):
+/// 1. First registered behavior executes first (outermost)
 /// 2. Each behavior can execute logic before calling next()
-/// 3. At the end of the chain, the handler is invoked
-/// 4. Each behavior can execute logic after the handler returns
-/// 5. The outermost behavior's result is returned to the caller
+/// 3. Behaviors are nested, so they execute in registration order going toward the handler
+/// 4. At the end of the chain, the handler is invoked
+/// 5. Each behavior can execute logic after next() returns
+/// 6. Behaviors return in reverse order, so first registered returns last
 /// 
-/// Example:
+/// Example with Behavior1 registered first, Behavior2 registered second:
+/// <code>
+/// Behavior1 (before) → Behavior2 (before) → Handler → Behavior2 (after) → Behavior1 (after)
+/// </code>
+/// 
+/// Example logging behavior:
 /// <code>
 /// // Logging behavior
 /// public class LoggingBehavior&lt;TRequest, TResponse&gt; : IPipelineBehavior&lt;TRequest, TResponse&gt;
