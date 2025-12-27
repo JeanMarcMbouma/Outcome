@@ -43,22 +43,29 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator
 
     private readonly ConcurrentDictionary<(Type Req, Type Res),
         Func<object, CancellationToken, Task>> _fireAndForgetCache = new();
+    
+    private readonly ConcurrentDictionary<(Type Req, Type Res),
+        Func<object, CancellationToken, Task>> _genericRequestCache = new();
 
 
     /// <summary>
     /// Sends a request through the CQRS pipeline and returns a response.
     /// </summary>
     /// <typeparam name="TResponse">The response type returned by the handler</typeparam>
-    /// <param name="request">The request to send (must be ICommand&lt;TResponse&gt; or IQuery&lt;TResponse&gt;)</param>
+    /// <param name="request">The request to send (must be ICommand&lt;TResponse&gt;, IQuery&lt;TResponse&gt;, or IRequest&lt;TResponse&gt;)</param>
     /// <param name="ct">Cancellation token for async operations</param>
     /// <returns>The response from the handler after passing through all behaviors</returns>
     /// <remarks>
     /// This method routes the request to the appropriate dispatcher:
     /// - ICommand&lt;TResponse&gt; -> ICommandDispatcher
     /// - IQuery&lt;TResponse&gt; -> IQueryDispatcher
+    /// - IRequest&lt;TResponse&gt; (direct implementation) -> Handled by Mediator with fallback logic
     /// 
     /// The routing is done at runtime based on the request type, allowing the mediator
     /// to act as a unified interface while delegating to specialized dispatchers.
+    /// 
+    /// For requests that implement IRequest&lt;TResponse&gt; directly (not recommended),
+    /// the mediator falls back to directly resolving and executing the handler.
     /// </remarks>
     public Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken ct = default)
     {
@@ -67,9 +74,56 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator
         {
             ICommand<TResponse> command => _commandDispatcher.Dispatch(command, ct),
             IQuery<TResponse> query => _queryDispatcher.Dispatch(query, ct),
-            _ => throw new InvalidOperationException(
-                $"Request type {request.GetType().Name} must implement either ICommand<TResponse> or IQuery<TResponse>")
+            // Fallback for requests that implement IRequest<TResponse> directly
+            _ => HandleGenericRequest(request, ct)
         };
+    }
+
+    /// <summary>
+    /// Handles requests that implement IRequest&lt;TResponse&gt; directly without implementing ICommand or IQuery.
+    /// This provides backward compatibility for direct IRequest implementations.
+    /// </summary>
+    private async Task<TResponse> HandleGenericRequest<TResponse>(IRequest<TResponse> request, CancellationToken ct)
+    {
+        var key = (request.GetType(), typeof(TResponse));
+
+        var dispatcher = _genericRequestCache.GetOrAdd(key, k =>
+        {
+            var (reqType, resType) = k;
+
+            // Resolve handler
+            var handlerType = typeof(IRequestHandler<,>).MakeGenericType(reqType, resType);
+            var handleMethod = handlerType.GetMethod("Handle")!;
+
+            Task<TResponse> terminal(object req, CancellationToken token)
+            {
+                var handler = _sp.GetRequiredService(handlerType);
+                return (Task<TResponse>)handleMethod.Invoke(handler, [req, token])!;
+            }
+
+            // Resolve behaviors (outermost first, wrap inner)
+            var behaviorType = typeof(IPipelineBehavior<,>).MakeGenericType(reqType, resType);
+            var behaviors = _sp.GetServices(behaviorType).Reverse().ToArray();
+
+            Func<object, CancellationToken, Task<TResponse>> pipeline = terminal;
+            foreach (var b in behaviors)
+            {
+                var method = behaviorType.GetMethod("Handle")!;
+                var next = pipeline;
+                pipeline = (req, token) =>
+                    (Task<TResponse>)method.Invoke(b,
+                    [
+                        req,
+                        token,
+                        new Func<object, CancellationToken, Task<TResponse>>(next)
+                    ])!;
+            }
+
+            return pipeline;
+        });
+
+        var resultObj = await (Task<TResponse>)dispatcher(request!, ct);
+        return resultObj;
     }
 
     /// <summary>
