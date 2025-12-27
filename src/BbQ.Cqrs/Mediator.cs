@@ -48,8 +48,8 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator
     /// <summary>
     /// Sends a request through the CQRS pipeline and returns a response.
     /// </summary>
-    /// <typeparam name="TResponse">The response type</typeparam>
-    /// <param name="request">The request to send</param>
+    /// <typeparam name="TResponse">The response type returned by the handler</typeparam>
+    /// <param name="request">The request to send (must be ICommand&lt;TResponse&gt; or IQuery&lt;TResponse&gt;)</param>
     /// <param name="ct">Cancellation token for async operations</param>
     /// <returns>The response from the handler after passing through all behaviors</returns>
     /// <remarks>
@@ -75,7 +75,7 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator
     /// <summary>
     /// Sends a fire-and-forget request (void-like) through the CQRS pipeline.
     /// </summary>
-    /// <param name="request">The request to send</param>
+    /// <param name="request">The fire-and-forget request to send (must implement IRequest)</param>
     /// <param name="ct">Cancellation token for async operations</param>
     /// <returns>A task that completes when the handler finishes executing</returns>
     /// <remarks>
