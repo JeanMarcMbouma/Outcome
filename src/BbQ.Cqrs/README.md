@@ -16,6 +16,35 @@ A lightweight, extensible CQRS (Command Query Responsibility Segregation) implem
 
 BbQ.Cqrs includes Roslyn source generators that can automatically detect and register your handlers and behaviors, reducing boilerplate code.
 
+### Important: Register IMediator First
+
+**Always call `AddBbQMediator()` before using the generated registration methods** to ensure `IMediator` is registered:
+
+```csharp
+// Required: Register IMediator and core infrastructure
+services.AddBbQMediator(typeof(Program).Assembly);
+
+// Then use generated methods (if available)
+services.AddYourAssemblyNameHandlers();  // Optional: Register additional handlers
+services.AddYourAssemblyNameBehaviors(); // Optional: Register behaviors with [Behavior]
+```
+
+The generated methods support customizable lifetimes:
+
+```csharp
+// Customize handler and behavior lifetimes
+services.AddBbQMediator(typeof(Program).Assembly);
+services.AddYourAssemblyNameHandlers(ServiceLifetime.Transient);
+services.AddYourAssemblyNameBehaviors(ServiceLifetime.Singleton);
+
+// Or use the combined method
+services.AddBbQMediator(typeof(Program).Assembly);
+services.AddYourAssemblyNameCqrs(
+    handlersLifetime: ServiceLifetime.Scoped,
+    behaviorsLifetime: ServiceLifetime.Scoped
+);
+```
+
 ### Automatic Handler Registration
 
 The source generator automatically detects all handlers implementing `IRequestHandler<,>` and `IRequestHandler<>` and generates extension methods to register them:

@@ -220,6 +220,7 @@ namespace BbQ.Cqrs.SourceGenerators
             sb.AppendLine("#nullable enable");
             sb.AppendLine();
             sb.AppendLine("using Microsoft.Extensions.DependencyInjection;");
+            sb.AppendLine("using Microsoft.Extensions.DependencyInjection.Extensions;");
             sb.AppendLine("using BbQ.Cqrs;");
             sb.AppendLine();
             sb.AppendLine("namespace BbQ.Cqrs.DependencyInjection");
@@ -230,26 +231,45 @@ namespace BbQ.Cqrs.SourceGenerators
             sb.AppendLine($"    public static class {className}");
             sb.AppendLine("    {");
 
-            // Generate AddGeneratedHandlers method
+            // Generate AddGeneratedHandlers method with lifetime parameter
             if (validHandlers.Count > 0)
             {
                 sb.AppendLine("        /// <summary>");
                 sb.AppendLine($"        /// Registers all auto-detected command and query handlers from {assemblyName}.");
+                if (assemblyName == "BbQ.Cqrs")
+                {
+                    sb.AppendLine("        /// Also registers IMediator as singleton if not already registered.");
+                }
+                else
+                {
+                    sb.AppendLine("        /// Note: You must call AddBbQMediator() before calling this method to register IMediator.");
+                }
                 sb.AppendLine("        /// </summary>");
-                sb.AppendLine($"        public static IServiceCollection Add{safeName}Handlers(this IServiceCollection services)");
+                sb.AppendLine("        /// <param name=\"services\">The service collection</param>");
+                sb.AppendLine("        /// <param name=\"handlersLifetime\">The lifetime to use for handler registrations (default: Scoped)</param>");
+                sb.AppendLine("        /// <returns>The service collection for chaining</returns>");
+                sb.AppendLine($"        public static IServiceCollection Add{safeName}Handlers(this IServiceCollection services, ServiceLifetime handlersLifetime = ServiceLifetime.Scoped)");
                 sb.AppendLine("        {");
+                
+                // Only register IMediator if we're in BbQ.Cqrs assembly (where Mediator is accessible)
+                if (assemblyName == "BbQ.Cqrs")
+                {
+                    sb.AppendLine("            // Register IMediator as singleton if not already registered");
+                    sb.AppendLine("            services.TryAddSingleton<IMediator, Mediator>();");
+                    sb.AppendLine();
+                }
 
                 foreach (var handler in validHandlers)
                 {
                     if (handler.IsFireAndForget)
                     {
                         sb.AppendLine($"            // Register fire-and-forget handler: {handler.HandlerTypeName}");
-                        sb.AppendLine($"            services.AddScoped<IRequestHandler<{handler.RequestTypeName}>, {handler.HandlerTypeName}>();");
+                        sb.AppendLine($"            services.Add(new ServiceDescriptor(typeof(IRequestHandler<{handler.RequestTypeName}>), typeof({handler.HandlerTypeName}), handlersLifetime));");
                     }
                     else
                     {
                         sb.AppendLine($"            // Register {(handler.IsCommand ? "command" : "query")} handler: {handler.HandlerTypeName}");
-                        sb.AppendLine($"            services.AddScoped<IRequestHandler<{handler.RequestTypeName}, {handler.ResponseTypeName}>, {handler.HandlerTypeName}>();");
+                        sb.AppendLine($"            services.Add(new ServiceDescriptor(typeof(IRequestHandler<{handler.RequestTypeName}, {handler.ResponseTypeName}>), typeof({handler.HandlerTypeName}), handlersLifetime));");
                     }
                 }
 
@@ -264,14 +284,33 @@ namespace BbQ.Cqrs.SourceGenerators
                 sb.AppendLine();
                 sb.AppendLine("        /// <summary>");
                 sb.AppendLine($"        /// Registers all behaviors marked with [Behavior] attribute from {assemblyName} in order.");
+                if (assemblyName == "BbQ.Cqrs")
+                {
+                    sb.AppendLine("        /// Also registers IMediator as singleton if not already registered.");
+                }
+                else
+                {
+                    sb.AppendLine("        /// Note: You must call AddBbQMediator() before calling this method to register IMediator.");
+                }
                 sb.AppendLine("        /// </summary>");
-                sb.AppendLine($"        public static IServiceCollection Add{safeName}Behaviors(this IServiceCollection services)");
+                sb.AppendLine("        /// <param name=\"services\">The service collection</param>");
+                sb.AppendLine("        /// <param name=\"behaviorsLifetime\">The lifetime to use for behavior registrations (default: Scoped)</param>");
+                sb.AppendLine("        /// <returns>The service collection for chaining</returns>");
+                sb.AppendLine($"        public static IServiceCollection Add{safeName}Behaviors(this IServiceCollection services, ServiceLifetime behaviorsLifetime = ServiceLifetime.Scoped)");
                 sb.AppendLine("        {");
+                
+                // Only register IMediator if we're in BbQ.Cqrs assembly (where Mediator is accessible)
+                if (assemblyName == "BbQ.Cqrs")
+                {
+                    sb.AppendLine("            // Register IMediator as singleton if not already registered");
+                    sb.AppendLine("            services.TryAddSingleton<IMediator, Mediator>();");
+                    sb.AppendLine();
+                }
 
                 foreach (var behavior in validBehaviors)
                 {
                     sb.AppendLine($"            // Register behavior (Order = {behavior.Order}): {behavior.BehaviorTypeName}");
-                    sb.AppendLine($"            services.AddScoped(typeof(IPipelineBehavior<,>), typeof({behavior.BehaviorTypeName}));");
+                    sb.AppendLine($"            services.Add(new ServiceDescriptor(typeof(IPipelineBehavior<,>), typeof({behavior.BehaviorTypeName}), behaviorsLifetime));");
                 }
 
                 sb.AppendLine();
@@ -285,18 +324,38 @@ namespace BbQ.Cqrs.SourceGenerators
                 sb.AppendLine();
                 sb.AppendLine("        /// <summary>");
                 sb.AppendLine($"        /// Registers all auto-detected handlers and behaviors from {assemblyName}.");
+                if (assemblyName == "BbQ.Cqrs")
+                {
+                    sb.AppendLine("        /// Also registers IMediator as singleton if not already registered.");
+                }
+                else
+                {
+                    sb.AppendLine("        /// Note: You must call AddBbQMediator() before calling this method to register IMediator.");
+                }
                 sb.AppendLine("        /// </summary>");
-                sb.AppendLine($"        public static IServiceCollection Add{safeName}Cqrs(this IServiceCollection services)");
+                sb.AppendLine("        /// <param name=\"services\">The service collection</param>");
+                sb.AppendLine("        /// <param name=\"handlersLifetime\">The lifetime to use for handler registrations (default: Scoped)</param>");
+                sb.AppendLine("        /// <param name=\"behaviorsLifetime\">The lifetime to use for behavior registrations (default: Scoped)</param>");
+                sb.AppendLine("        /// <returns>The service collection for chaining</returns>");
+                sb.AppendLine($"        public static IServiceCollection Add{safeName}Cqrs(this IServiceCollection services, ServiceLifetime handlersLifetime = ServiceLifetime.Scoped, ServiceLifetime behaviorsLifetime = ServiceLifetime.Scoped)");
                 sb.AppendLine("        {");
+                
+                // Only register IMediator if we're in BbQ.Cqrs assembly (where Mediator is accessible)
+                if (assemblyName == "BbQ.Cqrs")
+                {
+                    sb.AppendLine("            // Register IMediator as singleton if not already registered");
+                    sb.AppendLine("            services.TryAddSingleton<IMediator, Mediator>();");
+                    sb.AppendLine();
+                }
                 
                 if (validHandlers.Count > 0)
                 {
-                    sb.AppendLine($"            services.Add{safeName}Handlers();");
+                    sb.AppendLine($"            services.Add{safeName}Handlers(handlersLifetime);");
                 }
                 
                 if (validBehaviors.Count > 0)
                 {
-                    sb.AppendLine($"            services.Add{safeName}Behaviors();");
+                    sb.AppendLine($"            services.Add{safeName}Behaviors(behaviorsLifetime);");
                 }
                 
                 sb.AppendLine();
