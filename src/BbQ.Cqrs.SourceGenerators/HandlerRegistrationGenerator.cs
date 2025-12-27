@@ -16,14 +16,8 @@ namespace BbQ.Cqrs.SourceGenerators
     {
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
-            // Register syntax providers for handlers
-            var commandHandlers = context.SyntaxProvider
-                .CreateSyntaxProvider(
-                    predicate: static (s, _) => IsHandlerCandidate(s),
-                    transform: static (ctx, _) => GetHandlerInfo(ctx))
-                .Where(static m => m is not null);
-
-            var queryHandlers = context.SyntaxProvider
+            // Register syntax provider for all handlers (commands, queries, and fire-and-forget)
+            var handlers = context.SyntaxProvider
                 .CreateSyntaxProvider(
                     predicate: static (s, _) => IsHandlerCandidate(s),
                     transform: static (ctx, _) => GetHandlerInfo(ctx))
@@ -37,7 +31,7 @@ namespace BbQ.Cqrs.SourceGenerators
                 .Where(static m => m is not null);
 
             // Collect all handlers and behaviors
-            var allHandlers = commandHandlers.Collect();
+            var allHandlers = handlers.Collect();
             var allBehaviors = behaviors.Collect();
             
             // Get compilation to access assembly name

@@ -21,12 +21,30 @@ BbQ.Cqrs includes Roslyn source generators that can automatically detect and reg
 **Always call `AddBbQMediator()` before using the generated registration methods** to ensure `IMediator` is registered:
 
 ```csharp
-// Required: Register IMediator and core infrastructure
+// Option 1: Use assembly scanning for everything (uses reflection)
 services.AddBbQMediator(typeof(Program).Assembly);
 
-// Then use generated methods (if available)
-services.AddYourAssemblyNameHandlers();  // Optional: Register additional handlers
-services.AddYourAssemblyNameBehaviors(); // Optional: Register behaviors with [Behavior]
+// Option 2: Register IMediator only, then use source generators (recommended)
+services.AddBbQMediator(Array.Empty<Assembly>());  // Just register IMediator
+services.AddYourAssemblyNameHandlers();  // Use generated method - compile-time, no reflection
+services.AddYourAssemblyNameBehaviors(); // Use generated method
+```
+
+**Important Note on Assembly Scanning:**
+When you pass assemblies to `AddBbQMediator()`, it uses reflection-based assembly scanning to discover and register handlers. This approach:
+- Uses runtime reflection, which is slower than compile-time source generation
+- Should be used sparingly, primarily when reusing queries and handlers from external libraries
+- For your own application code, prefer using source generators (generated `AddXxxHandlers()` methods) for better performance and compile-time safety
+
+**Recommended Pattern:**
+```csharp
+// For your application's handlers (preferred - uses source generators)
+services.AddBbQMediator(Array.Empty<Assembly>());  // Register IMediator only
+services.AddMyAppHandlers();  // Use generated method - compile-time, no reflection
+services.AddMyAppBehaviors();  // Use generated method for behaviors
+
+// For library handlers (when needed - uses reflection)
+services.AddBbQMediator(typeof(SharedLibrary).Assembly);  // Assembly scanning for libraries
 ```
 
 The generated methods support customizable lifetimes:
@@ -54,7 +72,7 @@ The source generator automatically detects all handlers implementing `IRequestHa
 services.AddYourAssemblyNameHandlers();  // Registers all detected handlers
 ```
 
-All handlers implementing `ICommand<T>` or `IQuery<T>` are automatically detected without needing attributes.
+All handlers for requests implementing `ICommand<T>` or `IQuery<T>` are automatically detected without needing attributes.
 
 ### Opt-in Attributes
 

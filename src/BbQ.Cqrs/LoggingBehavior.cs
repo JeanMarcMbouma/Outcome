@@ -11,9 +11,8 @@ namespace BbQ.Cqrs;
 /// <typeparam name="TRequest">The request type being processed</typeparam>
 /// <typeparam name="TResponse">The response type returned by the handler</typeparam>
 /// <remarks>
-/// This behavior is automatically registered by AddBbQMediator() and is included
-/// in the default pipeline. It executes as an outermost behavior to capture
-/// the full request/response cycle.
+/// This behavior can be registered manually or automatically via source generators
+/// when marked with the [Behavior] attribute.
 /// 
 /// Example output:
 /// <code>

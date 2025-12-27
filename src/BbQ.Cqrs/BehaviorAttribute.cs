@@ -10,6 +10,10 @@ namespace BbQ.Cqrs;
 /// - Higher values execute later (closer to the handler)
 /// - Default value is 0 if not specified
 /// 
+/// <strong>Important:</strong> The behavior class must have exactly 2 type parameters matching
+/// IPipelineBehavior&lt;TRequest, TResponse&gt;. Behaviors with additional type parameters
+/// (e.g., 3 or more) cannot be automatically registered and must be registered manually.
+/// 
 /// Usage:
 /// <code>
 /// [Behavior(Order = 1)]

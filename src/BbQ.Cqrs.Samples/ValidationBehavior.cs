@@ -23,7 +23,10 @@ public sealed class RenameUserValidator : IRequestValidator<RenameUser>
     }
 }
 
-[Behavior(Order = 2)]
+// Note: ValidationBehavior has 3 type parameters (TRequest, TResponse, TPayload) which makes it
+// incompatible with the source generator's automatic registration. Behaviors with more than 2
+// type parameters must be registered manually. The [Behavior] attribute should only be used on
+// behaviors that directly match IPipelineBehavior<TRequest, TResponse> with exactly 2 type parameters.
 public sealed class ValidationBehavior<TRequest, TResponse, TPayload>
     : IPipelineBehavior<TRequest, TResponse>
     where TRequest : IRequest<TResponse>

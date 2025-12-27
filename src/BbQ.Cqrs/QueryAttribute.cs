@@ -1,13 +1,12 @@
 namespace BbQ.Cqrs;
 
 /// <summary>
-/// Marks a class as a query for source generation purposes.
-/// When applied to a class, the source generator can generate handler registration
-/// and other boilerplate code.
+/// Marks a class as a query so that it can be discovered by tooling and IDE support.
 /// </summary>
 /// <remarks>
-/// This attribute is opt-in for source generation. Apply it to query classes
-/// that you want the generator to process for automatic handler stub generation.
+/// This attribute is optional and primarily serves as metadata for tooling/IDE support.
+/// The source generator automatically detects handlers for requests implementing IQuery&lt;T&gt;
+/// without requiring this attribute.
 /// 
 /// Usage:
 /// <code>

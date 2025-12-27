@@ -1,12 +1,11 @@
 # BbQ.Cqrs Source Generators
 
-Source generators for BbQ.Cqrs that automatically generate handler registration and reduce boilerplate code.
+Source generators for BbQ.Cqrs that automatically detect and register handlers and behaviors, reducing boilerplate code.
 
 ## Features
 
-- **Handler Registration Generator**: Automatically detects and registers `ICommandHandler` and `IQueryHandler` implementations
-- **Opt-in Handler Stubs**: Generate handler stubs for classes marked with `[Command]` or `[Query]` attributes
-- **Behavior Registration**: Automatically register pipeline behaviors marked with `[Behavior(Order = ...)]` attribute
+- **Handler Registration Generator**: Automatically detects and registers handlers implementing `IRequestHandler<,>` and `IRequestHandler<>` for commands and queries
+- **Behavior Registration**: Automatically register pipeline behaviors marked with `[Behavior(Order = ...)]` attribute in the specified order
 
 ## Installation
 
@@ -16,7 +15,9 @@ dotnet add package BbQ.Cqrs.SourceGenerators
 
 ## Usage
 
-### Mark Commands and Queries
+### Mark Commands and Queries (Optional)
+
+The `[Command]` and `[Query]` attributes are optional markers for tooling/IDE support:
 
 ```csharp
 [Command]
@@ -33,7 +34,11 @@ public class GetUserByIdQuery : IQuery<Outcome<User>>
 }
 ```
 
+Handlers are automatically detected based on interface implementation, regardless of whether these attributes are present.
+
 ### Mark Behaviors for Automatic Registration
+
+Only behaviors with the `[Behavior]` attribute are automatically registered:
 
 ```csharp
 [Behavior(Order = 1)]
