@@ -33,6 +33,20 @@ static class Program
         await Scenario03_ErrorHandling();
         await Scenario04_RetryBehavior();
         await Scenario05_FireAndForgetCommand();
+        await Scenario06_DispatcherExample();
+    }
+
+    /// <summary>
+    /// Scenario 6: Dispatcher Example
+    /// 
+    /// Demonstrates:
+    /// - Using ICommandDispatcher for commands
+    /// - Using IQueryDispatcher for queries
+    /// - Separation of concerns between commands and queries
+    /// </summary>
+    static async Task Scenario06_DispatcherExample()
+    {
+        await DispatcherSample.RunExample();
     }
 
     /// <summary>
