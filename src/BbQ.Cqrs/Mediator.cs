@@ -115,15 +115,14 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator
                     [
                         req,
                         token,
-                        new Func<object, CancellationToken, Task<TResponse>>(next)
+                        next
                     ])!;
             }
 
             return pipeline;
         });
 
-        var resultObj = await (Task<TResponse>)dispatcher(request!, ct);
-        return resultObj;
+        return await (Task<TResponse>)dispatcher(request, ct);
     }
 
     /// <summary>
