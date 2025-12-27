@@ -16,7 +16,7 @@ public static class ServiceCollectionExtensions
     {
 
         /// <summary>
-        /// Registers the BbQ CQRS mediator and all handlers in the specified assemblies.
+        /// Registers the BbQ CQRS mediator, dispatchers, and all handlers in the specified assemblies.
         /// </summary>
         /// <param name="services">The service collection to register with</param>
         /// <param name="handlersLifeTime">The lifetime to use for handler instances</param>
@@ -25,10 +25,12 @@ public static class ServiceCollectionExtensions
         /// <remarks>
         /// This method:
         /// 1. Registers IMediator as a singleton (single instance for the application)
-        /// 2. Scans the provided assemblies for all classes implementing IRequestHandler&lt;&gt;
-        /// 3. Scans the provided assemblies for all classes implementing IRequestHandler&lt;,&gt;
-        /// 4. Registers each handler with its implemented interfaces
-        /// 5. Uses the specified lifetime for handlers (scoped by default - one per request in web apps)
+        /// 2. Registers ICommandDispatcher as a singleton
+        /// 3. Registers IQueryDispatcher as a singleton
+        /// 4. Scans the provided assemblies for all classes implementing IRequestHandler&lt;&gt;
+        /// 5. Scans the provided assemblies for all classes implementing IRequestHandler&lt;,&gt;
+        /// 6. Registers each handler with its implemented interfaces
+        /// 7. Uses the specified lifetime for handlers (scoped by default - one per request in web apps)
         /// 
         /// Pipeline behaviors must be registered separately. Example usage:
         /// <code>
@@ -51,8 +53,10 @@ public static class ServiceCollectionExtensions
         public IServiceCollection AddBbQMediator(ServiceLifetime handlersLifeTime,
             params System.Reflection.Assembly[] assemblies)
         {
-            // Register the mediator as singleton
+            // Register the mediator and dispatchers as singleton
             services.AddSingleton<IMediator, Mediator>();
+            services.AddSingleton<ICommandDispatcher, CommandDispatcher>();
+            services.AddSingleton<IQueryDispatcher, QueryDispatcher>();
 
             // Scan and register all request handlers from the provided assemblies
             services.Scan(s => s.FromAssemblies(assemblies)
@@ -69,7 +73,7 @@ public static class ServiceCollectionExtensions
         }
 
         /// <summary>
-        /// Registers the BbQ CQRS mediator and all handlers in the specified assemblies.
+        /// Registers the BbQ CQRS mediator, dispatchers, and all handlers in the specified assemblies.
         /// </summary>
         /// <param name="services">The service collection to register with</param>
         /// <param name="assemblies">Assemblies to scan for handlers</param>
@@ -77,10 +81,12 @@ public static class ServiceCollectionExtensions
         /// <remarks>
         /// This method:
         /// 1. Registers IMediator as a singleton (single instance for the application)
-        /// 2. Scans the provided assemblies for all classes implementing IRequestHandler&lt;&gt;
-        /// 3. Scans the provided assemblies for all classes implementing IRequestHandler&lt;,&gt;
-        /// 4. Registers each handler with its implemented interfaces
-        /// 5. Uses the specified lifetime for handlers (scoped by default - one per request in web apps)
+        /// 2. Registers ICommandDispatcher as a singleton
+        /// 3. Registers IQueryDispatcher as a singleton
+        /// 4. Scans the provided assemblies for all classes implementing IRequestHandler&lt;&gt;
+        /// 5. Scans the provided assemblies for all classes implementing IRequestHandler&lt;,&gt;
+        /// 6. Registers each handler with its implemented interfaces
+        /// 7. Uses the specified lifetime for handlers (scoped by default - one per request in web apps)
         /// 
         /// Pipeline behaviors must be registered separately. Example usage:
         /// <code>

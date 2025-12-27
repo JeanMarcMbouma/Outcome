@@ -8,64 +8,86 @@ namespace BbQ.Cqrs;
 /// <summary>
 /// The concrete implementation of IMediator for the CQRS pattern.
 /// 
-/// This mediator:
-/// 1. Resolves the handler for a given request
-/// 2. Builds a pipeline of behaviors in registration order
-/// 3. Executes the pipeline with the handler as the terminal
-/// 4. Returns the response from the handler
+/// This mediator delegates to specialized dispatchers:
+/// - Commands are routed to ICommandDispatcher
+/// - Queries are routed to IQueryDispatcher
+/// 
+/// This design allows the mediator to be a thin facade over the dispatchers,
+/// providing a unified interface while maintaining separation of concerns.
 /// </summary>
 /// <remarks>
-/// The mediator uses dependency injection to resolve:
-/// - The specific IRequestHandler&lt;TRequest, TResponse&gt; implementation
-/// - All registered IPipelineBehavior&lt;TRequest, TResponse&gt; implementations
+/// The mediator uses the following dispatchers:
+/// - ICommandDispatcher for ICommand&lt;TResponse&gt; requests
+/// - IQueryDispatcher for IQuery&lt;TResponse&gt; requests
 /// 
-/// Pipeline construction:
-/// - Behaviors are retrieved from the service provider in registration order
-/// - They are then composed in reverse order to form the chain
-/// - This ensures the first registered behavior is the outermost
-/// - The handler becomes the innermost (terminal) of the pipeline
+/// This approach:
+/// - Eliminates code duplication between Mediator and dispatchers
+/// - Allows dispatchers to be used independently or through the mediator
+/// - Maintains interchangeability between IMediator and the specialized dispatchers
+/// - Provides optimization opportunities for source generators
 /// 
-/// Example pipeline for 2 behaviors:
+/// Example usage:
 /// <code>
-/// request
-///   -> Behavior1.Handle()
-///        -> Behavior2.Handle()
-///             -> Handler.Handle()
+/// // Using mediator (unified interface)
+/// var result = await mediator.Send(new CreateUserCommand());
+/// 
+/// // Using dispatcher directly (explicit command/query separation)
+/// var result = await commandDispatcher.Dispatch(new CreateUserCommand());
 /// </code>
 /// </remarks>
 internal sealed class Mediator(IServiceProvider sp) : IMediator
 {
     private readonly IServiceProvider _sp = sp;
+    private readonly ICommandDispatcher _commandDispatcher = sp.GetRequiredService<ICommandDispatcher>();
+    private readonly IQueryDispatcher _queryDispatcher = sp.GetRequiredService<IQueryDispatcher>();
 
     private readonly ConcurrentDictionary<(Type Req, Type Res),
-        Func<object, CancellationToken, Task>> _dispatchCache = new();
+        Func<object, CancellationToken, Task>> _fireAndForgetCache = new();
+    
+    private readonly ConcurrentDictionary<(Type Req, Type Res),
+        Func<object, CancellationToken, Task>> _genericRequestCache = new();
 
 
     /// <summary>
     /// Sends a request through the CQRS pipeline and returns a response.
     /// </summary>
-    /// <typeparam name="TRequest">The request type</typeparam>
-    /// <typeparam name="TResponse">The response type</typeparam>
-    /// <param name="request">The request to send</param>
+    /// <typeparam name="TResponse">The response type returned by the handler</typeparam>
+    /// <param name="request">The request to send (must be ICommand&lt;TResponse&gt;, IQuery&lt;TResponse&gt;, or IRequest&lt;TResponse&gt;)</param>
     /// <param name="ct">Cancellation token for async operations</param>
     /// <returns>The response from the handler after passing through all behaviors</returns>
     /// <remarks>
-    /// Process:
-    /// 1. Resolves the handler with GetRequiredService()
-    /// 2. Resolves all behaviors with GetServices()
-    /// 3. Composes behaviors in reverse order
-    /// 4. Invokes the composed pipeline with the request
-    /// 5. Returns the final response
+    /// This method routes the request to the appropriate dispatcher:
+    /// - ICommand&lt;TResponse&gt; -> ICommandDispatcher
+    /// - IQuery&lt;TResponse&gt; -> IQueryDispatcher
+    /// - IRequest&lt;TResponse&gt; (direct implementation) -> Handled by Mediator with fallback logic
     /// 
-    /// If no handler is registered, GetRequiredService() throws InvalidOperationException.
-    /// If no behaviors are registered, the request goes directly to the handler.
+    /// The routing is done at runtime based on the request type, allowing the mediator
+    /// to act as a unified interface while delegating to specialized dispatchers.
+    /// 
+    /// For requests that implement IRequest&lt;TResponse&gt; directly (not recommended),
+    /// the mediator falls back to directly resolving and executing the handler.
     /// </remarks>
-    public async Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken ct = default)
+    public Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken ct = default)
     {
-        // Resolve strongly-typed handler - throws if not registered
+        // Route to appropriate dispatcher based on request type
+        return request switch
+        {
+            ICommand<TResponse> command => _commandDispatcher.Dispatch(command, ct),
+            IQuery<TResponse> query => _queryDispatcher.Dispatch(query, ct),
+            // Fallback for requests that implement IRequest<TResponse> directly
+            _ => HandleGenericRequest(request, ct)
+        };
+    }
+
+    /// <summary>
+    /// Handles requests that implement IRequest&lt;TResponse&gt; directly without implementing ICommand or IQuery.
+    /// This provides backward compatibility for direct IRequest implementations.
+    /// </summary>
+    private async Task<TResponse> HandleGenericRequest<TResponse>(IRequest<TResponse> request, CancellationToken ct)
+    {
         var key = (request.GetType(), typeof(TResponse));
 
-        var dispatcher = _dispatchCache.GetOrAdd(key, k =>
+        var dispatcher = _genericRequestCache.GetOrAdd(key, k =>
         {
             var (reqType, resType) = k;
 
@@ -80,6 +102,7 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator
             }
 
             // Resolve behaviors (outermost first, wrap inner)
+            // First registered becomes outermost: FIFO before handler, LIFO after handler
             var behaviorType = typeof(IPipelineBehavior<,>).MakeGenericType(reqType, resType);
             var behaviors = _sp.GetServices(behaviorType).Reverse().ToArray();
 
@@ -91,28 +114,32 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator
                 pipeline = (req, token) =>
                     (Task<TResponse>)method.Invoke(b,
                     [
-                            req,
-                            token,
-                            new Func<object, CancellationToken, Task<TResponse>>(next)
+                        req,
+                        token,
+                        new Func<object, CancellationToken, Task<TResponse>>(next)
                     ])!;
             }
 
             return pipeline;
         });
 
-        var resultObj = await (Task<TResponse>)dispatcher(request!, ct);
-        return resultObj;
-
+        return await (Task<TResponse>)dispatcher(request, ct);
     }
 
     /// <summary>
     /// Sends a fire-and-forget request (void-like) through the CQRS pipeline.
     /// </summary>
-    /// <typeparam name="TRequest">The request type</typeparam>
-    /// <param name="request">The request to send</param>
+    /// <param name="request">The fire-and-forget request to send (must implement IRequest)</param>
     /// <param name="ct">Cancellation token for async operations</param>
     /// <returns>A task that completes when the handler finishes executing</returns>
     /// <remarks>
+    /// This method handles fire-and-forget requests (IRequest without type parameter)
+    /// which implement IRequest but not ICommand or IQuery.
+    /// 
+    /// Fire-and-forget requests are handled directly by the mediator because they use
+    /// the IRequestHandler&lt;TRequest&gt; pattern (without TResponse) which doesn't
+    /// fit cleanly into the ICommand/IQuery dispatcher model.
+    /// 
     /// Process:
     /// 1. Resolves the handler implementing IRequestHandler&lt;TRequest&gt; (single type parameter)
     /// 2. Resolves all behaviors as IPipelineBehavior&lt;TRequest, Unit&gt; (Unit as response type)
@@ -120,12 +147,7 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator
     /// 4. Invokes the composed pipeline with the request
     /// 5. Returns the task without unwrapping any response value
     /// 
-    /// Important: The handler is resolved as IRequestHandler&lt;TRequest&gt; (fire-and-forget style),
-    /// but behaviors are resolved as IPipelineBehavior&lt;TRequest, Unit&gt; to work with the
-    /// fully generic pipeline infrastructure. The Unit type parameter in behaviors is for framework
-    /// consistency but is not exposed to handlers, which have no return type.
-    /// 
-    /// This overload is useful for operations that don't need to return a value,
+    /// This is useful for operations that don't need to return a value,
     /// such as sending emails, publishing events, or executing background jobs.
     /// If no handler is registered, GetRequiredService() throws InvalidOperationException.
     /// </remarks>
@@ -134,7 +156,7 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator
         // Resolve strongly-typed handler - throws if not registered
         var key = (request.GetType(), typeof(Unit));
 
-        var dispatcher = _dispatchCache.GetOrAdd(key, k =>
+        var dispatcher = _fireAndForgetCache.GetOrAdd(key, k =>
         {
             var (reqType, resType) = k;
 
@@ -150,6 +172,7 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator
             }
 
             // Resolve behaviors (outermost first, wrap inner)
+            // First registered becomes outermost: FIFO before handler, LIFO after handler
             var behaviorType = typeof(IPipelineBehavior<,>).MakeGenericType(reqType, resType);
             var behaviors = _sp.GetServices(behaviorType).Reverse().ToArray();
 

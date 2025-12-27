@@ -212,6 +212,67 @@ Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken c
 Task Send(IRequest request, CancellationToken ct = default);
 ```
 
+### ICommandDispatcher
+A specialized dispatcher for commands that provides clear separation between command and query operations.
+
+```csharp
+public interface ICommandDispatcher
+{
+    Task<TResponse> Dispatch<TResponse>(ICommand<TResponse> command, CancellationToken ct = default);
+    Task Dispatch(ICommand<Unit> command, CancellationToken ct = default);
+}
+```
+
+**Benefits:**
+- Explicit separation between commands (state-changing) and queries (read-only)
+- Better discoverability and documentation
+- Type safety with compile-time checking
+- No runtime scanning or hidden magic – uses dependency injection, with reflection only for initial pipeline construction (cached for subsequent calls)
+
+**Example usage:**
+```csharp
+public class UserController
+{
+    private readonly ICommandDispatcher _commandDispatcher;
+    
+    public async Task<IActionResult> CreateUser(CreateUserCommand command, CancellationToken ct)
+    {
+        var result = await _commandDispatcher.Dispatch(command, ct);
+        return result.Match(
+            onSuccess: user => Ok(user),
+            onError: errors => BadRequest(errors)
+        );
+    }
+}
+```
+
+### IQueryDispatcher
+A specialized dispatcher for queries that provides clear separation between command and query operations.
+
+```csharp
+public interface IQueryDispatcher
+{
+    Task<TResponse> Dispatch<TResponse>(IQuery<TResponse> query, CancellationToken ct = default);
+}
+```
+
+**Example usage:**
+```csharp
+public class UserController
+{
+    private readonly IQueryDispatcher _queryDispatcher;
+    
+    public async Task<IActionResult> GetUser(GetUserByIdQuery query, CancellationToken ct)
+    {
+        var result = await _queryDispatcher.Dispatch(query, ct);
+        return result.Match(
+            onSuccess: user => Ok(user),
+            onError: errors => NotFound(errors)
+        );
+    }
+}
+```
+
 ### ICommand<TResponse>
 Marker interface for state-modifying operations (create, update, delete).
 
