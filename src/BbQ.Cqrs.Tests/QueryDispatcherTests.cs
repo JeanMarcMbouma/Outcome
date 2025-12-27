@@ -79,6 +79,8 @@ public class QueryDispatcherTests
     public async Task Dispatch_WithCachingBehavior_CachesResults()
     {
         // Arrange
+        CountingQueryHandler.Reset(); // Reset static counter to ensure test isolation
+        
         var services = new ServiceCollection();
         services.AddBbQMediator(typeof(TestQuery).Assembly);
         services.AddTransient<IRequestHandler<TestQuery, Outcome<string>>, CountingQueryHandler>();
