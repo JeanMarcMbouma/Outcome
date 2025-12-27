@@ -1,11 +1,12 @@
 # BbQ.Cqrs Source Generators
 
-Source generators for BbQ.Cqrs that automatically detect and register handlers and behaviors, reducing boilerplate code.
+Source generators and analyzers for BbQ.Cqrs that automatically detect and register handlers and behaviors, reducing boilerplate code.
 
 ## Features
 
 - **Handler Registration Generator**: Automatically detects and registers handlers implementing `IRequestHandler<,>` and `IRequestHandler<>` for commands and queries
 - **Behavior Registration**: Automatically register pipeline behaviors marked with `[Behavior(Order = ...)]` attribute in the specified order
+- **Analyzer**: Prevents misuse of `[Behavior]` attribute on behaviors with more than 2 type parameters
 
 ## Installation
 
@@ -15,26 +16,23 @@ dotnet add package BbQ.Cqrs.SourceGenerators
 
 ## Usage
 
-### Mark Commands and Queries (Optional)
+### Automatic Handler Detection
 
-The `[Command]` and `[Query]` attributes are optional markers for tooling/IDE support:
+Handlers are automatically detected based on interface implementation. No attributes needed:
 
 ```csharp
-[Command]
 public class CreateUserCommand : ICommand<Outcome<User>>
 {
     public string Email { get; set; }
     public string Name { get; set; }
 }
 
-[Query]
-public class GetUserByIdQuery : IQuery<Outcome<User>>
+// Handler is automatically detected
+public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, Outcome<User>>
 {
-    public Guid UserId { get; set; }
+    // Implementation...
 }
 ```
-
-Handlers are automatically detected based on interface implementation, regardless of whether these attributes are present.
 
 ### Mark Behaviors for Automatic Registration
 
@@ -46,6 +44,34 @@ public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
     where TRequest : IRequest<TResponse>
 {
     // Implementation...
+}
+```
+
+**Important:** The `[Behavior]` attribute can only be used on behaviors with exactly 2 type parameters. Behaviors with additional type parameters (e.g., 3 or more) will trigger a compile-time error and must be registered manually.
+
+## Analyzer Rules
+
+### BBQCQRS001: Behavior attribute on class with incompatible type parameter count
+
+This analyzer ensures that the `[Behavior]` attribute is only used on classes with exactly 2 type parameters that match `IPipelineBehavior<TRequest, TResponse>`.
+
+**Invalid:**
+```csharp
+// ❌ Error: ValidationBehavior has 3 type parameters
+[Behavior(Order = 1)]
+public class ValidationBehavior<TRequest, TResponse, TPayload> : IPipelineBehavior<TRequest, TResponse>
+{
+    // This will cause a compile error
+}
+```
+
+**Valid:**
+```csharp
+// ✅ Correct: LoggingBehavior has exactly 2 type parameters
+[Behavior(Order = 1)]
+public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+{
+    // This will compile and register correctly
 }
 ```
 

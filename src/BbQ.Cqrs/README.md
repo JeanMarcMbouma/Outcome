@@ -74,37 +74,9 @@ services.AddYourAssemblyNameHandlers();  // Registers all detected handlers
 
 All handlers for requests implementing `ICommand<T>` or `IQuery<T>` are automatically detected without needing attributes.
 
-### Opt-in Attributes
-
-Mark your commands, queries, and behaviors with attributes for better tooling support:
-
-```csharp
-// Mark commands
-[Command]
-public class CreateUserCommand : ICommand<Outcome<User>>
-{
-    public string Email { get; set; }
-}
-
-// Mark queries  
-[Query]
-public class GetUserByIdQuery : IQuery<Outcome<User>>
-{
-    public Guid UserId { get; set; }
-}
-
-// Mark behaviors with execution order
-[Behavior(Order = 1)]  // Lower numbers execute first (outermost)
-public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-    where TRequest : IRequest<TResponse>
-{
-    // Implementation...
-}
-```
-
 ### Behavior Registration with Order
 
-Behaviors marked with `[Behavior(Order = ...)]` are automatically registered in the specified order:
+Mark your behaviors with the `[Behavior]` attribute to enable automatic registration in the specified order:
 
 ```csharp
 [Behavior(Order = 1)]  // Executes first (outermost)

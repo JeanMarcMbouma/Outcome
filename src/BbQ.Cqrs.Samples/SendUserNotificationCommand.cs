@@ -8,7 +8,6 @@ namespace BbQ.CQRS.Samples;
 /// This command demonstrates the IRequest pattern (without TResponse)
 /// for operations that don't need to return a meaningful value.
 /// </summary>
-[Command]
 public class SendUserNotificationCommand : IRequest
 {
     /// <summary>
