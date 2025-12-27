@@ -227,7 +227,7 @@ public interface ICommandDispatcher
 - Explicit separation between commands (state-changing) and queries (read-only)
 - Better discoverability and documentation
 - Type safety with compile-time checking
-- No reflection, scanning, or magic - just dependency injection
+- No runtime scanning or hidden magic – uses dependency injection, with reflection only for initial pipeline construction (cached for subsequent calls)
 
 **Example usage:**
 ```csharp
