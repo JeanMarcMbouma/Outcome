@@ -1,6 +1,6 @@
-﻿# BbQ Libraries - Functional Result Types & CQRS
+﻿# BbQ Libraries - Functional Result Types, CQRS & Events
 
-A comprehensive suite of modern C# libraries for functional error handling and command-query responsibility segregation patterns.
+A comprehensive suite of modern C# libraries for functional error handling, command-query responsibility segregation, and event-driven architecture patterns.
 
 ## 📦 Packages
 
@@ -36,6 +36,24 @@ dotnet add package BbQ.Cqrs
 ```
 
 [📖 Full Documentation 📖](./src/BbQ.Cqrs/README.md)
+
+### [BbQ.Events](./src/BbQ.Events/README.md)
+Event-driven architecture support with strongly-typed pub/sub patterns.
+
+- **Type-safe event publishing** with `IEventPublisher`
+- **Event handlers** (`IEventHandler<TEvent>`) for processing events one-by-one
+- **Event subscribers** (`IEventSubscriber<TEvent>`) for consuming event streams
+- **In-memory event bus** for single-process applications
+- **Thread-safe** implementation using `System.Threading.Channels`
+- **Storage-agnostic** design - extend for distributed scenarios
+- **Source generator support** - automatic handler/subscriber discovery
+- **Fully independent** - works standalone or with BbQ.Cqrs
+
+```csharp
+dotnet add package BbQ.Events
+```
+
+[📖 Full Documentation 📖](./src/BbQ.Events/README.md)
 
 ## 🚀 Quick Start
 
@@ -83,6 +101,29 @@ services.AddBbQMediator(typeof(Program).Assembly);
 var result = await mediator.Send(new CreateUserCommand { Email = "test@example.com", Name = "Test" });
 ```
 
+### Using Events
+```csharp
+// Register event bus
+services.AddInMemoryEventBus();
+services.AddYourAssemblyEventHandlers(); // Auto-discovers handlers
+
+// Define an event
+public record UserCreated(Guid Id, string Name);
+
+// Publish event
+await eventPublisher.Publish(new UserCreated(userId, userName));
+
+// Handle event (auto-discovered)
+public class SendWelcomeEmailHandler : IEventHandler<UserCreated>
+{
+    public Task Handle(UserCreated @event, CancellationToken ct)
+    {
+        // Send email...
+        return Task.CompletedTask;
+    }
+}
+```
+
 ## 💾 Installation
 
 ```bash
@@ -91,6 +132,9 @@ dotnet add package BbQ.Outcome
 
 # CQRS pattern support
 dotnet add package BbQ.Cqrs
+
+# Event-driven architecture
+dotnet add package BbQ.Events
 ```
 
 ## 🔗 Integration
@@ -128,24 +172,29 @@ public class GetUserQueryHandler : IRequestHandler<GetUserQuery, Outcome<User>>
 
 ## ✨ Key Features
 
-| Feature | Outcome | CQRS |
-|---------|---------|------|
-| Structured error handling | ✅ | ✅ |
-| Async composition | ✅ | ✅ |
-| Source-generated error helpers | ✅ | ✅ |
-| LINQ integration | ✅ | - |
-| Mediator pattern | - | ✅ |
-| Pipeline behaviors (regular & streaming) | - | ✅ |
-| Streaming handlers with `IAsyncEnumerable` | - | ✅ |
-| Specialized dispatchers | - | ✅ |
-| Type-safe commands/queries | - | ✅ |
-| Source-generated handler registration | - | ✅ |
-| Test utilities | - | ✅ |
+| Feature | Outcome | CQRS | Events |
+|---------|---------|------|--------|
+| Structured error handling | ✅ | ✅ | - |
+| Async composition | ✅ | ✅ | ✅ |
+| Source-generated helpers | ✅ | ✅ | ✅ |
+| LINQ integration | ✅ | - | - |
+| Mediator pattern | - | ✅ | - |
+| Pipeline behaviors | - | ✅ | - |
+| Streaming handlers | - | ✅ | ✅ |
+| Type-safe commands/queries | - | ✅ | - |
+| Event publishing | - | - | ✅ |
+| Event handlers | - | - | ✅ |
+| Event subscribers | - | - | ✅ |
+| Thread-safe in-memory bus | - | - | ✅ |
+| Storage-agnostic design | - | - | ✅ |
+| Fully independent | ✅ | ✅ | ✅ |
+| Test utilities | - | ✅ | - |
 
 ## 📚 Documentation
 
 - **[BbQ.Outcome Documentation](./src/Outcome/README.md)** - Complete guide to using Outcome for functional error handling
 - **[BbQ.Cqrs Documentation](./src/BbQ.Cqrs/README.md)** - Complete guide to CQRS pattern implementation
+- **[BbQ.Events Documentation](./src/BbQ.Events/README.md)** - Complete guide to event-driven architecture
 - **[Strongly Typed Errors Guide](./STRONGLY_TYPED_ERRORS.md)** - Best practices for error handling patterns
 
 ## 🤝 Contributing

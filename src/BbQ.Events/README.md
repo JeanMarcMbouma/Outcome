@@ -10,7 +10,7 @@ Event-driven architecture support with strongly-typed pub/sub for BbQ libraries.
 - **In-memory event bus** for single-process applications
 - **Thread-safe** implementation using `System.Threading.Channels`
 - **Storage-agnostic** design - extend for distributed scenarios
-- **Source generator support** - automatic handler/subscriber discovery when used with BbQ.Cqrs
+- **Source generator support** - automatic handler/subscriber discovery via BbQ.Events.SourceGenerators
 
 ## 📦 Installation
 
@@ -92,13 +92,35 @@ await foreach (var evt in subscriber.Subscribe(cancellationToken))
 }
 ```
 
-## 🔗 Integration with BbQ.Cqrs
+## 🔗 Automatic Handler Registration
 
-When used with BbQ.Cqrs, event handlers and subscribers are automatically discovered by source generators:
+Event handlers and subscribers are automatically discovered by the BbQ.Events source generator:
 
 ```csharp
 services.AddInMemoryEventBus();
-services.AddYourAssemblyNameHandlers();  // Auto-discovers event handlers/subscribers
+services.AddYourAssemblyNameEventHandlers();  // Auto-discovers event handlers/subscribers
+```
+
+## 🔗 Integration with BbQ.Cqrs (Optional)
+
+BbQ.Events works standalone, but can be easily integrated with BbQ.Cqrs for complete event-driven CQRS:
+
+```csharp
+// Command handler that publishes events
+public class CreateUserCommandHandler : IRequestHandler<CreateUser, Outcome<User>>
+{
+    private readonly IEventPublisher _publisher;
+
+    public async Task<Outcome<User>> Handle(CreateUser command, CancellationToken ct)
+    {
+        var user = new User(command.Id, command.Name);
+        
+        // Publish event after state change
+        await _publisher.Publish(new UserCreated(user.Id, user.Name), ct);
+        
+        return Outcome<User>.From(user);
+    }
+}
 ```
 
 ## 🏗️ Architecture
