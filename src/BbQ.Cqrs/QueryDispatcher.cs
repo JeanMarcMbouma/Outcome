@@ -106,4 +106,61 @@ internal sealed class QueryDispatcher(IServiceProvider sp) : IQueryDispatcher
 
         return await (Task<TResponse>)dispatcher(query, ct);
     }
+
+    /// <summary>
+    /// Dispatches a streaming query through the CQRS pipeline and returns a stream of items.
+    /// </summary>
+    /// <typeparam name="TItem">The type of items in the stream</typeparam>
+    /// <param name="query">The streaming query to dispatch</param>
+    /// <param name="ct">Cancellation token for async operations</param>
+    /// <returns>An asynchronous stream of items from the handler</returns>
+    /// <remarks>
+    /// Process:
+    /// 1. Resolves the stream handler with GetRequiredService()
+    /// 2. Resolves all stream behaviors with GetServices()
+    /// 3. Composes behaviors in reverse order
+    /// 4. Invokes the composed pipeline with the query
+    /// 5. Returns the stream
+    /// 
+    /// If no handler is registered, GetRequiredService() throws InvalidOperationException.
+    /// If no behaviors are registered, the query goes directly to the handler.
+    /// </remarks>
+    public async IAsyncEnumerable<TItem> Stream<TItem>(
+        IStreamQuery<TItem> query, 
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        var qryType = query.GetType();
+        var itemType = typeof(TItem);
+
+        // Resolve handler
+        var handlerType = typeof(IStreamHandler<,>).MakeGenericType(qryType, itemType);
+        var handler = _sp.GetRequiredService(handlerType);
+        var handleMethod = handlerType.GetMethod("Handle")!;
+
+        IAsyncEnumerable<TItem> terminal(object qry, CancellationToken token)
+        {
+            return (IAsyncEnumerable<TItem>)handleMethod.Invoke(handler, [qry, token])!;
+        }
+
+        // Resolve behaviors in registration order (first registered becomes outermost)
+        var behaviorType = typeof(IStreamPipelineBehavior<,>).MakeGenericType(qryType, itemType);
+        var behaviors = _sp.GetServices(behaviorType).Reverse().ToArray();
+
+        Func<object, CancellationToken, IAsyncEnumerable<TItem>> pipeline = terminal;
+        foreach (var b in behaviors)
+        {
+            var method = behaviorType.GetMethod("Handle")!;
+            var next = pipeline;
+            pipeline = (qry, token) =>
+            {
+                var result = method.Invoke(b, [qry, token, next]);
+                return (IAsyncEnumerable<TItem>)result!;
+            };
+        }
+
+        await foreach (var item in pipeline(query, ct).WithCancellation(ct))
+        {
+            yield return item;
+        }
+    }
 }
