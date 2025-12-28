@@ -17,27 +17,6 @@ namespace BbQ.Cqrs.Tests;
 [TestFixture]
 public class StreamingQueryTests
 {
-    private ServiceProvider _serviceProvider = null!;
-    private IQueryDispatcher _dispatcher = null!;
-    private IMediator _mediator = null!;
-
-    [SetUp]
-    public void Setup()
-    {
-        var services = new ServiceCollection();
-        services.AddBbQMediator(typeof(StreamNumbersQuery).Assembly);
-        
-        _serviceProvider = services.BuildServiceProvider();
-        _dispatcher = _serviceProvider.GetRequiredService<IQueryDispatcher>();
-        _mediator = _serviceProvider.GetRequiredService<IMediator>();
-    }
-
-    [TearDown]
-    public void TearDown()
-    {
-        _serviceProvider?.Dispose();
-    }
-
     [Test]
     public async Task Stream_WithValidQuery_ReturnsAllItems()
     {
@@ -95,7 +74,10 @@ public class StreamingQueryTests
         var services = new ServiceCollection();
         services.AddBbQMediator(typeof(StreamNumbersQuery).Assembly);
         services.AddTransient<IStreamHandler<StreamNumbersQuery, int>, StreamNumbersQueryHandler>();
-        services.AddTransient<IStreamPipelineBehavior<StreamNumbersQuery, int>, StreamLoggingBehavior>();
+        
+        // Use a behavior instance to track count
+        var loggingBehavior = new StreamLoggingBehavior();
+        services.AddSingleton<IStreamPipelineBehavior<StreamNumbersQuery, int>>(loggingBehavior);
 
         using var sp = services.BuildServiceProvider();
         var dispatcher = sp.GetRequiredService<IQueryDispatcher>();
@@ -111,7 +93,7 @@ public class StreamingQueryTests
 
         // Assert
         Assert.That(results, Has.Count.EqualTo(4));
-        Assert.That(StreamLoggingBehavior.ItemCount, Is.EqualTo(4));
+        Assert.That(loggingBehavior.ItemCount, Is.EqualTo(4));
     }
 
     [Test]
@@ -179,7 +161,7 @@ public class StreamingQueryTests
 
         var query = new StreamNumbersQuery(100);
         var results = new List<int>();
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
 
         // Act & Assert
         try
@@ -300,7 +282,7 @@ public class StreamUsersQueryHandler : IStreamHandler<StreamUsersQuery, User>
 // Test behaviors
 public class StreamLoggingBehavior : IStreamPipelineBehavior<StreamNumbersQuery, int>
 {
-    public static int ItemCount { get; private set; }
+    public int ItemCount { get; private set; }
 
     public async IAsyncEnumerable<int> Handle(
         StreamNumbersQuery request,

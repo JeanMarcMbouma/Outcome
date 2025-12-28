@@ -15,17 +15,17 @@ namespace BbQ.Cqrs;
 /// <typeparam name="TRequest">The streaming request type, must implement IStreamRequest&lt;TItem&gt;</typeparam>
 /// <typeparam name="TItem">The type of items in the stream</typeparam>
 /// <remarks>
-/// Pipeline execution order (FIFO before handler, LIFO after handler):
-/// 1. First registered behavior executes first (outermost)
-/// 2. Each behavior can execute logic before calling next()
-/// 3. Behaviors are nested, so they execute in registration order going toward the handler
-/// 4. At the end of the chain, the handler is invoked
-/// 5. Each behavior can transform, filter, or augment the stream from next()
-/// 6. Behaviors return in reverse order, so first registered returns last
+/// Execution model for streaming pipelines:
+/// 1. Behaviors are registered outermost-first: the first registered behavior wraps all others.
+/// 2. When a behavior calls next(), it receives an IAsyncEnumerable that has not yet been consumed.
+/// 3. The handler (at the end of the chain) produces items into the stream.
+/// 4. As items are yielded by the handler, they flow outward through behaviors in reverse registration order.
+/// 5. Each behavior can observe, transform, filter, or augment items as they pass through.
 /// 
-/// Example with Behavior1 registered first, Behavior2 registered second:
+/// Example with Behavior1 registered first (outermost) and Behavior2 registered second (inner):
 /// <code>
-/// Behavior1 (before) → Behavior2 (before) → Handler → Behavior2 (stream processing) → Behavior1 (stream processing)
+/// Behavior1 wraps Behavior2 wraps Handler
+/// Handler yields items → Behavior2 processes items → Behavior1 processes items
 /// </code>
 /// 
 /// Example logging behavior:

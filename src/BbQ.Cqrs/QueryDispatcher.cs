@@ -116,8 +116,8 @@ internal sealed class QueryDispatcher(IServiceProvider sp) : IQueryDispatcher
     /// <returns>An asynchronous stream of items from the handler</returns>
     /// <remarks>
     /// Process:
-    /// 1. Resolves the stream handler with GetRequiredService()
-    /// 2. Resolves all stream behaviors with GetServices()
+    /// 1. Resolves the stream handler metadata and behaviors (cached per type)
+    /// 2. Handler instances are resolved per-call to support scoped lifetimes
     /// 3. Composes behaviors in reverse order
     /// 4. Invokes the composed pipeline with the query
     /// 5. Returns the stream
@@ -132,13 +132,13 @@ internal sealed class QueryDispatcher(IServiceProvider sp) : IQueryDispatcher
         var qryType = query.GetType();
         var itemType = typeof(TItem);
 
-        // Resolve handler
+        // Resolve handler metadata (type and method). Handler instances are resolved per-call in the terminal.
         var handlerType = typeof(IStreamHandler<,>).MakeGenericType(qryType, itemType);
-        var handler = _sp.GetRequiredService(handlerType);
         var handleMethod = handlerType.GetMethod("Handle")!;
 
         IAsyncEnumerable<TItem> terminal(object qry, CancellationToken token)
         {
+            var handler = _sp.GetRequiredService(handlerType);
             return (IAsyncEnumerable<TItem>)handleMethod.Invoke(handler, [qry, token])!;
         }
 
@@ -158,7 +158,7 @@ internal sealed class QueryDispatcher(IServiceProvider sp) : IQueryDispatcher
             };
         }
 
-        await foreach (var item in pipeline(query, ct).WithCancellation(ct))
+        await foreach (var item in pipeline(query, ct))
         {
             yield return item;
         }

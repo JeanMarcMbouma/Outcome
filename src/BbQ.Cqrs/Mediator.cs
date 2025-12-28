@@ -224,7 +224,8 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator
             // Could add IStreamCommand support in the future if needed
             _ => throw new InvalidOperationException(
                 $"Stream request type '{request.GetType().Name}' is not supported. " +
-                $"Ensure the request implements IStreamQuery<{typeof(TItem).Name}>.")
+                $"Currently only IStreamQuery<{typeof(TItem).Name}> is supported. " +
+                $"Ensure the request implements this interface.")
         };
     }
 }
