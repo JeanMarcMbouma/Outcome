@@ -23,8 +23,10 @@ dotnet add package BbQ.Outcome
 A lightweight, extensible CQRS implementation that integrates seamlessly with Outcome.
 
 - **Type-safe mediator** for commands and queries
-- **Pipeline behaviors** for cross-cutting concerns (logging, validation, caching)
-- **Source generators** for automatic handler and behavior registration
+- **Unified pipeline behaviors** for both regular and streaming requests
+- **Streaming handlers** for processing large datasets with `IAsyncEnumerable<T>`
+- **Specialized dispatchers** (`ICommandDispatcher`, `IQueryDispatcher`) for explicit CQRS separation
+- **Source generators** for automatic handler registration, behavior registration
 - **Test utilities** with `TestMediator` and `StubHandler`
 - **Comprehensive documentation** on all interfaces and classes
 - **Seamless integration** with `Outcome<T>` for error handling
@@ -133,8 +135,11 @@ public class GetUserQueryHandler : IRequestHandler<GetUserQuery, Outcome<User>>
 | Source-generated error helpers | ✅ | ✅ |
 | LINQ integration | ✅ | - |
 | Mediator pattern | - | ✅ |
-| Pipeline behaviors | - | ✅ |
+| Pipeline behaviors (regular & streaming) | - | ✅ |
+| Streaming handlers with `IAsyncEnumerable` | - | ✅ |
+| Specialized dispatchers | - | ✅ |
 | Type-safe commands/queries | - | ✅ |
+| Source-generated handler registration | - | ✅ |
 | Test utilities | - | ✅ |
 
 ## 📚 Documentation

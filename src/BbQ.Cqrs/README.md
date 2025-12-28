@@ -5,12 +5,15 @@ A lightweight, extensible CQRS (Command Query Responsibility Segregation) implem
 ## ✨ Features
 
 - **Type-safe mediator** for commands and queries with compile-time checking
-- **Pipeline behaviors** for cross-cutting concerns (logging, validation, caching)
-- **Extensible behavior pipeline** with customizable middleware support
+- **Unified pipeline behaviors** for both regular requests (`IPipelineBehavior<TRequest, TResponse>`) and streaming requests (`IStreamPipelineBehavior<TRequest, TItem>`)
+- **Streaming handlers** for processing large datasets incrementally with `IAsyncEnumerable<T>` and `IStreamQuery<TItem>`
+- **Specialized dispatchers** (`ICommandDispatcher`, `IQueryDispatcher`) for explicit command/query separation
+- **Extensible behavior pipeline** with customizable middleware support and automatic ordering
+- **Source generators** for automatic handler registration, behavior registration with ordering
 - **Test utilities** with `TestMediator` and `StubHandler` for isolated testing
 - **Comprehensive documentation** on all interfaces and classes with XML comments
 - **Seamless integration** with `Outcome<T>` for advanced error management
-- **Source generators** for automatic handler and behavior registration (opt-in via attributes)
+- **Fire-and-forget commands** with `IRequest` (non-generic) for operations without return values
 
 ## 🔧 Source Generators
 
@@ -98,6 +101,15 @@ services.AddYourAssemblyNameCqrs();  // Registers both handlers and behaviors
 ```
 
 **Note:** Only behaviors with the `[Behavior]` attribute are automatically registered by the generator.
+
+### Source Generator Benefits
+
+- **Zero reflection at runtime** - All handler and behavior registrations are generated at compile-time
+- **Compile-time safety** - Errors in handler signatures are caught during compilation
+- **Better IDE support** - IntelliSense shows generated registration methods
+- **Reduced boilerplate** - No need to manually register each handler
+- **Automatic ordering** - Behaviors are registered in the order specified by `[Behavior(Order = ...)]`
+- **Performance** - Generated code is as fast as hand-written registration code
 
 ## 💾 Installation
 
@@ -253,6 +265,7 @@ A specialized dispatcher for queries that provides clear separation between comm
 public interface IQueryDispatcher
 {
     Task<TResponse> Dispatch<TResponse>(IQuery<TResponse> query, CancellationToken ct = default);
+    IAsyncEnumerable<TItem> Stream<TItem>(IStreamQuery<TItem> query, CancellationToken ct = default);
 }
 ```
 
@@ -269,6 +282,18 @@ public class UserController
             onSuccess: user => Ok(user),
             onError: errors => NotFound(errors)
         );
+    }
+    
+    [HttpGet("stream")]
+    public async Task StreamUsers(CancellationToken ct)
+    {
+        Response.ContentType = "application/x-ndjson";
+        
+        await foreach (var user in _queryDispatcher.Stream(new StreamAllUsersQuery(), ct))
+        {
+            await Response.WriteAsJsonAsync(user, ct);
+            await Response.Body.FlushAsync(ct);
+        }
     }
 }
 ```
@@ -493,6 +518,185 @@ services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 
 ---
 
+## 🎯 Dispatching Strategies
+
+BbQ.Cqrs provides multiple ways to dispatch requests, allowing you to choose the approach that best fits your architecture and use case.
+
+### Unified Dispatching with IMediator
+
+The `IMediator` interface provides a unified entry point for all request types:
+
+```csharp
+using System.Runtime.CompilerServices;
+
+public class UserService
+{
+    private readonly IMediator _mediator;
+    
+    public UserService(IMediator mediator)
+    {
+        _mediator = mediator;
+    }
+    
+    public async Task<Outcome<User>> CreateUserAsync(string email, string name, CancellationToken ct)
+    {
+        // Command with response
+        var command = new CreateUserCommand { Email = email, Name = name };
+        return await _mediator.Send(command, ct);
+    }
+    
+    public async Task<Outcome<User>> GetUserAsync(Guid userId, CancellationToken ct)
+    {
+        // Query with response
+        var query = new GetUserByIdQuery { UserId = userId };
+        return await _mediator.Send(query, ct);
+    }
+    
+    public async Task NotifyUserAsync(string userId, string message, CancellationToken ct)
+    {
+        // Fire-and-forget command
+        await _mediator.Send(new SendUserNotificationCommand(userId, message), ct);
+    }
+    
+    public async IAsyncEnumerable<User> StreamUsersAsync([EnumeratorCancellation] CancellationToken ct)
+    {
+        // Streaming query
+        await foreach (var user in _mediator.Stream(new StreamAllUsersQuery(), ct))
+        {
+            yield return user;
+        }
+    }
+}
+```
+
+**When to use IMediator:**
+- You want a single, unified interface for all request types
+- You're building a service layer that abstracts the CQRS implementation
+- You don't need explicit command/query separation in your code
+
+### Explicit Dispatching with ICommandDispatcher and IQueryDispatcher
+
+For clearer separation between commands and queries, use the specialized dispatchers:
+
+```csharp
+public class UserController : ControllerBase
+{
+    private readonly ICommandDispatcher _commandDispatcher;
+    private readonly IQueryDispatcher _queryDispatcher;
+    
+    public UserController(
+        ICommandDispatcher commandDispatcher,
+        IQueryDispatcher queryDispatcher)
+    {
+        _commandDispatcher = commandDispatcher;
+        _queryDispatcher = queryDispatcher;
+    }
+    
+    [HttpPost]
+    public async Task<IActionResult> CreateUser(CreateUserRequest request, CancellationToken ct)
+    {
+        var command = new CreateUserCommand { Email = request.Email, Name = request.Name };
+        var result = await _commandDispatcher.Dispatch(command, ct);
+        
+        return result.Match(
+            onSuccess: user => CreatedAtAction(nameof(GetUser), new { id = user.Id }, user),
+            onError: errors => BadRequest(new { errors })
+        );
+    }
+    
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetUser(Guid id, CancellationToken ct)
+    {
+        var query = new GetUserByIdQuery { UserId = id };
+        var result = await _queryDispatcher.Dispatch(query, ct);
+        
+        return result.Match(
+            onSuccess: user => Ok(user),
+            onError: errors => NotFound(new { errors })
+        );
+    }
+    
+    [HttpGet("stream")]
+    public async Task StreamAllUsers(CancellationToken ct)
+    {
+        Response.ContentType = "application/x-ndjson";
+        
+        await foreach (var user in _queryDispatcher.Stream(new StreamAllUsersQuery(), ct))
+        {
+            await Response.WriteAsJsonAsync(user, ct);
+            await Response.Body.FlushAsync(ct);
+        }
+    }
+}
+```
+
+**When to use specialized dispatchers:**
+- You want explicit command/query separation in your code
+- You're following CQRS principles strictly
+- You want better code documentation and intent
+- You're working in a team that values explicit architectural boundaries
+
+### Comparison
+
+| Feature | IMediator | ICommandDispatcher | IQueryDispatcher |
+|---------|-----------|-------------------|-----------------|
+| Commands with response | ✅ `Send()` | ✅ `Dispatch()` | ❌ |
+| Fire-and-forget commands | ✅ `Send()` | ✅ `Dispatch()` | ❌ |
+| Queries with response | ✅ `Send()` | ❌ | ✅ `Dispatch()` |
+| Streaming queries | ✅ `Stream()` | ❌ | ✅ `Stream()` |
+| Unified interface | ✅ | ❌ | ❌ |
+| Explicit separation | ❌ | ✅ | ✅ |
+
+### Performance Considerations
+
+All dispatching approaches have the same performance characteristics:
+
+1. **First dispatch**: Uses reflection to build the pipeline (handler + behaviors), then caches it
+2. **Subsequent dispatches**: Reuses the cached pipeline, only resolves handler and behavior instances from DI
+3. **No runtime overhead**: Pipeline construction is one-time per request/response type pair
+
+```csharp
+// First dispatch - pipeline is built and cached (slower due to one-time reflection)
+await mediator.Send(new GetUserByIdQuery { UserId = userId });
+
+// Subsequent dispatches - uses cached pipeline (faster, DI resolution only)
+await mediator.Send(new GetUserByIdQuery { UserId = userId });
+await mediator.Send(new GetUserByIdQuery { UserId = userId });
+```
+
+### Choosing the Right Approach
+
+**Use IMediator when:**
+- Building a service layer or application services
+- You want simplicity and a unified interface
+- Command/query distinction isn't critical to your architecture
+
+**Use ICommandDispatcher/IQueryDispatcher when:**
+- Building API controllers or presentation layer
+- You want explicit architectural boundaries
+- CQRS separation is important to your team
+- You want self-documenting code
+
+**You can mix both approaches:**
+```csharp
+public class UserService
+{
+    private readonly IMediator _mediator;  // For internal service methods
+    
+    // Use IMediator for unified access
+}
+
+public class UserController
+{
+    private readonly ICommandDispatcher _commands;  // For explicit separation
+    private readonly IQueryDispatcher _queries;
+    
+    // Use specialized dispatchers for clear intent
+}
+```
+
+---
+
 ## 🧭 Pipeline Behaviors
 
 Behaviors execute in registration order: **first registered = outermost = executes first**.
@@ -573,6 +777,8 @@ public class GetUserByIdQuery : IQuery<Outcome<User>>, ICacheable
 ### Custom: PerformanceBehavior
 
 ```csharp
+using System.Diagnostics;
+
 public class PerformanceBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
     where TRequest : IRequest<TResponse>
 {
@@ -611,6 +817,384 @@ services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 services.AddScoped(typeof(IPipelineBehavior<,>), typeof(PerformanceBehavior<,>));  // 3rd
 services.AddScoped(typeof(IPipelineBehavior<,>), typeof(CachingBehavior<,>));      // 4th (innermost)
 // Then the handler executes at the terminal
+```
+
+---
+
+## 🌊 Streaming Queries and Handlers
+
+BbQ.Cqrs supports streaming queries that return `IAsyncEnumerable<TItem>` for processing large datasets incrementally, real-time event streams, or progressive data delivery.
+
+### Why Use Streaming?
+
+- **Memory efficiency**: Process large datasets without loading everything into memory
+- **Progressive results**: Start processing data before the entire result set is available
+- **Real-time updates**: Subscribe to event streams or live data feeds
+- **Cancellation support**: Stop processing at any point with `CancellationToken`
+- **Better performance**: Reduce latency by streaming results as they become available
+
+### Define a Streaming Query
+
+```csharp
+public class StreamAllUsersQuery : IStreamQuery<User>
+{
+    public int PageSize { get; set; } = 100;
+    public string? Filter { get; set; }
+}
+```
+
+### Implement a Streaming Handler
+
+```csharp
+using System.Runtime.CompilerServices;
+using Microsoft.Extensions.Logging;
+
+public class StreamAllUsersQueryHandler : IStreamHandler<StreamAllUsersQuery, User>
+{
+    private readonly IUserRepository _repository;
+    private readonly ILogger<StreamAllUsersQueryHandler> _logger;
+    
+    public StreamAllUsersQueryHandler(
+        IUserRepository repository,
+        ILogger<StreamAllUsersQueryHandler> logger)
+    {
+        _repository = repository;
+        _logger = logger;
+    }
+    
+    public async IAsyncEnumerable<User> Handle(
+        StreamAllUsersQuery request, 
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        _logger.LogInformation("Starting to stream users with page size {PageSize}", request.PageSize);
+        
+        var offset = 0;
+        while (true)
+        {
+            ct.ThrowIfCancellationRequested();
+            
+            var batch = await _repository.GetBatchAsync(offset, request.PageSize, ct);
+            if (batch.Count == 0) break;
+            
+            foreach (var user in batch)
+            {
+                if (string.IsNullOrEmpty(request.Filter) || user.Name.Contains(request.Filter))
+                {
+                    yield return user;
+                }
+            }
+            
+            offset += batch.Count;
+        }
+        
+        _logger.LogInformation("Finished streaming users");
+    }
+}
+```
+
+### Use Streaming Queries
+
+```csharp
+using System.Text.Json;
+
+[ApiController]
+[Route("api/[controller]")]
+public class UsersController : ControllerBase
+{
+    private readonly IMediator _mediator;
+    
+    public UsersController(IMediator mediator)
+    {
+        _mediator = mediator;
+    }
+    
+    [HttpGet("stream")]
+    public async Task StreamUsers([FromQuery] string? filter, CancellationToken ct)
+    {
+        var query = new StreamAllUsersQuery { Filter = filter };
+        
+        Response.ContentType = "application/x-ndjson";
+        await foreach (var user in _mediator.Stream(query, ct))
+        {
+            var json = JsonSerializer.Serialize(user);
+            await Response.WriteAsync(json + "\n", ct);
+            await Response.Body.FlushAsync(ct);
+        }
+    }
+}
+```
+
+### Streaming Pipeline Behaviors
+
+Create custom behaviors for streaming queries using `IStreamPipelineBehavior<TRequest, TItem>`:
+
+#### Streaming Logging Behavior
+
+```csharp
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using Microsoft.Extensions.Logging;
+
+[Behavior(Order = 1)]
+public class StreamLoggingBehavior<TRequest, TItem> : IStreamPipelineBehavior<TRequest, TItem>
+    where TRequest : IStreamRequest<TItem>
+{
+    private readonly ILogger<StreamLoggingBehavior<TRequest, TItem>> _logger;
+    
+    public StreamLoggingBehavior(ILogger<StreamLoggingBehavior<TRequest, TItem>> logger)
+    {
+        _logger = logger;
+    }
+    
+    public async IAsyncEnumerable<TItem> Handle(
+        TRequest request,
+        [EnumeratorCancellation] CancellationToken ct,
+        Func<TRequest, CancellationToken, IAsyncEnumerable<TItem>> next)
+    {
+        _logger.LogInformation("Starting stream for {RequestType}", typeof(TRequest).Name);
+        
+        var itemCount = 0;
+        var stopwatch = Stopwatch.StartNew();
+        
+        await foreach (var item in next(request, ct).WithCancellation(ct))
+        {
+            itemCount++;
+            yield return item;
+        }
+        
+        stopwatch.Stop();
+        _logger.LogInformation(
+            "Stream completed: {RequestType}, {ItemCount} items in {ElapsedMs}ms",
+            typeof(TRequest).Name, itemCount, stopwatch.ElapsedMilliseconds);
+    }
+}
+```
+
+#### Streaming Filter Behavior
+
+```csharp
+using System.Runtime.CompilerServices;
+
+public interface IFilterable<TItem>
+{
+    bool Filter(TItem item);
+}
+
+public class StreamFilterBehavior<TRequest, TItem> : IStreamPipelineBehavior<TRequest, TItem>
+    where TRequest : IStreamRequest<TItem>, IFilterable<TItem>
+{
+    public async IAsyncEnumerable<TItem> Handle(
+        TRequest request,
+        [EnumeratorCancellation] CancellationToken ct,
+        Func<TRequest, CancellationToken, IAsyncEnumerable<TItem>> next)
+    {
+        await foreach (var item in next(request, ct).WithCancellation(ct))
+        {
+            if (request.Filter(item))
+            {
+                yield return item;
+            }
+        }
+    }
+}
+```
+
+#### Streaming Rate Limiting Behavior
+
+```csharp
+using System.Runtime.CompilerServices;
+
+public class StreamRateLimitBehavior<TRequest, TItem> : IStreamPipelineBehavior<TRequest, TItem>
+    where TRequest : IStreamRequest<TItem>
+{
+    private readonly TimeSpan _delayBetweenItems;
+    
+    public StreamRateLimitBehavior(TimeSpan delayBetweenItems)
+    {
+        _delayBetweenItems = delayBetweenItems;
+    }
+    
+    public async IAsyncEnumerable<TItem> Handle(
+        TRequest request,
+        [EnumeratorCancellation] CancellationToken ct,
+        Func<TRequest, CancellationToken, IAsyncEnumerable<TItem>> next)
+    {
+        await foreach (var item in next(request, ct).WithCancellation(ct))
+        {
+            yield return item;
+            await Task.Delay(_delayBetweenItems, ct);
+        }
+    }
+}
+```
+
+### Streaming Best Practices
+
+1. **Always use `[EnumeratorCancellation]`** on the `CancellationToken` parameter
+2. **Check cancellation regularly** using `ct.ThrowIfCancellationRequested()`
+3. **Use `.WithCancellation(ct)`** when enumerating streams in behaviors
+4. **Be mindful of exceptions** - they will terminate the stream
+5. **Consider batching** for better performance with database queries
+6. **Log start and completion** to track stream lifecycle
+7. **Test with different page sizes** to optimize performance
+
+---
+
+## 🔄 Unified Pipeline Behaviors
+
+BbQ.Cqrs provides a unified behavior system that works seamlessly with both regular requests and streaming requests:
+
+### Behavior Types
+
+1. **`IPipelineBehavior<TRequest, TResponse>`** - For regular commands and queries
+2. **`IStreamPipelineBehavior<TRequest, TItem>`** - For streaming queries
+
+Both behavior types follow the same principles:
+- Execute in registration order (first registered = outermost)
+- Form a chain of responsibility around handlers
+- Support cross-cutting concerns like logging, validation, caching
+- Can be marked with `[Behavior(Order = ...)]` for automatic registration
+
+### Unified Behavior Registration
+
+Register behaviors using source generators with the `[Behavior]` attribute:
+
+```csharp
+// Regular pipeline behavior
+[Behavior(Order = 1)]
+public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : IRequest<TResponse>
+{
+    // Implementation...
+}
+
+// Streaming pipeline behavior
+[Behavior(Order = 1)]
+public class StreamLoggingBehavior<TRequest, TItem> : IStreamPipelineBehavior<TRequest, TItem>
+    where TRequest : IStreamRequest<TItem>
+{
+    // Implementation...
+}
+
+// Register all behaviors automatically
+services.AddBbQMediator(Array.Empty<Assembly>());
+// Note: Replace "YourAssemblyName" with your actual assembly name
+// Example: services.AddMyApplicationBehaviors()
+services.AddYourAssemblyNameBehaviors();  // Registers both regular and streaming behaviors
+```
+
+### Behavior Execution Order
+
+Behaviors execute in **FIFO order before the handler** and **LIFO order after the handler**:
+
+```
+Request
+  ↓
+Behavior 1 (Order = 1) ─ before
+  ↓
+Behavior 2 (Order = 2) ─ before
+  ↓
+Handler
+  ↓
+Behavior 2 (Order = 2) ─ after
+  ↓
+Behavior 1 (Order = 1) ─ after
+  ↓
+Response
+```
+
+### Common Behavior Patterns
+
+#### Authorization Behavior
+
+```csharp
+[Behavior(Order = 1)]
+public class AuthorizationBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : IRequest<TResponse>, IAuthorizable
+{
+    private readonly ICurrentUserService _currentUser;
+    private readonly IAuthorizationService _authService;
+    
+    public async Task<TResponse> Handle(
+        TRequest request,
+        CancellationToken ct,
+        Func<TRequest, CancellationToken, Task<TResponse>> next)
+    {
+        var user = await _currentUser.GetUserAsync(ct);
+        var isAuthorized = await _authService.AuthorizeAsync(user, request.RequiredPermission);
+        
+        if (!isAuthorized)
+        {
+            throw new UnauthorizedAccessException();
+        }
+        
+        return await next(request, ct);
+    }
+}
+```
+
+#### Transaction Behavior
+
+```csharp
+[Behavior(Order = 2)]
+public class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : ICommand<TResponse>
+{
+    private readonly IDbContext _dbContext;
+    
+    public async Task<TResponse> Handle(
+        TRequest request,
+        CancellationToken ct,
+        Func<TRequest, CancellationToken, Task<TResponse>> next)
+    {
+        using var transaction = await _dbContext.BeginTransactionAsync(ct);
+        
+        try
+        {
+            var response = await next(request, ct);
+            await transaction.CommitAsync(ct);
+            return response;
+        }
+        catch
+        {
+            await transaction.RollbackAsync(ct);
+            throw;
+        }
+    }
+}
+```
+
+#### Error Handling Behavior
+
+```csharp
+[Behavior(Order = 3)]
+public class ErrorHandlingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : IRequest<TResponse>
+    where TResponse : IOutcome
+{
+    private readonly ILogger<ErrorHandlingBehavior<TRequest, TResponse>> _logger;
+    
+    public async Task<TResponse> Handle(
+        TRequest request,
+        CancellationToken ct,
+        Func<TRequest, CancellationToken, Task<TResponse>> next)
+    {
+        try
+        {
+            return await next(request, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled exception for {RequestType}", typeof(TRequest).Name);
+            
+            // Note: This is a simplified example. In production code, you would need to ensure
+            // TResponse has the appropriate constructor or use a factory pattern.
+            // This approach works if TResponse is Outcome<T> with an errors constructor.
+            var error = new Error("UNHANDLED_ERROR", ex.Message, ErrorSeverity.Error);
+            return (TResponse)Activator.CreateInstance(typeof(TResponse), new[] { error })!;
+        }
+    }
+}
 ```
 
 ---
