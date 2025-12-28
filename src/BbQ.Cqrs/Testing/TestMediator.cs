@@ -42,7 +42,7 @@ namespace BbQ.Cqrs.Testing;
 ///     
 ///     // Assert
 ///     Assert.That(result.IsSuccess, Is.True);
-///     mockRepository.Verify(r => r.AddAsync(It.IsAny&lt;User&gt;(), It.IsAny&lt;CancellationToken&gt;()), Times.Once);
+///     mockRepository.Verify(r => r.AddAsync(It.IsAny&lt;User&gt;(), It.IsAny&lt;CancellationToken&gt;()), Times.Once());
 /// }
 /// </code>
 /// </remarks>
