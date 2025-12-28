@@ -62,7 +62,7 @@ public class EventIntegrationTests
         var subscriber = sp.GetRequiredService<IEventSubscriber<UserCreatedEvent>>();
 
         var receivedEvents = new List<UserCreatedEvent>();
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
 
         // Start subscription
         var subscriptionTask = Task.Run(async () =>

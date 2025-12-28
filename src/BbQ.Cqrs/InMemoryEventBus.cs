@@ -20,11 +20,10 @@ namespace BbQ.Cqrs;
 /// <remarks>
 /// Features:
 /// - Thread-safe event publishing and subscription
-/// - Non-blocking publish operations
 /// - Automatic cleanup of cancelled subscriptions
 /// - Support for multiple concurrent subscribers
-/// - Handles backpressure per subscriber
-/// - Fire-and-forget handler execution
+/// - Handles backpressure per subscriber (drops oldest messages for slow subscribers)
+/// - Concurrent handler execution (awaited before publish completes)
 /// 
 /// Limitations:
 /// - Events are not persisted (lost on application restart)
@@ -84,7 +83,6 @@ internal sealed class InMemoryEventBus : IEventBus
     /// </summary>
     private async Task ExecuteHandlers<TEvent>(TEvent @event, CancellationToken ct)
     {
-        var handlerType = typeof(IEventHandler<TEvent>);
         var handlers = _serviceProvider.GetServices<IEventHandler<TEvent>>().ToList();
 
         if (handlers.Count == 0)
@@ -96,7 +94,7 @@ internal sealed class InMemoryEventBus : IEventBus
         _logger.LogDebug("Executing {HandlerCount} handler(s) for event type {EventType}", 
             handlers.Count, typeof(TEvent).Name);
 
-        // Execute all handlers concurrently (fire-and-forget pattern)
+        // Execute all handlers concurrently and await their completion
         var tasks = handlers.Select(async handler =>
         {
             try
@@ -121,23 +119,17 @@ internal sealed class InMemoryEventBus : IEventBus
     {
         var eventType = typeof(TEvent);
         
-        if (!_subscriptions.TryGetValue(eventType, out var channels))
-        {
-            _logger.LogDebug("No subscribers for event type {EventType}", eventType.Name);
-            return;
-        }
-
         List<Channel<TEvent>> activeChannels;
         lock (_subscriptionLock)
         {
+            if (!_subscriptions.TryGetValue(eventType, out var channels) || channels.Count == 0)
+            {
+                _logger.LogDebug("No subscribers for event type {EventType}", eventType.Name);
+                return;
+            }
+            
             // Get a snapshot of active channels (cast from object)
             activeChannels = channels.Cast<Channel<TEvent>>().ToList();
-        }
-
-        if (activeChannels.Count == 0)
-        {
-            _logger.LogDebug("No active subscribers for event type {EventType}", eventType.Name);
-            return;
         }
 
         _logger.LogDebug("Publishing to {SubscriberCount} subscriber(s) for event type {EventType}", 
@@ -177,7 +169,7 @@ internal sealed class InMemoryEventBus : IEventBus
         // Create a bounded channel for this subscription (with capacity for backpressure)
         var channel = Channel.CreateBounded<TEvent>(new BoundedChannelOptions(100)
         {
-            FullMode = BoundedChannelFullMode.Wait // Block publisher if subscriber is slow
+            FullMode = BoundedChannelFullMode.DropOldest // Don't block publishers; drop oldest messages for slow subscribers
         });
 
         _logger.LogDebug("Creating new subscription for event type {EventType}", eventType.Name);

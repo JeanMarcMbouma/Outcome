@@ -55,10 +55,9 @@ public class PubSubIntegrationSample
         if (result.IsSuccess)
         {
             Console.WriteLine($"✓ User created: {result.Value.Name}");
-            // Event handlers automatically executed
+            // Event handlers are executed before this line
         }
-        
-        await Task.Delay(500); // Give handlers time to execute
+
         Console.WriteLine();
         
         // Scenario 2: Create another user to see multiple event handlers
@@ -71,9 +70,9 @@ public class PubSubIntegrationSample
         if (result2.IsSuccess)
         {
             Console.WriteLine($"✓ User created: {result2.Value.Name}");
+            // Event handlers are executed before this line
         }
-        
-        await Task.Delay(500);
+
         Console.WriteLine();
         
         // Scenario 3: Streaming events using IStreamHandler
@@ -220,9 +219,14 @@ public class InMemoryEventStore : IEventStore
         List<object> events;
         lock (_lock)
         {
-            events = _events.ContainsKey(stream) 
-                ? _events[stream].ToList() 
-                : new List<object>();
+            if (_events.TryGetValue(stream, out var streamEvents))
+            {
+                events = streamEvents.ToList();
+            }
+            else
+            {
+                events = new List<object>();
+            }
         }
         
         foreach (var evt in events.OfType<TEvent>())

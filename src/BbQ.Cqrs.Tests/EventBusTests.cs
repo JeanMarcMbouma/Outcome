@@ -64,9 +64,6 @@ public class EventBusTests
 
         // Act
         await publisher.Publish(testEvent);
-        
-        // Give handler time to execute
-        await Task.Delay(100);
 
         // Assert
         Assert.That(handledEvents.Count, Is.EqualTo(1));
@@ -96,9 +93,6 @@ public class EventBusTests
 
         // Act
         await publisher.Publish(testEvent);
-        
-        // Give handlers time to execute
-        await Task.Delay(100);
 
         // Assert
         Assert.That(handledEvents1.Count, Is.EqualTo(1));
@@ -110,7 +104,7 @@ public class EventBusTests
     {
         // Arrange
         var receivedEvents = new List<TestEvent>();
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         
         // Start subscription in background
         var subscriptionTask = Task.Run(async () =>
@@ -150,7 +144,7 @@ public class EventBusTests
         // Arrange
         var receivedEvents1 = new List<TestEvent>();
         var receivedEvents2 = new List<TestEvent>();
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         
         // Start two subscriptions in background
         var subscription1 = Task.Run(async () =>
@@ -221,7 +215,7 @@ public class EventBusTests
         var eventBus = sp.GetRequiredService<IEventBus>();
 
         var subscribedEvents = new List<TestEvent>();
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         
         // Start subscription
         var subscriptionTask = Task.Run(async () =>
@@ -246,7 +240,6 @@ public class EventBusTests
 
         // Wait for processing
         await Task.WhenAny(subscriptionTask, Task.Delay(5000));
-        await Task.Delay(100); // Give handlers time to complete
 
         // Assert
         Assert.That(handledEvents.Count, Is.EqualTo(2));
@@ -286,9 +279,6 @@ public class EventBusTests
 
         // Act
         await publisher.Publish(testEvent);
-        
-        // Give handlers time to execute
-        await Task.Delay(200);
 
         // Assert - the successful handler should still have executed
         Assert.That(successfulEvents.Count, Is.EqualTo(1));

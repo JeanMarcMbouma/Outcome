@@ -12,7 +12,7 @@ namespace BbQ.Cqrs;
 /// </summary>
 /// <remarks>
 /// This interface is typically implemented by an event bus and allows command handlers
-/// to publish domain events after state changes. Events are fire-and-forget by default.
+/// to publish domain events after state changes.
 /// 
 /// Example usage in a command handler:
 /// <code>
@@ -48,10 +48,10 @@ public interface IEventPublisher
     /// <returns>A task that completes when the event has been published</returns>
     /// <remarks>
     /// This method publishes the event to:
-    /// - All registered IEventHandler&lt;TEvent&gt; instances (executed immediately)
+    /// - All registered IEventHandler&lt;TEvent&gt; instances (executed concurrently and awaited)
     /// - All IEventSubscriber&lt;TEvent&gt; streams (queued for consumption)
     /// 
-    /// Publishing is non-blocking and does not wait for handlers to complete.
+    /// The method awaits completion of all handlers before returning.
     /// If no handlers or subscribers are registered, the event is silently ignored.
     /// </remarks>
     Task Publish<TEvent>(TEvent @event, CancellationToken ct = default);
