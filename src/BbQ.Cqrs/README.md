@@ -1201,7 +1201,7 @@ public class ErrorHandlingBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
 
 ## 🧪 Unit Testing
 
-Use `TestMediator` and `StubHandler` for isolated handler testing:
+Use `TestMediator` and `StubHandler` for isolated handler testing. The examples below use [BbQ.MockLite](https://github.com/JeanMarcMbouma/MockLite) for mocking dependencies.
 
 ### Test a Handler
 
@@ -1232,7 +1232,7 @@ public class CreateUserCommandHandlerTests
         Assert.That(result.IsSuccess, Is.True);
         _mockRepository.Verify(
             r => r.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), 
-            Times.Once);
+            Times.Once());
     }
 }
 ```

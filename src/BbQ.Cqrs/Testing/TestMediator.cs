@@ -18,7 +18,7 @@ namespace BbQ.Cqrs.Testing;
 /// - Avoid the complexity of setting up full DI containers
 /// - Mock or stub handler implementations
 /// 
-/// Example unit test:
+/// Example unit test (using BbQ.MockLite for mocking):
 /// <code>
 /// [Test]
 /// public async Task CreateUserHandler_WithValidRequest_CreatesUser()
@@ -42,7 +42,7 @@ namespace BbQ.Cqrs.Testing;
 ///     
 ///     // Assert
 ///     Assert.That(result.IsSuccess, Is.True);
-///     mockRepository.Verify(r => r.AddAsync(It.IsAny&lt;User&gt;(), It.IsAny&lt;CancellationToken&gt;()), Times.Once);
+///     mockRepository.Verify(r => r.AddAsync(It.IsAny&lt;User&gt;(), It.IsAny&lt;CancellationToken&gt;()), Times.Once());
 /// }
 /// </code>
 /// </remarks>
