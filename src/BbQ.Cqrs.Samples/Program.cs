@@ -34,6 +34,7 @@ static class Program
         await Scenario04_RetryBehavior();
         await Scenario05_FireAndForgetCommand();
         await Scenario06_DispatcherExample();
+        await Scenario07_PubSubIntegration();
     }
 
     /// <summary>
@@ -47,6 +48,20 @@ static class Program
     static async Task Scenario06_DispatcherExample()
     {
         await DispatcherSample.RunExample();
+    }
+
+    /// <summary>
+    /// Scenario 7: Pub/Sub Integration
+    /// 
+    /// Demonstrates:
+    /// - Publishing events from command handlers
+    /// - Handling events with IEventHandler
+    /// - Subscribing to event streams with IEventSubscriber
+    /// - Using streaming handlers to expose event streams
+    /// </summary>
+    static async Task Scenario07_PubSubIntegration()
+    {
+        await PubSubIntegrationSample.RunAsync();
     }
 
     /// <summary>

@@ -257,7 +257,7 @@ namespace BbQ.Cqrs.SourceGenerators
             if (validHandlers.Count > 0)
             {
                 sb.AppendLine("        /// <summary>");
-                sb.AppendLine($"        /// Registers all auto-detected command and query handlers from {assemblyName}.");
+                sb.AppendLine($"        /// Registers all auto-detected command handlers and query handlers from {assemblyName}.");
                 if (assemblyName == "BbQ.Cqrs")
                 {
                     sb.AppendLine("        /// Also registers IMediator as singleton if not already registered.");

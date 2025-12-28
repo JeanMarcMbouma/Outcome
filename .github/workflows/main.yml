@@ -43,11 +43,20 @@ jobs:
       - name: Pack NuGet Outcome
         run: dotnet pack src/Outcome/Outcome.csproj --configuration Release --no-build -o ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
       
-      - name: Pack NuGet SourceGenerators
+      - name: Pack NuGet Outcome SourceGenerators
         run: dotnet pack src/Outcome.SourceGenerators/Outcome.SourceGenerators.csproj --configuration Release --no-build -o ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
       
-      - name: Pack NuGet Cqrs
+      - name: Pack NuGet BbQ.Cqrs
         run: dotnet pack src/BbQ.Cqrs/BbQ.Cqrs.csproj --configuration Release --no-build -o ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
+      
+      - name: Pack NuGet BbQ.Cqrs.SourceGenerators
+        run: dotnet pack src/BbQ.Cqrs.SourceGenerators/BbQ.Cqrs.SourceGenerators.csproj --configuration Release --no-build -o ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
+      
+      - name: Pack NuGet BbQ.Events
+        run: dotnet pack src/BbQ.Events/BbQ.Events.csproj --configuration Release --no-build -o ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
+      
+      - name: Pack NuGet BbQ.Events.SourceGenerators
+        run: dotnet pack src/BbQ.Events.SourceGenerators/BbQ.Events.SourceGenerators.csproj --configuration Release --no-build -o ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
       
       - name: NuGet login (OIDC → temp API key)
         uses: NuGet/login@v1
