@@ -71,15 +71,38 @@ namespace BbQ.Cqrs.SourceGenerators
             if (classSymbol == null)
                 return null;
 
-            // Check if this class implements IRequestHandler<,> or IRequestHandler<>
+            // Check if this class implements IRequestHandler<,>, IRequestHandler<>, or IStreamHandler<,>
             var interfaces = classSymbol.AllInterfaces;
             
             foreach (var iface in interfaces)
             {
                 var interfaceName = iface.ToDisplayString();
                 
+                // Check for IStreamHandler<TRequest, TItem>
+                if (interfaceName.StartsWith("BbQ.Cqrs.IStreamHandler<") && iface.TypeArguments.Length == 2)
+                {
+                    var requestType = iface.TypeArguments[0];
+                    var itemType = iface.TypeArguments[1];
+                    
+                    // Check if request implements IStreamQuery
+                    var requestInterfaces = requestType.AllInterfaces;
+                    bool isStreamQuery = requestInterfaces.Any(i => i.ToDisplayString().StartsWith("BbQ.Cqrs.IStreamQuery<"));
+                    
+                    if (isStreamQuery)
+                    {
+                        return new HandlerInfo
+                        {
+                            HandlerTypeName = classSymbol.ToDisplayString(),
+                            RequestTypeName = requestType.ToDisplayString(),
+                            ResponseTypeName = itemType.ToDisplayString(),
+                            IsStreamHandler = true,
+                            IsQuery = true,
+                            Namespace = classSymbol.ContainingNamespace.ToDisplayString()
+                        };
+                    }
+                }
                 // Check for IRequestHandler<TRequest, TResponse>
-                if (interfaceName.StartsWith("BbQ.Cqrs.IRequestHandler<") && iface.TypeArguments.Length == 2)
+                else if (interfaceName.StartsWith("BbQ.Cqrs.IRequestHandler<") && iface.TypeArguments.Length == 2)
                 {
                     var requestType = iface.TypeArguments[0];
                     var responseType = iface.TypeArguments[1];
@@ -147,13 +170,17 @@ namespace BbQ.Cqrs.SourceGenerators
             if (behaviorAttr == null)
                 return null;
 
-            // Check if this class implements IPipelineBehavior<,>
+            // Check if this class implements IPipelineBehavior<,> or IStreamPipelineBehavior<,>
             var interfaces = classSymbol.AllInterfaces;
             var pipelineInterface = interfaces.FirstOrDefault(i => 
                 i.ToDisplayString().StartsWith("BbQ.Cqrs.IPipelineBehavior<"));
+            var streamPipelineInterface = interfaces.FirstOrDefault(i => 
+                i.ToDisplayString().StartsWith("BbQ.Cqrs.IStreamPipelineBehavior<"));
 
-            if (pipelineInterface == null)
+            if (pipelineInterface == null && streamPipelineInterface == null)
                 return null;
+
+            bool isStreamBehavior = streamPipelineInterface != null;
 
             // Extract Order property from attribute
             int order = 0;
@@ -187,7 +214,8 @@ namespace BbQ.Cqrs.SourceGenerators
                 BehaviorTypeName = behaviorTypeName,
                 Order = order,
                 Namespace = classSymbol.ContainingNamespace.ToDisplayString(),
-                IsGeneric = isGeneric
+                IsGeneric = isGeneric,
+                IsStreamBehavior = isStreamBehavior
             };
         }
 
@@ -255,7 +283,12 @@ namespace BbQ.Cqrs.SourceGenerators
 
                 foreach (var handler in validHandlers)
                 {
-                    if (handler.IsFireAndForget)
+                    if (handler.IsStreamHandler)
+                    {
+                        sb.AppendLine($"            // Register stream handler: {handler.HandlerTypeName}");
+                        sb.AppendLine($"            services.Add(new ServiceDescriptor(typeof(IStreamHandler<{handler.RequestTypeName}, {handler.ResponseTypeName}>), typeof({handler.HandlerTypeName}), handlersLifetime));");
+                    }
+                    else if (handler.IsFireAndForget)
                     {
                         sb.AppendLine($"            // Register fire-and-forget handler: {handler.HandlerTypeName}");
                         sb.AppendLine($"            services.Add(new ServiceDescriptor(typeof(IRequestHandler<{handler.RequestTypeName}>), typeof({handler.HandlerTypeName}), handlersLifetime));");
@@ -303,8 +336,16 @@ namespace BbQ.Cqrs.SourceGenerators
 
                 foreach (var behavior in validBehaviors)
                 {
-                    sb.AppendLine($"            // Register behavior (Order = {behavior.Order}): {behavior.BehaviorTypeName}");
-                    sb.AppendLine($"            services.Add(new ServiceDescriptor(typeof(IPipelineBehavior<,>), typeof({behavior.BehaviorTypeName}), behaviorsLifetime));");
+                    if (behavior.IsStreamBehavior)
+                    {
+                        sb.AppendLine($"            // Register stream behavior (Order = {behavior.Order}): {behavior.BehaviorTypeName}");
+                        sb.AppendLine($"            services.Add(new ServiceDescriptor(typeof(IStreamPipelineBehavior<,>), typeof({behavior.BehaviorTypeName}), behaviorsLifetime));");
+                    }
+                    else
+                    {
+                        sb.AppendLine($"            // Register behavior (Order = {behavior.Order}): {behavior.BehaviorTypeName}");
+                        sb.AppendLine($"            services.Add(new ServiceDescriptor(typeof(IPipelineBehavior<,>), typeof({behavior.BehaviorTypeName}), behaviorsLifetime));");
+                    }
                 }
 
                 sb.AppendLine();
@@ -371,6 +412,7 @@ namespace BbQ.Cqrs.SourceGenerators
             public bool IsCommand { get; set; }
             public bool IsQuery { get; set; }
             public bool IsFireAndForget { get; set; }
+            public bool IsStreamHandler { get; set; }
             public string Namespace { get; set; } = string.Empty;
         }
 
@@ -380,6 +422,7 @@ namespace BbQ.Cqrs.SourceGenerators
             public int Order { get; set; }
             public string Namespace { get; set; } = string.Empty;
             public bool IsGeneric { get; set; }
+            public bool IsStreamBehavior { get; set; }
         }
     }
 }

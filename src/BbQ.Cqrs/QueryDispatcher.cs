@@ -45,6 +45,9 @@ internal sealed class QueryDispatcher(IServiceProvider sp) : IQueryDispatcher
     private readonly ConcurrentDictionary<(Type Qry, Type Res),
         Func<object, CancellationToken, Task>> _dispatchCache = new();
 
+    private readonly ConcurrentDictionary<(Type Qry, Type Item),
+        Func<object, CancellationToken, IAsyncEnumerable<object>>> _streamCache = new();
+
     /// <summary>
     /// Dispatches a query through the CQRS pipeline and returns a response.
     /// </summary>
@@ -105,5 +108,97 @@ internal sealed class QueryDispatcher(IServiceProvider sp) : IQueryDispatcher
         });
 
         return await (Task<TResponse>)dispatcher(query, ct);
+    }
+
+    /// <summary>
+    /// Dispatches a streaming query through the CQRS pipeline and returns a stream of items.
+    /// </summary>
+    /// <typeparam name="TItem">The type of items in the stream</typeparam>
+    /// <param name="query">The streaming query to dispatch</param>
+    /// <param name="ct">Cancellation token for async operations</param>
+    /// <returns>An asynchronous stream of items from the handler</returns>
+    /// <remarks>
+    /// Process:
+    /// 1. Resolves the stream handler metadata and behaviors (cached per type)
+    /// 2. Handler instances are resolved per-call to support scoped lifetimes
+    /// 3. Composes behaviors in reverse order
+    /// 4. Invokes the composed pipeline with the query
+    /// 5. Returns the stream
+    /// 
+    /// If no handler is registered, GetRequiredService() throws InvalidOperationException.
+    /// If no behaviors are registered, the query goes directly to the handler.
+    /// 
+    /// The pipeline construction is cached per query/item type pair to avoid repeated reflection overhead.
+    /// </remarks>
+    public async IAsyncEnumerable<TItem> Stream<TItem>(
+        IStreamQuery<TItem> query, 
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        var key = (query.GetType(), typeof(TItem));
+
+        var dispatcher = _streamCache.GetOrAdd(key, k =>
+        {
+            var (qryType, itemType) = k;
+
+            // Resolve handler metadata (type and method). Handler instances are resolved per-call in the terminal.
+            var handlerType = typeof(IStreamHandler<,>).MakeGenericType(qryType, itemType);
+            var handleMethod = handlerType.GetMethod("Handle")!;
+
+            async IAsyncEnumerable<object> terminal(object qry, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken token)
+            {
+                var handler = _sp.GetRequiredService(handlerType);
+                var stream = (IAsyncEnumerable<TItem>)handleMethod.Invoke(handler, [qry, token])!;
+                await foreach (var item in stream.ConfigureAwait(false))
+                {
+                    yield return item!;
+                }
+            }
+
+            // Resolve behaviors in registration order (first registered becomes outermost)
+            var behaviorType = typeof(IStreamPipelineBehavior<,>).MakeGenericType(qryType, itemType);
+            var behaviors = _sp.GetServices(behaviorType).Reverse().ToArray();
+
+            Func<object, CancellationToken, IAsyncEnumerable<object>> pipeline = terminal;
+            foreach (var b in behaviors)
+            {
+                var method = behaviorType.GetMethod("Handle")!;
+                var next = pipeline;
+                pipeline = (qry, token) =>
+                {
+                    var typedNext = CreateTypedNextFunc<TItem>(next);
+                    var result = method.Invoke(b, [qry, token, typedNext]);
+                    return ConvertToObjectStream((IAsyncEnumerable<TItem>)result!);
+                };
+            }
+
+            return pipeline;
+        });
+
+        await foreach (var item in dispatcher(query, ct).ConfigureAwait(false))
+        {
+            yield return (TItem)item;
+        }
+    }
+
+    private static Func<object, CancellationToken, IAsyncEnumerable<TItem>> CreateTypedNextFunc<TItem>(
+        Func<object, CancellationToken, IAsyncEnumerable<object>> next)
+    {
+        return (qry, token) => ConvertFromObjectStream<TItem>(next(qry, token));
+    }
+
+    private static async IAsyncEnumerable<object> ConvertToObjectStream<TItem>(IAsyncEnumerable<TItem> source)
+    {
+        await foreach (var item in source.ConfigureAwait(false))
+        {
+            yield return item!;
+        }
+    }
+
+    private static async IAsyncEnumerable<TItem> ConvertFromObjectStream<TItem>(IAsyncEnumerable<object> source)
+    {
+        await foreach (var item in source.ConfigureAwait(false))
+        {
+            yield return (TItem)item;
+        }
     }
 }

@@ -63,4 +63,25 @@ public interface IQueryDispatcher
     /// 5. Returns through behaviors in reverse order (first registered returns last)
     /// </remarks>
     Task<TResponse> Dispatch<TResponse>(IQuery<TResponse> query, CancellationToken ct = default);
+
+    /// <summary>
+    /// Dispatches a streaming query through the pipeline and returns a stream of items.
+    /// </summary>
+    /// <typeparam name="TItem">The type of items in the stream</typeparam>
+    /// <param name="query">The streaming query to dispatch</param>
+    /// <param name="ct">Optional cancellation token for async operations</param>
+    /// <returns>An asynchronous stream of items from the query handler</returns>
+    /// <remarks>
+    /// The streaming query is passed through all registered IStreamPipelineBehavior implementations
+    /// in registration order, with the handler invoked at the end of the chain.
+    /// 
+    /// Example usage:
+    /// <code>
+    /// await foreach (var user in queryDispatcher.Stream(new StreamAllUsersQuery(), ct))
+    /// {
+    ///     Console.WriteLine($"User: {user.Name}");
+    /// }
+    /// </code>
+    /// </remarks>
+    IAsyncEnumerable<TItem> Stream<TItem>(IStreamQuery<TItem> query, CancellationToken ct = default);
 }

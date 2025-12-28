@@ -195,4 +195,37 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator
 
         return dispatcher(request!, ct);
     }
+
+    /// <summary>
+    /// Sends a streaming request through the CQRS pipeline and returns a stream of items.
+    /// </summary>
+    /// <typeparam name="TItem">The type of items in the stream</typeparam>
+    /// <param name="request">The streaming request to send</param>
+    /// <param name="ct">Cancellation token for async operations</param>
+    /// <returns>An asynchronous stream of items from the handler</returns>
+    /// <remarks>
+    /// This method routes the streaming request to the appropriate dispatcher:
+    /// - IStreamQuery&lt;TItem&gt; -> IQueryDispatcher.Stream()
+    /// 
+    /// Example usage:
+    /// <code>
+    /// await foreach (var user in mediator.Stream(new StreamAllUsersQuery(), ct))
+    /// {
+    ///     Console.WriteLine($"User: {user.Name}");
+    /// }
+    /// </code>
+    /// </remarks>
+    public IAsyncEnumerable<TItem> Stream<TItem>(IStreamRequest<TItem> request, CancellationToken ct = default)
+    {
+        // Route to appropriate dispatcher based on request type
+        return request switch
+        {
+            IStreamQuery<TItem> query => _queryDispatcher.Stream(query, ct),
+            // Could add IStreamCommand support in the future if needed
+            _ => throw new InvalidOperationException(
+                $"Stream request type '{request.GetType().Name}' is not supported. " +
+                $"Currently only IStreamQuery<{typeof(TItem).Name}> is supported. " +
+                $"Ensure the request implements this interface.")
+        };
+    }
 }
