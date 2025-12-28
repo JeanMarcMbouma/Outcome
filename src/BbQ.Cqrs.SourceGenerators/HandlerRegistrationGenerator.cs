@@ -148,34 +148,6 @@ namespace BbQ.Cqrs.SourceGenerators
                         };
                     }
                 }
-                // Check for IEventHandler<TEvent>
-                else if ((interfaceName.StartsWith("BbQ.Cqrs.IEventHandler<") || interfaceName.StartsWith("BbQ.Events.IEventHandler<")) && iface.TypeArguments.Length == 1)
-                {
-                    var eventType = iface.TypeArguments[0];
-                    
-                    return new HandlerInfo
-                    {
-                        HandlerTypeName = classSymbol.ToDisplayString(),
-                        RequestTypeName = eventType.ToDisplayString(),
-                        ResponseTypeName = "void",
-                        IsEventHandler = true,
-                        Namespace = classSymbol.ContainingNamespace.ToDisplayString()
-                    };
-                }
-                // Check for IEventSubscriber<TEvent>
-                else if ((interfaceName.StartsWith("BbQ.Cqrs.IEventSubscriber<") || interfaceName.StartsWith("BbQ.Events.IEventSubscriber<")) && iface.TypeArguments.Length == 1)
-                {
-                    var eventType = iface.TypeArguments[0];
-                    
-                    return new HandlerInfo
-                    {
-                        HandlerTypeName = classSymbol.ToDisplayString(),
-                        RequestTypeName = eventType.ToDisplayString(),
-                        ResponseTypeName = "void",
-                        IsEventSubscriber = true,
-                        Namespace = classSymbol.ContainingNamespace.ToDisplayString()
-                    };
-                }
             }
 
             return null;
@@ -272,7 +244,6 @@ namespace BbQ.Cqrs.SourceGenerators
             sb.AppendLine("using Microsoft.Extensions.DependencyInjection;");
             sb.AppendLine("using Microsoft.Extensions.DependencyInjection.Extensions;");
             sb.AppendLine("using BbQ.Cqrs;");
-            sb.AppendLine("using BbQ.Events;");
             sb.AppendLine();
             sb.AppendLine("namespace BbQ.Cqrs.DependencyInjection");
             sb.AppendLine("{");
@@ -286,7 +257,7 @@ namespace BbQ.Cqrs.SourceGenerators
             if (validHandlers.Count > 0)
             {
                 sb.AppendLine("        /// <summary>");
-                sb.AppendLine($"        /// Registers all auto-detected command handlers, query handlers, event handlers, and event subscribers from {assemblyName}.");
+                sb.AppendLine($"        /// Registers all auto-detected command handlers and query handlers from {assemblyName}.");
                 if (assemblyName == "BbQ.Cqrs")
                 {
                     sb.AppendLine("        /// Also registers IMediator as singleton if not already registered.");
@@ -321,16 +292,6 @@ namespace BbQ.Cqrs.SourceGenerators
                     {
                         sb.AppendLine($"            // Register fire-and-forget handler: {handler.HandlerTypeName}");
                         sb.AppendLine($"            services.Add(new ServiceDescriptor(typeof(IRequestHandler<{handler.RequestTypeName}>), typeof({handler.HandlerTypeName}), handlersLifetime));");
-                    }
-                    else if (handler.IsEventHandler)
-                    {
-                        sb.AppendLine($"            // Register event handler: {handler.HandlerTypeName}");
-                        sb.AppendLine($"            services.Add(new ServiceDescriptor(typeof(IEventHandler<{handler.RequestTypeName}>), typeof({handler.HandlerTypeName}), handlersLifetime));");
-                    }
-                    else if (handler.IsEventSubscriber)
-                    {
-                        sb.AppendLine($"            // Register event subscriber: {handler.HandlerTypeName}");
-                        sb.AppendLine($"            services.Add(new ServiceDescriptor(typeof(IEventSubscriber<{handler.RequestTypeName}>), typeof({handler.HandlerTypeName}), handlersLifetime));");
                     }
                     else
                     {
@@ -452,8 +413,6 @@ namespace BbQ.Cqrs.SourceGenerators
             public bool IsQuery { get; set; }
             public bool IsFireAndForget { get; set; }
             public bool IsStreamHandler { get; set; }
-            public bool IsEventHandler { get; set; }
-            public bool IsEventSubscriber { get; set; }
             public string Namespace { get; set; } = string.Empty;
         }
 

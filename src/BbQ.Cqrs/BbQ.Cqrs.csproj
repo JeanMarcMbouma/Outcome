@@ -42,9 +42,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Reference to BbQ.Events for event-driven architecture support -->
-    <ProjectReference Include="..\BbQ.Events\BbQ.Events.csproj" />
-    
     <!-- Reference to source generator -->
     <ProjectReference Include="..\BbQ.Cqrs.SourceGenerators\BbQ.Cqrs.SourceGenerators.csproj" 
                       OutputItemType="Analyzer" 
