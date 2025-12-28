@@ -1,7 +1,7 @@
 // -------------------------------
 // Event/Pub-Sub contracts
 // -------------------------------
-namespace BbQ.Cqrs;
+namespace BbQ.Events;
 
 /// <summary>
 /// Publisher interface for publishing events in the pub/sub pattern.

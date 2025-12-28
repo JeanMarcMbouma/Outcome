@@ -1,6 +1,8 @@
 // Sample demonstrating pub/sub integration with BbQ.Cqrs
 using BbQ.Cqrs;
 using BbQ.Cqrs.DependencyInjection;
+using BbQ.Events;
+using BbQ.Events.DependencyInjection;
 using BbQ.Outcome;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;

@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\BbQ.Cqrs\BbQ.Cqrs.csproj" />
+    <ProjectReference Include="..\BbQ.Events\BbQ.Events.csproj" />
     <ProjectReference Include="..\Outcome\Outcome.csproj" />
   </ItemGroup>
 

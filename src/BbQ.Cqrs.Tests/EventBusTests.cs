@@ -1,5 +1,6 @@
 using BbQ.Cqrs;
-using BbQ.Cqrs.DependencyInjection;
+using BbQ.Events;
+using BbQ.Events.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;

@@ -1,7 +1,7 @@
 // -------------------------------
 // Event/Pub-Sub contracts
 // -------------------------------
-namespace BbQ.Cqrs;
+namespace BbQ.Events;
 
 /// <summary>
 /// Core event bus interface combining publishing and subscribing capabilities.

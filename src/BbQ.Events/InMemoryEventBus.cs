@@ -7,7 +7,7 @@ using System.Threading.Channels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace BbQ.Cqrs;
+namespace BbQ.Events;
 
 /// <summary>
 /// In-memory implementation of IEventBus using System.Threading.Channels.

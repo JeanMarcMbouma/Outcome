@@ -149,7 +149,7 @@ namespace BbQ.Cqrs.SourceGenerators
                     }
                 }
                 // Check for IEventHandler<TEvent>
-                else if (interfaceName.StartsWith("BbQ.Cqrs.IEventHandler<") && iface.TypeArguments.Length == 1)
+                else if ((interfaceName.StartsWith("BbQ.Cqrs.IEventHandler<") || interfaceName.StartsWith("BbQ.Events.IEventHandler<")) && iface.TypeArguments.Length == 1)
                 {
                     var eventType = iface.TypeArguments[0];
                     
@@ -163,7 +163,7 @@ namespace BbQ.Cqrs.SourceGenerators
                     };
                 }
                 // Check for IEventSubscriber<TEvent>
-                else if (interfaceName.StartsWith("BbQ.Cqrs.IEventSubscriber<") && iface.TypeArguments.Length == 1)
+                else if ((interfaceName.StartsWith("BbQ.Cqrs.IEventSubscriber<") || interfaceName.StartsWith("BbQ.Events.IEventSubscriber<")) && iface.TypeArguments.Length == 1)
                 {
                     var eventType = iface.TypeArguments[0];
                     
@@ -272,6 +272,7 @@ namespace BbQ.Cqrs.SourceGenerators
             sb.AppendLine("using Microsoft.Extensions.DependencyInjection;");
             sb.AppendLine("using Microsoft.Extensions.DependencyInjection.Extensions;");
             sb.AppendLine("using BbQ.Cqrs;");
+            sb.AppendLine("using BbQ.Events;");
             sb.AppendLine();
             sb.AppendLine("namespace BbQ.Cqrs.DependencyInjection");
             sb.AppendLine("{");
