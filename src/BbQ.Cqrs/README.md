@@ -802,6 +802,8 @@ public class GetUserByIdQuery : IQuery<Outcome<User>>, ICacheable
 ### Custom: PerformanceBehavior
 
 ```csharp
+using System.Diagnostics;
+
 public class PerformanceBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
     where TRequest : IRequest<TResponse>
 {
@@ -915,6 +917,8 @@ public class StreamAllUsersQueryHandler : IStreamHandler<StreamAllUsersQuery, Us
 ### Use Streaming Queries
 
 ```csharp
+using System.Text.Json;
+
 [ApiController]
 [Route("api/[controller]")]
 public class UsersController : ControllerBase
@@ -949,6 +953,8 @@ Create custom behaviors for streaming queries using `IStreamPipelineBehavior<TRe
 #### Streaming Logging Behavior
 
 ```csharp
+using System.Diagnostics;
+
 [Behavior(Order = 1)]
 public class StreamLoggingBehavior<TRequest, TItem> : IStreamPipelineBehavior<TRequest, TItem>
     where TRequest : IStreamRequest<TItem>
