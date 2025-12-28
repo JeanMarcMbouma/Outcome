@@ -554,6 +554,8 @@ BbQ.Cqrs provides multiple ways to dispatch requests, allowing you to choose the
 The `IMediator` interface provides a unified entry point for all request types:
 
 ```csharp
+using System.Runtime.CompilerServices;
+
 public class UserService
 {
     private readonly IMediator _mediator;
@@ -871,6 +873,9 @@ public class StreamAllUsersQuery : IStreamQuery<User>
 ### Implement a Streaming Handler
 
 ```csharp
+using System.Runtime.CompilerServices;
+using Microsoft.Extensions.Logging;
+
 public class StreamAllUsersQueryHandler : IStreamHandler<StreamAllUsersQuery, User>
 {
     private readonly IUserRepository _repository;
@@ -954,6 +959,8 @@ Create custom behaviors for streaming queries using `IStreamPipelineBehavior<TRe
 
 ```csharp
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using Microsoft.Extensions.Logging;
 
 [Behavior(Order = 1)]
 public class StreamLoggingBehavior<TRequest, TItem> : IStreamPipelineBehavior<TRequest, TItem>
@@ -993,6 +1000,8 @@ public class StreamLoggingBehavior<TRequest, TItem> : IStreamPipelineBehavior<TR
 #### Streaming Filter Behavior
 
 ```csharp
+using System.Runtime.CompilerServices;
+
 public interface IFilterable<TItem>
 {
     bool Filter(TItem item);
@@ -1020,6 +1029,8 @@ public class StreamFilterBehavior<TRequest, TItem> : IStreamPipelineBehavior<TRe
 #### Streaming Rate Limiting Behavior
 
 ```csharp
+using System.Runtime.CompilerServices;
+
 public class StreamRateLimitBehavior<TRequest, TItem> : IStreamPipelineBehavior<TRequest, TItem>
     where TRequest : IStreamRequest<TItem>
 {
