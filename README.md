@@ -26,7 +26,7 @@ A lightweight, extensible CQRS implementation that integrates seamlessly with Ou
 - **Unified pipeline behaviors** for both regular and streaming requests
 - **Streaming handlers** for processing large datasets with `IAsyncEnumerable<T>`
 - **Specialized dispatchers** (`ICommandDispatcher`, `IQueryDispatcher`) for explicit CQRS separation
-- **Source generators** for automatic handler registration, behavior registration, and handler stubs
+- **Source generators** for automatic handler registration, behavior registration
 - **Test utilities** with `TestMediator` and `StubHandler`
 - **Comprehensive documentation** on all interfaces and classes
 - **Seamless integration** with `Outcome<T>` for error handling

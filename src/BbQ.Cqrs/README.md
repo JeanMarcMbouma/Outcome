@@ -9,7 +9,7 @@ A lightweight, extensible CQRS (Command Query Responsibility Segregation) implem
 - **Streaming handlers** for processing large datasets incrementally with `IAsyncEnumerable<T>` and `IStreamQuery<TItem>`
 - **Specialized dispatchers** (`ICommandDispatcher`, `IQueryDispatcher`) for explicit command/query separation
 - **Extensible behavior pipeline** with customizable middleware support and automatic ordering
-- **Source generators** for automatic handler registration, behavior registration with ordering, and handler stub generation
+- **Source generators** for automatic handler registration, behavior registration with ordering
 - **Test utilities** with `TestMediator` and `StubHandler` for isolated testing
 - **Comprehensive documentation** on all interfaces and classes with XML comments
 - **Seamless integration** with `Outcome<T>` for advanced error management
@@ -101,33 +101,6 @@ services.AddYourAssemblyNameCqrs();  // Registers both handlers and behaviors
 ```
 
 **Note:** Only behaviors with the `[Behavior]` attribute are automatically registered by the generator.
-
-### Handler Stubs for Testing
-
-The source generator can also create stub handlers for testing purposes. When you define a command or query, you can generate a stub handler implementation to use in tests:
-
-```csharp
-// Define your query
-public class GetUserByIdQuery : IQuery<Outcome<User>>
-{
-    public Guid UserId { get; set; }
-}
-
-// The generator can create a stub handler for testing:
-// (This is generated automatically based on your handler definitions)
-var stubHandler = new StubHandler<GetUserByIdQuery, Outcome<User>>(
-    async (request, ct) => 
-    {
-        // Test-specific logic
-        var user = new User { Id = request.UserId, Name = "Test User" };
-        return Outcome<User>.From(user);
-    }
-);
-
-// Use in tests
-var mediator = new TestMediator<GetUserByIdQuery, Outcome<User>>(stubHandler, []);
-var result = await mediator.Send(new GetUserByIdQuery { UserId = Guid.NewGuid() });
-```
 
 ### Source Generator Benefits
 
@@ -683,12 +656,12 @@ All dispatching approaches have the same performance characteristics:
 3. **No runtime overhead**: Pipeline construction is one-time per request/response type pair
 
 ```csharp
-// First dispatch - pipeline is built and cached
-await mediator.Send(new GetUserByIdQuery { UserId = userId });  // ~0.5ms (one-time reflection)
+// First dispatch - pipeline is built and cached (slower due to one-time reflection)
+await mediator.Send(new GetUserByIdQuery { UserId = userId });
 
-// Subsequent dispatches - uses cached pipeline
-await mediator.Send(new GetUserByIdQuery { UserId = userId });  // ~0.05ms (DI resolution only)
-await mediator.Send(new GetUserByIdQuery { UserId = userId });  // ~0.05ms
+// Subsequent dispatches - uses cached pipeline (faster, DI resolution only)
+await mediator.Send(new GetUserByIdQuery { UserId = userId });
+await mediator.Send(new GetUserByIdQuery { UserId = userId });
 ```
 
 ### Choosing the Right Approach
