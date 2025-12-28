@@ -10,10 +10,78 @@ A lightweight, extensible CQRS (Command Query Responsibility Segregation) implem
 - **Specialized dispatchers** (`ICommandDispatcher`, `IQueryDispatcher`) for explicit command/query separation
 - **Extensible behavior pipeline** with customizable middleware support and automatic ordering
 - **Source generators** for automatic handler registration, behavior registration with ordering
+- **Event-driven architecture** with built-in pub/sub support (`IEventPublisher`, `IEventHandler`, `IEventSubscriber`)
+- **In-memory event bus** for real-time event processing within a single application
 - **Test utilities** with `TestMediator` and `StubHandler` for isolated testing
 - **Comprehensive documentation** on all interfaces and classes with XML comments
 - **Seamless integration** with `Outcome<T>` for advanced error management
 - **Fire-and-forget commands** with `IRequest` (non-generic) for operations without return values
+
+## 📡 Pub/Sub Support
+
+BbQ.Cqrs includes first-class support for event-driven architecture with a strongly typed pub/sub system. Events can be published from command handlers and consumed by multiple handlers or subscribers.
+
+### Key Interfaces
+
+- **`IEventPublisher`** - Publish events from command handlers
+- **`IEventHandler<TEvent>`** - Handle events one-by-one as they're published
+- **`IEventSubscriber<TEvent>`** - Subscribe to event streams for reactive processing
+- **`IEventBus`** - Core event bus combining publishing and subscribing
+
+### Quick Start
+
+```csharp
+// 1. Register the in-memory event bus
+services.AddInMemoryEventBus();
+
+// 2. Register handlers (auto-discovered by source generator)
+services.AddYourAssemblyNameHandlers();
+
+// 3. Publish events from command handlers
+public class CreateUserHandler : IRequestHandler<CreateUser, Outcome<User>>
+{
+    private readonly IEventPublisher _publisher;
+
+    public async Task<Outcome<User>> Handle(CreateUser command, CancellationToken ct)
+    {
+        var user = new User(command.Id, command.Name);
+        
+        // Publish event after state change
+        await _publisher.Publish(new UserCreated(user.Id, user.Name), ct);
+        
+        return Outcome<User>.From(user);
+    }
+}
+
+// 4. Handle events one-by-one
+public class SendWelcomeEmailHandler : IEventHandler<UserCreated>
+{
+    public Task Handle(UserCreated evt, CancellationToken ct)
+    {
+        // Send welcome email
+        return Task.CompletedTask;
+    }
+}
+
+// 5. Subscribe to event streams
+public class UserAnalyticsSubscriber : IEventSubscriber<UserCreated>
+{
+    private readonly IEventBus _eventBus;
+
+    public IAsyncEnumerable<UserCreated> Subscribe(CancellationToken ct)
+        => _eventBus.Subscribe<UserCreated>(ct);
+}
+```
+
+### Features
+
+- **Optional handlers/subscribers** - Events can be published without any consumers
+- **Multiple handlers** - Multiple `IEventHandler<TEvent>` instances can handle the same event
+- **Thread-safe** - Built on `System.Threading.Channels` for safe concurrent access
+- **Storage-agnostic** - In-memory by default, easily extensible for distributed scenarios
+- **Source generator support** - Event handlers and subscribers are auto-discovered and registered
+
+For distributed systems, implement a custom `IEventBus` using message brokers like RabbitMQ, Azure Service Bus, or Kafka.
 
 ## 🔧 Source Generators
 
