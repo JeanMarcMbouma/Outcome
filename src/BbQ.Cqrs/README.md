@@ -1105,6 +1105,8 @@ public class StreamLoggingBehavior<TRequest, TItem> : IStreamPipelineBehavior<TR
 
 // Register all behaviors automatically
 services.AddBbQMediator(Array.Empty<Assembly>());
+// Note: Replace "YourAssemblyName" with your actual assembly name
+// Example: services.AddMyApplicationBehaviors()
 services.AddYourAssemblyNameBehaviors();  // Registers both regular and streaming behaviors
 ```
 
@@ -1212,7 +1214,9 @@ public class ErrorHandlingBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
         {
             _logger.LogError(ex, "Unhandled exception for {RequestType}", typeof(TRequest).Name);
             
-            // Convert exception to Outcome error
+            // Note: This is a simplified example. In production code, you would need to ensure
+            // TResponse has the appropriate constructor or use a factory pattern.
+            // This approach works if TResponse is Outcome<T> with an errors constructor.
             var error = new Error("UNHANDLED_ERROR", ex.Message, ErrorSeverity.Error);
             return (TResponse)Activator.CreateInstance(typeof(TResponse), new[] { error })!;
         }
