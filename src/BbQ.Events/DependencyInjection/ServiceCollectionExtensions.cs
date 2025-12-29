@@ -91,7 +91,7 @@ public static class ServiceCollectionExtensions
                 
                 // Register in the projection handler registry for the engine to discover
                 var eventType = iface.GenericTypeArguments[0];
-                ProjectionHandlerRegistry.Register(eventType, iface);
+                ProjectionHandlerRegistry.Register(eventType, iface, projectionType);
             }
 
             return services;
@@ -182,7 +182,7 @@ public static class ServiceCollectionExtensions
                     
                     // Register in the projection handler registry for the engine to discover
                     var eventType = iface.GenericTypeArguments[0];
-                    ProjectionHandlerRegistry.Register(eventType, iface);
+                    ProjectionHandlerRegistry.Register(eventType, iface, projectionType);
                 }
             }
 

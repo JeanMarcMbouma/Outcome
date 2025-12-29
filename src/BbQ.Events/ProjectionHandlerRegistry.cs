@@ -8,21 +8,21 @@ namespace BbQ.Events;
 /// </summary>
 public static class ProjectionHandlerRegistry
 {
-    private static readonly ConcurrentDictionary<Type, List<Type>> _handlers = new();
+    private static readonly ConcurrentDictionary<Type, List<HandlerRegistration>> _handlers = new();
 
     /// <summary>
     /// Registers a projection handler service type for a specific event type.
     /// </summary>
-    public static void Register(Type eventType, Type handlerServiceType)
+    public static void Register(Type eventType, Type handlerServiceType, Type concreteType)
     {
         _handlers.AddOrUpdate(
             eventType,
-            _ => new List<Type> { handlerServiceType },
+            _ => new List<HandlerRegistration> { new(handlerServiceType, concreteType) },
             (_, list) =>
             {
-                if (!list.Contains(handlerServiceType))
+                if (!list.Any(r => r.HandlerServiceType == handlerServiceType))
                 {
-                    list.Add(handlerServiceType);
+                    list.Add(new HandlerRegistration(handlerServiceType, concreteType));
                 }
                 return list;
             });
@@ -34,8 +34,20 @@ public static class ProjectionHandlerRegistry
     public static List<Type> GetHandlers(Type eventType)
     {
         return _handlers.TryGetValue(eventType, out var handlers) 
-            ? new List<Type>(handlers) 
+            ? handlers.Select(h => h.HandlerServiceType).ToList()
             : new List<Type>();
+    }
+
+    /// <summary>
+    /// Gets the handler registration (including concrete type) for a handler service type and event type.
+    /// </summary>
+    public static HandlerRegistration? GetHandlerRegistration(Type eventType, Type handlerServiceType)
+    {
+        if (_handlers.TryGetValue(eventType, out var handlers))
+        {
+            return handlers.FirstOrDefault(h => h.HandlerServiceType == handlerServiceType);
+        }
+        return null;
     }
 
     /// <summary>
@@ -53,4 +65,9 @@ public static class ProjectionHandlerRegistry
     {
         _handlers.Clear();
     }
+
+    /// <summary>
+    /// Represents a handler registration with both interface and concrete types.
+    /// </summary>
+    public record HandlerRegistration(Type HandlerServiceType, Type ConcreteType);
 }

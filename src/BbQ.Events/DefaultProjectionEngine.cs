@@ -214,12 +214,20 @@ internal class DefaultProjectionEngine : IProjectionEngine
             try
             {
                 var handler = scope.ServiceProvider.GetRequiredService(handlerServiceType);
+                
+                // Get the concrete type for options
+                var registration = ProjectionHandlerRegistry.GetHandlerRegistration(eventType, handlerServiceType);
+                if (registration == null)
+                {
+                    _logger.LogWarning("No registration found for {HandlerType}", handlerServiceType.Name);
+                    continue;
+                }
 
                 // Check if it's a partitioned projection handler
                 if (cache.PartitionedHandlerInterface.IsAssignableFrom(handlerServiceType))
                 {
                     // Get projection options
-                    var options = GetProjectionOptions(handlerServiceType);
+                    var options = GetProjectionOptions(registration.ConcreteType);
                     
                     // Extract partition key
                     var partitionKey = (string)cache.GetPartitionKeyMethod!.Invoke(handler, new[] { @event })!;
@@ -238,7 +246,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
                 else if (cache.RegularHandlerInterface.IsAssignableFrom(handlerServiceType))
                 {
                     // Regular handlers use default partition (sequential processing)
-                    var options = GetProjectionOptions(handlerServiceType);
+                    var options = GetProjectionOptions(registration.ConcreteType);
                     
                     // Route to default partition worker
                     await RouteToPartitionWorkerAsync(
@@ -266,13 +274,13 @@ internal class DefaultProjectionEngine : IProjectionEngine
     /// <summary>
     /// Gets projection options for a handler, either from attribute or defaults.
     /// </summary>
-    private ProjectionOptions GetProjectionOptions(Type handlerServiceType)
+    private ProjectionOptions GetProjectionOptions(Type concreteType)
     {
-        var attribute = handlerServiceType.GetCustomAttribute<ProjectionAttribute>();
+        var attribute = concreteType.GetCustomAttribute<ProjectionAttribute>();
         
         return new ProjectionOptions
         {
-            ProjectionName = handlerServiceType.Name,
+            ProjectionName = concreteType.Name,
             MaxDegreeOfParallelism = attribute?.MaxDegreeOfParallelism ?? 1,
             CheckpointBatchSize = attribute?.CheckpointBatchSize ?? 100
         };
