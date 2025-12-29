@@ -1,3 +1,4 @@
+using BbQ.Events;
 using BbQ.Events.SqlServer;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
