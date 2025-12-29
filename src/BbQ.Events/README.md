@@ -1,16 +1,18 @@
 # BbQ.Events
 
-Event-driven architecture support with strongly-typed pub/sub for BbQ libraries.
+Event-driven architecture support with strongly-typed pub/sub and projections for BbQ libraries.
 
 ## ✨ Features
 
 - **Type-safe event publishing** with `IEventPublisher`
 - **Event handlers** (`IEventHandler<TEvent>`) for processing events one-by-one
 - **Event subscribers** (`IEventSubscriber<TEvent>`) for consuming event streams
+- **Projection support** for building read models and materialized views
+- **Partitioned projections** for parallel event processing
 - **In-memory event bus** for single-process applications
 - **Thread-safe** implementation using `System.Threading.Channels`
 - **Storage-agnostic** design - extend for distributed scenarios
-- **Source generator support** - automatic handler/subscriber discovery via BbQ.Events.SourceGenerators
+- **Source generator support** - automatic handler/subscriber/projection discovery via BbQ.Events.SourceGenerators
 
 ## 📦 Installation
 
@@ -92,13 +94,83 @@ await foreach (var evt in subscriber.Subscribe(cancellationToken))
 }
 ```
 
+## 🎯 Projections (NEW)
+
+Projections transform events into queryable read models for event-sourced systems.
+
+### Define a Projection
+
+```csharp
+[Projection]
+public class UserProfileProjection :
+    IProjectionHandler<UserCreated>,
+    IProjectionHandler<UserUpdated>
+{
+    private readonly IUserRepository _repository;
+    
+    public UserProfileProjection(IUserRepository repository)
+    {
+        _repository = repository;
+    }
+    
+    public async ValueTask ProjectAsync(UserCreated evt, CancellationToken ct)
+    {
+        var profile = new UserProfile(evt.UserId, evt.Name, evt.Email);
+        await _repository.UpsertAsync(profile, ct);
+    }
+    
+    public async ValueTask ProjectAsync(UserUpdated evt, CancellationToken ct)
+    {
+        var profile = await _repository.GetAsync(evt.UserId, ct);
+        if (profile != null)
+        {
+            profile.Name = evt.Name;
+            await _repository.UpsertAsync(profile, ct);
+        }
+    }
+}
+```
+
+### Register and Run Projections
+
+```csharp
+// Register event bus and projections
+services.AddInMemoryEventBus();
+services.AddProjectionsFromAssembly(typeof(Program).Assembly);
+services.AddProjectionEngine();
+
+// Run projection engine (as hosted service or manually)
+var engine = serviceProvider.GetRequiredService<IProjectionEngine>();
+await engine.RunAsync(cancellationToken);
+```
+
+### Partitioned Projections
+
+For parallel processing, use `IPartitionedProjectionHandler<TEvent>`:
+
+```csharp
+[Projection]
+public class UserStatisticsProjection : IPartitionedProjectionHandler<UserActivity>
+{
+    public string GetPartitionKey(UserActivity evt) => evt.UserId.ToString();
+    
+    public async ValueTask ProjectAsync(UserActivity evt, CancellationToken ct)
+    {
+        // Process event within partition
+    }
+}
+```
+
+📖 **See [PROJECTION_SAMPLE.md](PROJECTION_SAMPLE.md) for complete examples and best practices.**
+
 ## 🔗 Automatic Handler Registration
 
-Event handlers and subscribers are automatically discovered by the BbQ.Events source generator:
+Event handlers, subscribers, and projections are automatically discovered by the BbQ.Events source generator:
 
 ```csharp
 services.AddInMemoryEventBus();
 services.AddYourAssemblyNameEventHandlers();  // Auto-discovers event handlers/subscribers
+services.AddYourAssemblyNameProjections();    // Auto-discovers projections
 ```
 
 ## 🔗 Integration with BbQ.Cqrs (Optional)
@@ -135,6 +207,14 @@ The default `InMemoryEventBus` implementation:
 - Slow subscribers don't block publishers (drops oldest messages)
 - Suitable for single-process applications
 
+### Projection Engine
+
+The default projection engine:
+- Subscribes to event streams and dispatches to projection handlers
+- Maintains checkpoints for resumability (with pluggable checkpoint storage)
+- Supports partitioned projections for parallel processing
+- Handles errors gracefully and continues processing
+
 ### Distributed Systems
 
 For multi-process or distributed systems, implement `IEventBus` with your preferred message broker:
@@ -154,6 +234,12 @@ Processes events one-by-one as they're published. Multiple handlers can process 
 ### Event Subscriber
 Provides a stream of events for reactive programming patterns. Each subscriber gets an independent stream.
 
+### Projection Handler
+Transforms events into read models. Can handle multiple event types and optionally support partitioning.
+
+### Projection Engine
+Orchestrates projection execution, maintains checkpoints, and supports parallel processing.
+
 ### Event Bus
 Central hub combining publishing and subscribing capabilities.
 
@@ -166,14 +252,23 @@ services.AddInMemoryEventBus();
 // Manual handler registration
 services.AddScoped<IEventHandler<MyEvent>, MyEventHandler>();
 services.AddScoped<IEventSubscriber<MyEvent>, MyEventSubscriber>();
+
+// Projection registration
+services.AddProjection<MyProjection>();
+services.AddProjectionsFromAssembly(typeof(Program).Assembly);
+services.AddProjectionEngine();
+
+// Custom checkpoint store for production
+services.AddSingleton<IProjectionCheckpointStore, SqlCheckpointStore>();
 ```
 
 ## 🎯 Design Principles
 
 - **Optional consumers**: Events can be published without handlers or subscribers
 - **Type safety**: Compile-time checking for all event types
-- **Explicit**: Clear separation between publishing, handling, and subscribing
+- **Explicit**: Clear separation between publishing, handling, subscribing, and projecting
 - **Storage-agnostic**: Interfaces can be implemented for any storage/messaging backend
+- **Production-ready**: Projections support checkpointing, idempotency, and error handling
 - **Compatible**: Works standalone or integrates with BbQ.Cqrs
 
 ## 📄 License
