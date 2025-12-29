@@ -20,9 +20,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\BbQ.Cqrs\BbQ.Cqrs.csproj" />
-    <ProjectReference Include="..\BbQ.Events\BbQ.Events.csproj" />
-    <ProjectReference Include="..\Outcome\Outcome.csproj" />
+    <ProjectReference Include="..\..\src\BbQ.Cqrs\BbQ.Cqrs.csproj" />
+    <ProjectReference Include="..\..\src\BbQ.Events\BbQ.Events.csproj" />
+    <ProjectReference Include="..\..\src\Outcome\Outcome.csproj" />
   </ItemGroup>
 
 </Project>

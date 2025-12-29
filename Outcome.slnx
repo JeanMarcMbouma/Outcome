@@ -3,7 +3,7 @@
     <Project Path="src/BbQ.Cqrs/BbQ.Cqrs.csproj" />
     <Project Path="src/BbQ.Cqrs.SourceGenerators/BbQ.Cqrs.SourceGenerators.csproj" />
     <Project Path="src/BbQ.Cqrs.Samples/BbQ.Cqrs.Samples.csproj"  />
-    <Project Path="src/BbQ.Cqrs.Tests/BbQ.Cqrs.Tests.csproj" />
+    <Project Path="tests/BbQ.Cqrs.Tests/BbQ.Cqrs.Tests.csproj" />
   </Folder>
   <Folder Name="/Events/">
     <Project Path="src/BbQ.Events/BbQ.Events.csproj" />
@@ -12,6 +12,6 @@
     <Project Path="tests/BbQ.Events.SqlServer.Tests/BbQ.Events.SqlServer.Tests.csproj" />
   </Folder>
   <Project Path="src/Outcome.SourceGenerators/Outcome.SourceGenerators.csproj" />
-  <Project Path="src/Outcome.Tests/Outcome.Tests.csproj" />
+  <Project Path="tests/Outcome.Tests/Outcome.Tests.csproj" />
   <Project Path="src/Outcome/Outcome.csproj" />
 </Solution>
