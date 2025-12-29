@@ -19,8 +19,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Outcome\Outcome.csproj" />
-    <ProjectReference Include="..\Outcome.SourceGenerators\Outcome.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\src\Outcome\Outcome.csproj" />
+    <ProjectReference Include="..\..\src\Outcome.SourceGenerators\Outcome.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
 </Project>
