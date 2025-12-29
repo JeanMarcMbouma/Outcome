@@ -32,7 +32,7 @@ CREATE TABLE BbQ_ProjectionCheckpoints (
 );
 ```
 
-**Note**: The `PartitionKey` column is nullable and defaults to `NULL` for non-partitioned projections. This enables the schema to support future partitioned projection features.
+**Note**: The `PartitionKey` column is nullable and defaults to `NULL` for non-partitioned projections. SQL Server allows nullable columns in composite primary keys. Due to how NULL values work in unique constraints, only one row with a NULL `PartitionKey` can exist per `ProjectionName`, which is the desired behavior for non-partitioned projections. This schema design enables future support for partitioned projection features.
 
 ## Usage
 
@@ -49,8 +49,9 @@ services.AddInMemoryEventBus();
 services.AddProjection<UserProfileProjection>();
 
 // Register SQL Server checkpoint store
+// For development with self-signed certificates, add: TrustServerCertificate=true
 services.UseSqlServerCheckpoints(
-    "Server=localhost;Database=MyApp;Integrated Security=true;TrustServerCertificate=true");
+    "Server=localhost;Database=MyApp;Integrated Security=true");
 
 // Register projection engine
 services.AddProjectionEngine();
@@ -81,10 +82,12 @@ services.UseSqlServerCheckpoints(connectionString);
 ```json
 {
   "ConnectionStrings": {
-    "ProjectionCheckpoints": "Server=localhost;Database=MyApp;Integrated Security=true;TrustServerCertificate=true"
+    "ProjectionCheckpoints": "Server=localhost;Database=MyApp;Integrated Security=true"
   }
 }
 ```
+
+**Note**: For development environments with self-signed certificates, you may need to add `TrustServerCertificate=true` to the connection string. However, this should not be used in production as it disables TLS certificate validation and can allow man-in-the-middle attacks.
 
 ## Concurrency and Idempotency
 

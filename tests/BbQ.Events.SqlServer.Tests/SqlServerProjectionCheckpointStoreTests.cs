@@ -27,31 +27,39 @@ public class SqlServerProjectionCheckpointStoreTests
         if (string.IsNullOrWhiteSpace(_connectionString))
         {
             // Try LocalDB as fallback
-            _connectionString = @"Server=(localdb)\mssqllocaldb;Database=BbQEventsTest;Integrated Security=true;TrustServerCertificate=true";
+            _connectionString = @"Server=(localdb)\mssqllocaldb;Database=BbQEventsTest;Integrated Security=true";
         }
 
         try
         {
-            // Test connection and create table if needed
+            // First, connect to master database to create the test database if needed
+            var masterConnectionString = _connectionString.Replace("Database=BbQEventsTest", "Database=master");
+            
+            await using (var masterConnection = new SqlConnection(masterConnectionString))
+            {
+                await masterConnection.OpenAsync();
+
+                // Create test database if it doesn't exist
+                var createDbCommand = masterConnection.CreateCommand();
+                createDbCommand.CommandText = @"
+                    IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'BbQEventsTest')
+                    BEGIN
+                        CREATE DATABASE BbQEventsTest;
+                    END";
+                
+                try
+                {
+                    await createDbCommand.ExecuteNonQueryAsync();
+                }
+                catch
+                {
+                    // Ignore errors - database might already exist or we might not have permission
+                }
+            }
+
+            // Now connect to the test database to create the table
             await using var connection = new SqlConnection(_connectionString);
             await connection.OpenAsync();
-
-            // Create test database if it doesn't exist (LocalDB only)
-            var createDbCommand = connection.CreateCommand();
-            createDbCommand.CommandText = @"
-                IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'BbQEventsTest')
-                BEGIN
-                    CREATE DATABASE BbQEventsTest;
-                END";
-            
-            try
-            {
-                await createDbCommand.ExecuteNonQueryAsync();
-            }
-            catch
-            {
-                // Ignore errors - database might already exist or we might not have permission
-            }
 
             // Create table
             var createTableCommand = connection.CreateCommand();
@@ -105,6 +113,13 @@ public class SqlServerProjectionCheckpointStoreTests
 
     private async Task CleanupTestDataAsync()
     {
+        // Be defensive: if tests cannot run or the connection string is not available,
+        // there is nothing to clean up.
+        if (!_canRunTests || string.IsNullOrWhiteSpace(_connectionString))
+        {
+            return;
+        }
+
         await using var connection = new SqlConnection(_connectionString);
         await connection.OpenAsync();
 
