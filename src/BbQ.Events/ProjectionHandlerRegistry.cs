@@ -6,7 +6,7 @@ namespace BbQ.Events;
 /// Registry for tracking registered projection handlers.
 /// Used by the projection engine to discover which event types have registered handlers.
 /// </summary>
-internal class ProjectionHandlerRegistry
+public static class ProjectionHandlerRegistry
 {
     private static readonly ConcurrentDictionary<Type, List<Type>> _handlers = new();
 

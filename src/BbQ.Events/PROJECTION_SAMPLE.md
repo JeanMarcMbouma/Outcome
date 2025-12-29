@@ -66,7 +66,7 @@ public class UserProfileProjection :
 
 ### 2. User Login Statistics (Partitioned)
 
-This projection tracks login statistics with partitioning for parallel processing:
+This projection tracks login statistics and uses partition keys for future parallelization:
 
 ```csharp
 [Projection]
@@ -81,7 +81,7 @@ public class UserLoginStatisticsProjection : IPartitionedProjectionHandler<UserL
     
     public string GetPartitionKey(UserLoginOccurred evt)
     {
-        // Partition by user ID to ensure ordering per user
+        // Partition by user ID - can be used for parallel processing in custom engines
         return evt.UserId.ToString();
     }
     
@@ -98,6 +98,8 @@ public class UserLoginStatisticsProjection : IPartitionedProjectionHandler<UserL
     }
 }
 ```
+
+**Note:** The default projection engine processes events sequentially. To leverage partition keys for parallel processing, implement a custom `IProjectionEngine`.
 
 ## Registration
 
@@ -241,19 +243,19 @@ public class UserService
 
 ## Best Practices
 
-1. **Idempotency**: Projections should be idempotent - processing the same event multiple times should produce the same result.
+1. **Idempotency**: Design projections to be idempotent so that processing the same event multiple times produces the same result. While the default engine processes live events and doesn't replay them, idempotency keeps projections safe for scenarios like republished events or future replay support.
 
 2. **Determinism**: Projection logic should be deterministic - the same event should always produce the same projection.
 
 3. **No Side Effects**: Projections should only update read models, not trigger external actions like sending emails.
 
-4. **Partition Keys**: Choose partition keys that ensure proper ordering while distributing load evenly.
+4. **Partition Keys**: For `IPartitionedProjectionHandler`, choose partition keys that group related events together. These can be leveraged by custom engine implementations for parallel processing.
 
-5. **Checkpoint Storage**: For production, use a durable checkpoint store (database, Redis, etc.) instead of in-memory.
+5. **Checkpoint Storage**: The checkpoint store infrastructure is provided via `IProjectionCheckpointStore`. Implement custom checkpointing logic in your projection engine or handlers as needed for your use case.
 
-## Advanced: Custom Checkpoint Store
+## Advanced: Custom Checkpoint Store (Infrastructure)
 
-For production use, implement a durable checkpoint store using your preferred database.
+The following example shows how a durable checkpoint store can be implemented. Note that the default projection engine doesn't automatically use checkpoints - you would integrate this in a custom engine implementation or manually in your projections.
 
 Example using SQL with Dapper (requires `Dapper` NuGet package):
 

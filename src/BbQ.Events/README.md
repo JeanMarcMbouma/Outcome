@@ -146,7 +146,7 @@ await engine.RunAsync(cancellationToken);
 
 ### Partitioned Projections
 
-For parallel processing, use `IPartitionedProjectionHandler<TEvent>`:
+Use `IPartitionedProjectionHandler<TEvent>` to specify partition keys for ordering guarantees:
 
 ```csharp
 [Projection]
@@ -156,10 +156,12 @@ public class UserStatisticsProjection : IPartitionedProjectionHandler<UserActivi
     
     public async ValueTask ProjectAsync(UserActivity evt, CancellationToken ct)
     {
-        // Process event within partition
+        // Process event - partition key can be used for custom parallelization
     }
 }
 ```
+
+**Note:** The default projection engine processes events sequentially. Implement a custom IProjectionEngine to leverage partition keys for parallel processing.
 
 📖 **See [PROJECTION_SAMPLE.md](PROJECTION_SAMPLE.md) for complete examples and best practices.**
 
@@ -210,10 +212,11 @@ The default `InMemoryEventBus` implementation:
 ### Projection Engine
 
 The default projection engine:
-- Subscribes to event streams and dispatches to projection handlers
-- Maintains checkpoints for resumability (with pluggable checkpoint storage)
-- Supports partitioned projections for parallel processing
+- Subscribes to live event streams and dispatches to projection handlers
+- Processes events sequentially as they arrive
+- Provides checkpoint storage infrastructure (IProjectionCheckpointStore)
 - Handles errors gracefully and continues processing
+- Can be extended for batch processing, parallel processing, and automatic checkpointing
 
 ### Distributed Systems
 
@@ -238,7 +241,7 @@ Provides a stream of events for reactive programming patterns. Each subscriber g
 Transforms events into read models. Can handle multiple event types and optionally support partitioning.
 
 ### Projection Engine
-Orchestrates projection execution, maintains checkpoints, and supports parallel processing.
+Orchestrates projection execution from live event streams. Provides infrastructure for checkpointing via IProjectionCheckpointStore.
 
 ### Event Bus
 Central hub combining publishing and subscribing capabilities.
@@ -268,7 +271,7 @@ services.AddSingleton<IProjectionCheckpointStore, SqlCheckpointStore>();
 - **Type safety**: Compile-time checking for all event types
 - **Explicit**: Clear separation between publishing, handling, subscribing, and projecting
 - **Storage-agnostic**: Interfaces can be implemented for any storage/messaging backend
-- **Production-ready**: Projections support checkpointing, idempotency, and error handling
+- **Extensible**: Default implementations can be extended for production features (checkpointing, batching, parallelism)
 - **Compatible**: Works standalone or integrates with BbQ.Cqrs
 
 ## 📄 License

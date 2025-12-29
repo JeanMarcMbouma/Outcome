@@ -7,21 +7,19 @@ namespace BbQ.Events;
 /// Default implementation of the projection engine.
 /// 
 /// This engine processes events sequentially (event-by-event) and dispatches them
-/// to registered projection handlers. It maintains checkpoints to enable resumability
-/// after restarts or failures.
+/// to registered projection handlers.
 /// </summary>
 /// <remarks>
-/// This is a basic implementation that:
-/// - Processes events sequentially (no parallel processing yet)
+/// This implementation:
+/// - Processes events sequentially from live event streams
 /// - Dispatches to all registered handlers for each event type
-/// - Logs errors but continues processing
-/// - Uses a simple checkpoint strategy (after each event)
+/// - Logs errors but continues processing other handlers
+/// - Uses a single DI scope per event for efficiency
+/// - Does not currently implement checkpointing (infrastructure provided via IProjectionCheckpointStore)
+/// - Does not currently implement parallel processing for partitioned projections
 /// 
-/// Future enhancements could include:
-/// - Batch processing for higher throughput
-/// - Parallel processing for partitioned projections
-/// - Configurable retry policies
-/// - Dead-letter queues for failed events
+/// Batch processing, parallel processing, checkpointing, configurable retry policies,
+/// and dead-letter queues can be added as needed for specific use cases.
 /// </remarks>
 internal class DefaultProjectionEngine : IProjectionEngine
 {
@@ -96,25 +94,64 @@ internal class DefaultProjectionEngine : IProjectionEngine
                 .MakeGenericMethod(eventType);
 
             var eventStream = subscribeMethod.Invoke(_eventBus, new object[] { ct });
+            
+            if (eventStream == null)
+            {
+                _logger.LogError("Subscribe returned null for event type {EventType}", eventType.Name);
+                return;
+            }
 
-            // Get the async enumerator
-            var getEnumeratorMethod = eventStream!.GetType().GetMethod("GetAsyncEnumerator")!;
+            // The eventStream is an IAsyncEnumerable<TEvent>
+            // We need to get its GetAsyncEnumerator method
+            var asyncEnumerableType = typeof(IAsyncEnumerable<>).MakeGenericType(eventType);
+            var getEnumeratorMethod = asyncEnumerableType.GetMethod("GetAsyncEnumerator");
+            
+            if (getEnumeratorMethod == null)
+            {
+                _logger.LogError("Could not find GetAsyncEnumerator for event type {EventType}", eventType.Name);
+                return;
+            }
+            
+            // Call GetAsyncEnumerator with the CancellationToken
             var enumerator = getEnumeratorMethod.Invoke(eventStream, new object[] { ct });
+            
+            if (enumerator == null)
+            {
+                _logger.LogError("GetAsyncEnumerator returned null for event type {EventType}", eventType.Name);
+                return;
+            }
 
-            // Process events from the stream
-            var moveNextMethod = enumerator!.GetType().GetMethod("MoveNextAsync")!;
-            var currentProperty = enumerator.GetType().GetProperty("Current")!;
+            // Get MoveNextAsync and Current from the enumerator
+            var enumeratorType = enumerator.GetType();
+            var moveNextMethod = enumeratorType.GetMethod("MoveNextAsync");
+            var currentProperty = enumeratorType.GetProperty("Current");
+            
+            if (moveNextMethod == null || currentProperty == null)
+            {
+                _logger.LogError("Could not find MoveNextAsync or Current on enumerator for event type {EventType}", eventType.Name);
+                return;
+            }
 
             while (true)
             {
-                var moveNextTask = (ValueTask<bool>)moveNextMethod.Invoke(enumerator, Array.Empty<object>())!;
+                var moveNextResult = moveNextMethod.Invoke(enumerator, Array.Empty<object>());
+                if (moveNextResult == null)
+                {
+                    _logger.LogError("MoveNextAsync returned null for event type {EventType}", eventType.Name);
+                    break;
+                }
+                
+                var moveNextTask = (ValueTask<bool>)moveNextResult;
                 if (!await moveNextTask)
                 {
                     break;
                 }
 
                 var currentEvent = currentProperty.GetValue(enumerator);
-                await DispatchEventToHandlersAsync(eventType, currentEvent!, handlerServiceTypes, ct);
+                if (currentEvent != null)
+                {
+                    await DispatchEventToHandlersAsync(eventType, currentEvent, handlerServiceTypes, ct);
+                }
             }
         }
         catch (OperationCanceledException)

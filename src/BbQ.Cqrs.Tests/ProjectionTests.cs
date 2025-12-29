@@ -237,6 +237,34 @@ public class ProjectionTests
         Assert.That(userStatsProjection, Is.Not.Null);
     }
 
+    [Test]
+    public void ProjectionEngine_CanBeCreated_WithRegisteredProjections()
+    {
+        // Arrange
+        ProjectionHandlerRegistry.Clear();
+        
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddInMemoryEventBus();
+        services.AddProjection<TestUserProfileProjection>();
+        services.AddProjection<TestUserStatisticsProjection>();
+        services.AddProjectionEngine();
+        
+        var provider = services.BuildServiceProvider();
+        
+        // Act
+        var engine = provider.GetService<IProjectionEngine>();
+        
+        // Assert
+        Assert.That(engine, Is.Not.Null, "Projection engine should be registered");
+        
+        // Verify handlers are in registry
+        var registeredEvents = ProjectionHandlerRegistry.GetEventTypes().ToList();
+        Assert.That(registeredEvents.Count, Is.GreaterThan(0), "Should have registered event types");
+        Assert.That(registeredEvents, Contains.Item(typeof(UserCreatedEvent)), "Should have UserCreatedEvent registered");
+        Assert.That(registeredEvents, Contains.Item(typeof(UserActivityEvent)), "Should have UserActivityEvent registered");
+    }
+
     // Test event types
     public record UserCreatedEvent(string UserId, string Name, string Email);
     public record UserUpdatedEvent(string UserId, string Name, string Email);

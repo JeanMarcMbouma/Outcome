@@ -1,23 +1,26 @@
 namespace BbQ.Events;
 
 /// <summary>
-/// Orchestrates the execution of projection handlers by subscribing to event streams,
-/// dispatching events to handlers, and maintaining checkpoints.
+/// Orchestrates the execution of projection handlers by subscribing to event streams
+/// and dispatching events to handlers.
 /// 
 /// The projection engine is the runtime component that:
 /// - Subscribes to the event bus for configured event types
 /// - Routes events to registered projection handlers
-/// - Maintains processing checkpoints for resumability
-/// - Supports parallel processing for partitioned projections
-/// - Handles errors and retries
+/// - Handles errors gracefully and continues processing
+/// - Provides infrastructure for checkpointing (via IProjectionCheckpointStore)
 /// </summary>
 /// <remarks>
 /// The projection engine runs as a background service that continuously processes
-/// events from the event stream. It is designed to be:
-/// - Resilient: Handles failures gracefully and supports retries
-/// - Resumable: Uses checkpoints to resume from the last processed position
-/// - Performant: Supports parallel processing of independent events
-/// - Observable: Logs progress and errors
+/// events from live event streams. The default implementation:
+/// - Processes events sequentially (not parallel)
+/// - Does not implement automatic checkpointing (infrastructure provided)
+/// - Logs progress and errors
+/// 
+/// For production workloads, consider implementing:
+/// - Custom checkpoint logic using IProjectionCheckpointStore
+/// - Parallel processing for partitioned projections
+/// - Retry policies and dead-letter queues
 /// 
 /// Usage:
 /// <code>
@@ -59,13 +62,13 @@ public interface IProjectionEngine
     /// <remarks>
     /// This method:
     /// - Subscribes to the event bus for all registered projection event types
-    /// - Dispatches events to registered projection handlers
-    /// - Maintains checkpoints after processing batches of events
+    /// - Dispatches events to registered projection handlers sequentially
     /// - Runs until the cancellation token is triggered
-    /// - Handles errors by logging and optionally retrying
+    /// - Handles errors by logging and continuing to process other events
     /// 
-    /// The engine processes events continuously in a loop. For partitioned projections,
-    /// events with different partition keys may be processed concurrently.
+    /// The default engine processes events from live streams as they arrive.
+    /// Checkpointing and replay functionality can be implemented via custom
+    /// IProjectionEngine implementations using IProjectionCheckpointStore.
     /// 
     /// Example:
     /// <code>
