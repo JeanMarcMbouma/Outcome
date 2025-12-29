@@ -8,7 +8,7 @@ using System.Text;
 namespace BbQ.Events.SourceGenerators
 {
     /// <summary>
-    /// Incremental source generator that detects event handlers and subscribers
+    /// Incremental source generator that detects event handlers, subscribers, and projections
     /// and generates registration code.
     /// </summary>
     [Generator]
@@ -23,19 +23,28 @@ namespace BbQ.Events.SourceGenerators
                     transform: static (ctx, _) => GetEventHandlerInfo(ctx))
                 .Where(static m => m is not null);
 
-            // Collect all handlers
+            // Register syntax provider for projections
+            var projections = context.SyntaxProvider
+                .CreateSyntaxProvider(
+                    predicate: static (s, _) => IsProjectionCandidate(s),
+                    transform: static (ctx, _) => GetProjectionInfo(ctx))
+                .Where(static m => m is not null);
+
+            // Collect all handlers and projections
             var allHandlers = handlers.Collect();
+            var allProjections = projections.Collect();
             
             // Get compilation to access assembly name
             var compilation = context.CompilationProvider;
 
             // Generate registration extension methods with assembly name
             context.RegisterSourceOutput(
-                compilation.Combine(allHandlers),
+                compilation.Combine(allHandlers.Combine(allProjections)),
                 static (spc, data) =>
                 {
-                    var (compilation, handlers) = data;
-                    GenerateRegistrationExtensions(spc, compilation, handlers);
+                    var (compilation, handlersAndProjections) = data;
+                    var (handlers, projections) = handlersAndProjections;
+                    GenerateRegistrationExtensions(spc, compilation, handlers, projections);
                 });
         }
 
@@ -43,6 +52,14 @@ namespace BbQ.Events.SourceGenerators
         {
             return node is ClassDeclarationSyntax classDecl &&
                    !classDecl.Modifiers.Any(SyntaxKind.AbstractKeyword) &&
+                   classDecl.BaseList != null;
+        }
+
+        private static bool IsProjectionCandidate(SyntaxNode node)
+        {
+            return node is ClassDeclarationSyntax classDecl &&
+                   !classDecl.Modifiers.Any(SyntaxKind.AbstractKeyword) &&
+                   classDecl.AttributeLists.Count > 0 &&
                    classDecl.BaseList != null;
         }
 
@@ -93,14 +110,74 @@ namespace BbQ.Events.SourceGenerators
             return null;
         }
 
+        private static ProjectionInfo? GetProjectionInfo(GeneratorSyntaxContext context)
+        {
+            var classDecl = (ClassDeclarationSyntax)context.Node;
+            var semanticModel = context.SemanticModel;
+
+            var classSymbol = semanticModel.GetDeclaredSymbol(classDecl);
+            if (classSymbol == null)
+                return null;
+
+            // Check for [Projection] attribute
+            var attributes = classSymbol.GetAttributes();
+            var hasProjectionAttr = attributes.Any(a => 
+                a.AttributeClass?.ToDisplayString() == "BbQ.Events.ProjectionAttribute");
+
+            if (!hasProjectionAttr)
+                return null;
+
+            // Collect all event types this projection handles
+            var interfaces = classSymbol.AllInterfaces;
+            var eventTypes = new List<EventTypeInfo>();
+            
+            foreach (var iface in interfaces)
+            {
+                var interfaceName = iface.ToDisplayString();
+                
+                // Check for IProjectionHandler<TEvent>
+                if (interfaceName.StartsWith("BbQ.Events.IProjectionHandler<") && iface.TypeArguments.Length == 1)
+                {
+                    var eventType = iface.TypeArguments[0];
+                    eventTypes.Add(new EventTypeInfo
+                    {
+                        EventTypeName = eventType.ToDisplayString(),
+                        IsPartitioned = false
+                    });
+                }
+                // Check for IPartitionedProjectionHandler<TEvent>
+                else if (interfaceName.StartsWith("BbQ.Events.IPartitionedProjectionHandler<") && iface.TypeArguments.Length == 1)
+                {
+                    var eventType = iface.TypeArguments[0];
+                    eventTypes.Add(new EventTypeInfo
+                    {
+                        EventTypeName = eventType.ToDisplayString(),
+                        IsPartitioned = true
+                    });
+                }
+            }
+
+            if (eventTypes.Count == 0)
+                return null;
+
+            return new ProjectionInfo
+            {
+                ProjectionTypeName = classSymbol.ToDisplayString(),
+                EventTypes = eventTypes,
+                Namespace = classSymbol.ContainingNamespace.ToDisplayString()
+            };
+        }
+
         private static void GenerateRegistrationExtensions(
             SourceProductionContext context,
             Compilation compilation,
-            IEnumerable<EventHandlerInfo?> handlers)
+            IEnumerable<EventHandlerInfo?> handlers,
+            IEnumerable<ProjectionInfo?> projections)
         {
             var validHandlers = handlers.Where(h => h != null).Cast<EventHandlerInfo>().ToList();
+            var validProjections = projections.Where(p => p != null).Cast<ProjectionInfo>().ToList();
 
-            if (validHandlers.Count == 0)
+            if (validHandlers.Count == 0 && validProjections.Count == 0)
                 return;
 
             // Create a unique class name based on assembly name
@@ -150,6 +227,47 @@ namespace BbQ.Events.SourceGenerators
             sb.AppendLine();
             sb.AppendLine("            return services;");
             sb.AppendLine("        }");
+            
+            // Generate AddProjections method if there are projections
+            if (validProjections.Count > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine("        /// <summary>");
+                sb.AppendLine($"        /// Registers all projections discovered in {assemblyName}.");
+                sb.AppendLine("        /// </summary>");
+                sb.AppendLine("        /// <param name=\"services\">The service collection to register with</param>");
+                sb.AppendLine("        /// <param name=\"handlersLifetime\">The lifetime to use for projection instances (default: Scoped)</param>");
+                sb.AppendLine("        /// <returns>The service collection for chaining</returns>");
+                sb.AppendLine("        public static IServiceCollection Add" + safeName + "Projections(");
+                sb.AppendLine("            this IServiceCollection services,");
+                sb.AppendLine("            ServiceLifetime handlersLifetime = ServiceLifetime.Scoped)");
+                sb.AppendLine("        {");
+                
+                // Register each projection
+                foreach (var projection in validProjections)
+                {
+                    sb.AppendLine($"            // Register projection: {projection.ProjectionTypeName}");
+                    sb.AppendLine($"            services.Add(new ServiceDescriptor(typeof({projection.ProjectionTypeName}), typeof({projection.ProjectionTypeName}), handlersLifetime));");
+                    
+                    // Register for each event type it handles
+                    foreach (var eventType in projection.EventTypes)
+                    {
+                        if (eventType.IsPartitioned)
+                        {
+                            sb.AppendLine($"            services.Add(new ServiceDescriptor(typeof(IPartitionedProjectionHandler<{eventType.EventTypeName}>), sp => sp.GetRequiredService<{projection.ProjectionTypeName}>(), handlersLifetime));");
+                        }
+                        else
+                        {
+                            sb.AppendLine($"            services.Add(new ServiceDescriptor(typeof(IProjectionHandler<{eventType.EventTypeName}>), sp => sp.GetRequiredService<{projection.ProjectionTypeName}>(), handlersLifetime));");
+                        }
+                    }
+                    sb.AppendLine();
+                }
+                
+                sb.AppendLine("            return services;");
+                sb.AppendLine("        }");
+            }
+            
             sb.AppendLine("    }");
             sb.AppendLine("}");
 
@@ -163,6 +281,19 @@ namespace BbQ.Events.SourceGenerators
             public bool IsEventHandler { get; set; }
             public bool IsEventSubscriber { get; set; }
             public string Namespace { get; set; } = "";
+        }
+
+        private class ProjectionInfo
+        {
+            public string ProjectionTypeName { get; set; } = "";
+            public List<EventTypeInfo> EventTypes { get; set; } = new();
+            public string Namespace { get; set; } = "";
+        }
+
+        private class EventTypeInfo
+        {
+            public string EventTypeName { get; set; } = "";
+            public bool IsPartitioned { get; set; }
         }
     }
 }
