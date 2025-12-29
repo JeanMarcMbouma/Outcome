@@ -253,7 +253,14 @@ public class UserService
 
 ## Advanced: Custom Checkpoint Store
 
+For production use, implement a durable checkpoint store using your preferred database.
+
+Example using SQL with Dapper (requires `Dapper` NuGet package):
+
 ```csharp
+using Dapper; // Install Dapper NuGet package
+using System.Data;
+
 public class SqlProjectionCheckpointStore : IProjectionCheckpointStore
 {
     private readonly IDbConnection _connection;
@@ -273,12 +280,23 @@ public class SqlProjectionCheckpointStore : IProjectionCheckpointStore
     
     public async ValueTask SaveCheckpointAsync(string projectionName, long checkpoint, CancellationToken ct)
     {
+        // PostgreSQL example - adapt for your database
         await _connection.ExecuteAsync(@"
             INSERT INTO ProjectionCheckpoints (ProjectionName, Checkpoint, UpdatedAt)
             VALUES (@Name, @Checkpoint, @UpdatedAt)
             ON CONFLICT (ProjectionName) 
             DO UPDATE SET Checkpoint = @Checkpoint, UpdatedAt = @UpdatedAt",
             new { Name = projectionName, Checkpoint = checkpoint, UpdatedAt = DateTime.UtcNow });
+            
+        // SQL Server alternative:
+        // MERGE INTO ProjectionCheckpoints AS target
+        // USING (SELECT @Name AS ProjectionName) AS source
+        // ON target.ProjectionName = source.ProjectionName
+        // WHEN MATCHED THEN 
+        //     UPDATE SET Checkpoint = @Checkpoint, UpdatedAt = @UpdatedAt
+        // WHEN NOT MATCHED THEN
+        //     INSERT (ProjectionName, Checkpoint, UpdatedAt)
+        //     VALUES (@Name, @Checkpoint, @UpdatedAt);
     }
     
     public async ValueTask ResetCheckpointAsync(string projectionName, CancellationToken ct)
@@ -292,4 +310,22 @@ public class SqlProjectionCheckpointStore : IProjectionCheckpointStore
 // Register custom checkpoint store
 services.AddSingleton<IProjectionCheckpointStore, SqlProjectionCheckpointStore>();
 services.AddProjectionEngine();
+```
+
+**Database Schema:**
+
+```sql
+-- PostgreSQL
+CREATE TABLE ProjectionCheckpoints (
+    ProjectionName VARCHAR(255) PRIMARY KEY,
+    Checkpoint BIGINT NOT NULL,
+    UpdatedAt TIMESTAMP NOT NULL
+);
+
+-- SQL Server
+CREATE TABLE ProjectionCheckpoints (
+    ProjectionName NVARCHAR(255) PRIMARY KEY,
+    Checkpoint BIGINT NOT NULL,
+    UpdatedAt DATETIME2 NOT NULL
+);
 ```

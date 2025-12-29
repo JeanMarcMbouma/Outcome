@@ -255,10 +255,12 @@ namespace BbQ.Events.SourceGenerators
                         if (eventType.IsPartitioned)
                         {
                             sb.AppendLine($"            services.Add(new ServiceDescriptor(typeof(IPartitionedProjectionHandler<{eventType.EventTypeName}>), sp => sp.GetRequiredService<{projection.ProjectionTypeName}>(), handlersLifetime));");
+                            sb.AppendLine($"            ProjectionHandlerRegistry.Register(typeof({eventType.EventTypeName}), typeof(IPartitionedProjectionHandler<{eventType.EventTypeName}>));");
                         }
                         else
                         {
                             sb.AppendLine($"            services.Add(new ServiceDescriptor(typeof(IProjectionHandler<{eventType.EventTypeName}>), sp => sp.GetRequiredService<{projection.ProjectionTypeName}>(), handlersLifetime));");
+                            sb.AppendLine($"            ProjectionHandlerRegistry.Register(typeof({eventType.EventTypeName}), typeof(IProjectionHandler<{eventType.EventTypeName}>));");
                         }
                     }
                     sb.AppendLine();
