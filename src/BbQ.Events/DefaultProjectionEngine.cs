@@ -130,11 +130,13 @@ internal class DefaultProjectionEngine : IProjectionEngine
 
     private async Task DispatchEventToHandlersAsync(Type eventType, object @event, List<Type> handlerServiceTypes, CancellationToken ct)
     {
+        // Use a single scope for all handlers processing this event
+        using var scope = _serviceProvider.CreateScope();
+        
         foreach (var handlerServiceType in handlerServiceTypes)
         {
             try
             {
-                using var scope = _serviceProvider.CreateScope();
                 var handler = scope.ServiceProvider.GetRequiredService(handlerServiceType);
 
                 // Check if it's a regular projection handler
