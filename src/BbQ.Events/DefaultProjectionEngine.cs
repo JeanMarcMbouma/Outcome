@@ -29,7 +29,6 @@ internal class DefaultProjectionEngine : IProjectionEngine
     private readonly IEventBus _eventBus;
     private readonly IProjectionCheckpointStore _checkpointStore;
     private readonly ILogger<DefaultProjectionEngine> _logger;
-    private readonly Dictionary<Type, List<Type>> _projectionHandlers = new();
 
     public DefaultProjectionEngine(
         IServiceProvider serviceProvider,
@@ -44,45 +43,29 @@ internal class DefaultProjectionEngine : IProjectionEngine
     }
 
     /// <summary>
-    /// Registers a projection handler for a specific event type.
-    /// </summary>
-    /// <remarks>
-    /// This method is called during service registration to inform the engine
-    /// which handlers to invoke for each event type.
-    /// </remarks>
-    internal void RegisterProjectionHandler(Type eventType, Type handlerType)
-    {
-        if (!_projectionHandlers.ContainsKey(eventType))
-        {
-            _projectionHandlers[eventType] = new List<Type>();
-        }
-        _projectionHandlers[eventType].Add(handlerType);
-    }
-
-    /// <summary>
     /// Runs the projection engine, processing events until cancelled.
     /// </summary>
     public async Task RunAsync(CancellationToken ct = default)
     {
-        if (_projectionHandlers.Count == 0)
+        // Get registered event types from the registry
+        var eventTypes = ProjectionHandlerRegistry.GetEventTypes().ToList();
+
+        if (eventTypes.Count == 0)
         {
             _logger.LogWarning("No projection handlers registered. Engine will not process any events.");
             return;
         }
 
         _logger.LogInformation("Starting projection engine with {HandlerCount} event type(s) registered", 
-            _projectionHandlers.Keys.Count);
-
-        // For now, we'll process events as they arrive without checkpointing
-        // since we don't have a way to track event positions in the current IEventBus
-        // This is a minimal implementation to get the basic structure in place
+            eventTypes.Count);
 
         var tasks = new List<Task>();
 
-        foreach (var eventType in _projectionHandlers.Keys)
+        foreach (var eventType in eventTypes)
         {
+            var handlerServiceTypes = ProjectionHandlerRegistry.GetHandlers(eventType);
             // Create a task for each event type subscription
-            var task = ProcessEventStreamAsync(eventType, ct);
+            var task = ProcessEventStreamAsync(eventType, handlerServiceTypes, ct);
             tasks.Add(task);
         }
 
@@ -101,7 +84,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
         }
     }
 
-    private async Task ProcessEventStreamAsync(Type eventType, CancellationToken ct)
+    private async Task ProcessEventStreamAsync(Type eventType, List<Type> handlerServiceTypes, CancellationToken ct)
     {
         _logger.LogInformation("Starting event stream processor for {EventType}", eventType.Name);
 
@@ -131,7 +114,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
                 }
 
                 var currentEvent = currentProperty.GetValue(enumerator);
-                await DispatchEventToHandlersAsync(eventType, currentEvent!, ct);
+                await DispatchEventToHandlersAsync(eventType, currentEvent!, handlerServiceTypes, ct);
             }
         }
         catch (OperationCanceledException)
@@ -145,23 +128,18 @@ internal class DefaultProjectionEngine : IProjectionEngine
         }
     }
 
-    private async Task DispatchEventToHandlersAsync(Type eventType, object @event, CancellationToken ct)
+    private async Task DispatchEventToHandlersAsync(Type eventType, object @event, List<Type> handlerServiceTypes, CancellationToken ct)
     {
-        if (!_projectionHandlers.TryGetValue(eventType, out var handlerTypes))
-        {
-            return;
-        }
-
-        foreach (var handlerType in handlerTypes)
+        foreach (var handlerServiceType in handlerServiceTypes)
         {
             try
             {
                 using var scope = _serviceProvider.CreateScope();
-                var handler = scope.ServiceProvider.GetRequiredService(handlerType);
+                var handler = scope.ServiceProvider.GetRequiredService(handlerServiceType);
 
                 // Check if it's a regular projection handler
                 var regularHandlerInterface = typeof(IProjectionHandler<>).MakeGenericType(eventType);
-                if (regularHandlerInterface.IsAssignableFrom(handlerType))
+                if (regularHandlerInterface.IsAssignableFrom(handlerServiceType))
                 {
                     var projectMethod = regularHandlerInterface.GetMethod(nameof(IProjectionHandler<object>.ProjectAsync))!;
                     var projectTask = (ValueTask)projectMethod.Invoke(handler, new[] { @event, ct })!;
@@ -171,7 +149,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
                 else
                 {
                     var partitionedHandlerInterface = typeof(IPartitionedProjectionHandler<>).MakeGenericType(eventType);
-                    if (partitionedHandlerInterface.IsAssignableFrom(handlerType))
+                    if (partitionedHandlerInterface.IsAssignableFrom(handlerServiceType))
                     {
                         var projectMethod = partitionedHandlerInterface.GetMethod(nameof(IPartitionedProjectionHandler<object>.ProjectAsync))!;
                         var projectTask = (ValueTask)projectMethod.Invoke(handler, new[] { @event, ct })!;
@@ -180,12 +158,12 @@ internal class DefaultProjectionEngine : IProjectionEngine
                 }
 
                 _logger.LogDebug("Successfully projected {EventType} to {HandlerType}", 
-                    eventType.Name, handlerType.Name);
+                    eventType.Name, handlerServiceType.Name);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error projecting {EventType} to {HandlerType}", 
-                    eventType.Name, handlerType.Name);
+                    eventType.Name, handlerServiceType.Name);
                 // Continue processing other handlers
             }
         }
