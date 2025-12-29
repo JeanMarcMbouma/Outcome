@@ -9,6 +9,7 @@ namespace BbQ.Events;
 /// - Enables automatic discovery of projection handlers
 /// - Works with source generators to generate registration code
 /// - Requires the class to implement at least one IProjectionHandler&lt;TEvent&gt; or IPartitionedProjectionHandler&lt;TEvent&gt;
+/// - Optionally configures projection behavior via MaxDegreeOfParallelism and CheckpointBatchSize
 /// 
 /// Usage:
 /// <code>
@@ -20,7 +21,7 @@ namespace BbQ.Events;
 ///     // Implementation...
 /// }
 /// 
-/// [Projection]
+/// [Projection(MaxDegreeOfParallelism = 4, CheckpointBatchSize = 50)]
 /// public class UserStatisticsProjection : IPartitionedProjectionHandler&lt;UserActivity&gt;
 /// {
 ///     // Implementation...
@@ -42,4 +43,15 @@ namespace BbQ.Events;
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
 public sealed class ProjectionAttribute : Attribute
 {
+    /// <summary>
+    /// Maximum number of partitions that can be processed in parallel.
+    /// Default: 1 (sequential processing)
+    /// </summary>
+    public int MaxDegreeOfParallelism { get; set; } = 1;
+
+    /// <summary>
+    /// Number of events to process before persisting a checkpoint.
+    /// Default: 100
+    /// </summary>
+    public int CheckpointBatchSize { get; set; } = 100;
 }
