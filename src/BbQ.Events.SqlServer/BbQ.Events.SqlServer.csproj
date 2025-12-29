@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+
+    <PackageId>BbQ.Events.SqlServer</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>Jean</Authors>
+    <Company>JM Mbouma</Company>
+    <Description>SQL Server implementation of IProjectionCheckpointStore for BbQ.Events projections. Provides durable, production-ready checkpoint persistence with atomic upserts and parallel processing support.</Description>
+    <PackageTags>events sqlserver projections checkpoint persistence bbq</PackageTags>
+    <RepositoryUrl>https://github.com/JeanMarcMbouma/Outcome</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/JeanMarcMbouma/Outcome</PackageProjectUrl>
+    <RepositoryType>git</RepositoryType>
+    <LicenseExpression>MIT</LicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+
+    <!-- Build settings -->
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>BbQ.Events.SqlServer</RootNamespace>
+
+    <!-- Source Link settings -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Title>BbQ.Events.SqlServer</Title>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BbQ.Events\BbQ.Events.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Include README in the NuGet package -->
+    <None Include="README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+</Project>

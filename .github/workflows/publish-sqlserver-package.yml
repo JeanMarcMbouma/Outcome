@@ -1,0 +1,39 @@
+name: Publish BbQ.Events.SqlServer to NuGet
+
+on:
+  push:
+    tags:
+      - 'sqlserver-v*'  # Triggers on tags like sqlserver-v0.1.0, sqlserver-v1.0.0
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore src/BbQ.Events.SqlServer/BbQ.Events.SqlServer.csproj
+
+    - name: Build
+      run: dotnet build src/BbQ.Events.SqlServer/BbQ.Events.SqlServer.csproj --configuration Release --no-restore
+
+    - name: Test
+      run: dotnet test tests/BbQ.Events.SqlServer.Tests/BbQ.Events.SqlServer.Tests.csproj --configuration Release --no-build --verbosity normal
+      continue-on-error: true  # Integration tests might fail without SQL Server
+      env:
+        TEST_SQLSERVER_CONNECTION_STRING: "Server=(localdb)\\mssqllocaldb;Database=BbQEventsTest;Integrated Security=true;TrustServerCertificate=true"
+
+    - name: Pack
+      run: dotnet pack src/BbQ.Events.SqlServer/BbQ.Events.SqlServer.csproj --configuration Release --no-build --output ./artifacts
+
+    - name: Push to NuGet
+      run: dotnet nuget push ./artifacts/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+      env:
+        NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
