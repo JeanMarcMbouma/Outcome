@@ -428,12 +428,13 @@ public class PartitionedProjectionEngineTests
     [Projection(MaxDegreeOfParallelism = 4)]
     public class TestOrderingProjection : IPartitionedProjectionHandler<OrderingEvent>
     {
-        private static readonly ConcurrentDictionary<string, ConcurrentBag<int>> _partitionOrders = new();
+        // Use ConcurrentQueue to preserve insertion order for ordering verification
+        private static readonly ConcurrentDictionary<string, ConcurrentQueue<int>> _partitionOrders = new();
         
         public ConcurrentDictionary<string, List<int>> PartitionOrders =>
             new(_partitionOrders.ToDictionary(
                 kvp => kvp.Key,
-                kvp => kvp.Value.ToList())); // Keep original order
+                kvp => kvp.Value.ToList())); // Convert queue to list preserving order
 
         public string GetPartitionKey(OrderingEvent @event)
         {
@@ -444,11 +445,11 @@ public class PartitionedProjectionEngineTests
         {
             _partitionOrders.AddOrUpdate(
                 @event.PartitionKey,
-                new ConcurrentBag<int> { @event.Sequence },
-                (_, bag) =>
+                new ConcurrentQueue<int>(new[] { @event.Sequence }),
+                (_, queue) =>
                 {
-                    bag.Add(@event.Sequence);
-                    return bag;
+                    queue.Enqueue(@event.Sequence);
+                    return queue;
                 });
             return ValueTask.CompletedTask;
         }

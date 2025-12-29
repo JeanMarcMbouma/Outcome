@@ -311,9 +311,14 @@ internal class DefaultProjectionEngine : IProjectionEngine
             // Get or create semaphore for this projection
             var semaphore = _projectionSemaphores.GetOrAdd(
                 options.ProjectionName,
-                _ => options.MaxDegreeOfParallelism > 0
-                    ? new SemaphoreSlim(options.MaxDegreeOfParallelism, options.MaxDegreeOfParallelism)
-                    : new SemaphoreSlim(int.MaxValue, int.MaxValue));
+                _ =>
+                {
+                    // Cap unlimited parallelism at a reasonable maximum (1000 concurrent workers)
+                    var maxCount = options.MaxDegreeOfParallelism > 0
+                        ? options.MaxDegreeOfParallelism
+                        : 1000;
+                    return new SemaphoreSlim(maxCount, maxCount);
+                });
             
             // Create channel for this partition
             var channel = Channel.CreateUnbounded<WorkItem>(new UnboundedChannelOptions
