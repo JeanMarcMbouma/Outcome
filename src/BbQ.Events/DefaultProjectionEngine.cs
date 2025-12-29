@@ -2,26 +2,27 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Reflection;
+using System.Threading.Channels;
 
 namespace BbQ.Events;
 
 /// <summary>
-/// Default implementation of the projection engine.
+/// Default implementation of the projection engine with partition support.
 /// 
-/// This engine processes events sequentially (event-by-event) and dispatches them
-/// to registered projection handlers.
+/// This engine processes events with support for partitioned parallel processing,
+/// checkpointing, and graceful shutdown.
 /// </summary>
 /// <remarks>
 /// This implementation:
-/// - Processes events sequentially from live event streams
+/// - Processes events from live event streams
+/// - Supports partitioned projections with parallel processing across partitions
+/// - Maintains sequential ordering within each partition
+/// - Implements checkpoint loading and batched persistence
+/// - Respects MaxDegreeOfParallelism for parallelism control
+/// - Provides graceful shutdown with checkpoint flushing
 /// - Dispatches to all registered handlers for each event type
 /// - Logs errors but continues processing other handlers
 /// - Uses a single DI scope per event for efficiency
-/// - Does not currently implement checkpointing (infrastructure provided via IProjectionCheckpointStore)
-/// - Does not currently implement parallel processing for partitioned projections
-/// 
-/// Batch processing, parallel processing, checkpointing, configurable retry policies,
-/// and dead-letter queues can be added as needed for specific use cases.
 /// </remarks>
 internal class DefaultProjectionEngine : IProjectionEngine
 {
@@ -32,6 +33,12 @@ internal class DefaultProjectionEngine : IProjectionEngine
     
     // Cache reflection calls for performance
     private static readonly ConcurrentDictionary<Type, ReflectionCache> _reflectionCache = new();
+    
+    // Track partition workers: (projectionName, partitionKey) -> worker task
+    private readonly ConcurrentDictionary<string, PartitionWorker> _partitionWorkers = new();
+    
+    // Semaphore for controlling parallelism across all partitions
+    private readonly ConcurrentDictionary<string, SemaphoreSlim> _projectionSemaphores = new();
 
     public DefaultProjectionEngine(
         IServiceProvider serviceProvider,
@@ -41,7 +48,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
     {
         _serviceProvider = serviceProvider;
         _eventBus = eventBus;
-        _checkpointStore = checkpointStore; // Kept for future extensibility
+        _checkpointStore = checkpointStore;
         _logger = logger;
     }
 
@@ -76,13 +83,49 @@ internal class DefaultProjectionEngine : IProjectionEngine
         }
         catch (OperationCanceledException)
         {
+            _logger.LogInformation("Projection engine stopping gracefully...");
+            
+            // Await all partition workers to complete
+            await GracefulShutdownAsync();
+            
             _logger.LogInformation("Projection engine stopped gracefully");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Projection engine encountered an error");
+            
+            // Attempt graceful shutdown even on error
+            await GracefulShutdownAsync();
+            
             throw;
         }
+    }
+
+    /// <summary>
+    /// Gracefully shuts down all partition workers, completing channels and flushing checkpoints.
+    /// </summary>
+    private async Task GracefulShutdownAsync()
+    {
+        _logger.LogInformation("Shutting down {WorkerCount} partition worker(s)", _partitionWorkers.Count);
+        
+        // Complete all channels to signal workers to stop
+        foreach (var worker in _partitionWorkers.Values)
+        {
+            worker.Channel.Writer.Complete();
+        }
+        
+        // Wait for all workers to complete
+        var workerTasks = _partitionWorkers.Values.Select(w => w.Task).ToList();
+        await Task.WhenAll(workerTasks);
+        
+        _logger.LogInformation("All partition workers stopped");
+        
+        // Dispose semaphores
+        foreach (var semaphore in _projectionSemaphores.Values)
+        {
+            semaphore.Dispose();
+        }
+        _projectionSemaphores.Clear();
     }
 
     private async Task ProcessEventStreamAsync(Type eventType, List<Type> handlerServiceTypes, CancellationToken ct)
@@ -172,29 +215,261 @@ internal class DefaultProjectionEngine : IProjectionEngine
             {
                 var handler = scope.ServiceProvider.GetRequiredService(handlerServiceType);
 
-                // Check if it's a regular projection handler
-                if (cache.RegularHandlerInterface.IsAssignableFrom(handlerServiceType))
-                {
-                    var projectTask = (ValueTask)cache.RegularProjectMethod.Invoke(handler, new[] { @event, ct })!;
-                    await projectTask;
-                }
                 // Check if it's a partitioned projection handler
-                else if (cache.PartitionedHandlerInterface.IsAssignableFrom(handlerServiceType))
+                if (cache.PartitionedHandlerInterface.IsAssignableFrom(handlerServiceType))
                 {
-                    var projectTask = (ValueTask)cache.PartitionedProjectMethod.Invoke(handler, new[] { @event, ct })!;
-                    await projectTask;
+                    // Get projection options
+                    var options = GetProjectionOptions(handlerServiceType);
+                    
+                    // Extract partition key
+                    var partitionKey = (string)cache.GetPartitionKeyMethod!.Invoke(handler, new[] { @event })!;
+                    
+                    // Route event to partition worker
+                    await RouteToPartitionWorkerAsync(
+                        handlerServiceType,
+                        eventType,
+                        @event,
+                        partitionKey,
+                        options,
+                        cache,
+                        ct);
+                }
+                // Check if it's a regular projection handler
+                else if (cache.RegularHandlerInterface.IsAssignableFrom(handlerServiceType))
+                {
+                    // Regular handlers use default partition (sequential processing)
+                    var options = GetProjectionOptions(handlerServiceType);
+                    
+                    // Route to default partition worker
+                    await RouteToPartitionWorkerAsync(
+                        handlerServiceType,
+                        eventType,
+                        @event,
+                        "_default",
+                        options,
+                        cache,
+                        ct);
                 }
 
-                _logger.LogDebug("Successfully projected {EventType} to {HandlerType}", 
+                _logger.LogDebug("Successfully routed {EventType} to {HandlerType}", 
                     eventType.Name, handlerServiceType.Name);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error projecting {EventType} to {HandlerType}", 
+                _logger.LogError(ex, "Error routing {EventType} to {HandlerType}", 
                     eventType.Name, handlerServiceType.Name);
                 // Continue processing other handlers
             }
         }
+    }
+
+    /// <summary>
+    /// Gets projection options for a handler, either from attribute or defaults.
+    /// </summary>
+    private ProjectionOptions GetProjectionOptions(Type handlerServiceType)
+    {
+        var attribute = handlerServiceType.GetCustomAttribute<ProjectionAttribute>();
+        
+        return new ProjectionOptions
+        {
+            ProjectionName = handlerServiceType.Name,
+            MaxDegreeOfParallelism = attribute?.MaxDegreeOfParallelism ?? 1,
+            CheckpointBatchSize = attribute?.CheckpointBatchSize ?? 100
+        };
+    }
+
+    /// <summary>
+    /// Routes an event to the appropriate partition worker, creating it if needed.
+    /// </summary>
+    private async Task RouteToPartitionWorkerAsync(
+        Type handlerServiceType,
+        Type eventType,
+        object @event,
+        string partitionKey,
+        ProjectionOptions options,
+        ReflectionCache cache,
+        CancellationToken ct)
+    {
+        var workerKey = $"{options.ProjectionName}:{partitionKey}";
+        
+        // Get or create partition worker
+        var worker = _partitionWorkers.GetOrAdd(workerKey, _ =>
+        {
+            _logger.LogInformation(
+                "Creating partition worker for projection {ProjectionName}, partition {PartitionKey}",
+                options.ProjectionName,
+                partitionKey);
+            
+            // Get or create semaphore for this projection
+            var semaphore = _projectionSemaphores.GetOrAdd(
+                options.ProjectionName,
+                _ => options.MaxDegreeOfParallelism > 0
+                    ? new SemaphoreSlim(options.MaxDegreeOfParallelism, options.MaxDegreeOfParallelism)
+                    : new SemaphoreSlim(int.MaxValue, int.MaxValue));
+            
+            // Create channel for this partition
+            var channel = Channel.CreateUnbounded<WorkItem>(new UnboundedChannelOptions
+            {
+                SingleReader = true,
+                SingleWriter = false
+            });
+            
+            // Start worker task
+            var task = Task.Run(
+                async () => await ProcessPartitionAsync(
+                    options,
+                    partitionKey,
+                    channel,
+                    semaphore,
+                    ct),
+                ct);
+            
+            return new PartitionWorker
+            {
+                Channel = channel,
+                Task = task
+            };
+        });
+        
+        // Enqueue event to worker channel
+        var workItem = new WorkItem
+        {
+            HandlerServiceType = handlerServiceType,
+            EventType = eventType,
+            Event = @event,
+            Cache = cache
+        };
+        
+        await worker.Channel.Writer.WriteAsync(workItem, ct);
+    }
+
+    /// <summary>
+    /// Processes events for a single partition sequentially.
+    /// </summary>
+    private async Task ProcessPartitionAsync(
+        ProjectionOptions options,
+        string partitionKey,
+        Channel<WorkItem> channel,
+        SemaphoreSlim semaphore,
+        CancellationToken ct)
+    {
+        // Acquire semaphore to respect parallelism limit
+        await semaphore.WaitAsync(ct);
+        
+        try
+        {
+            var checkpointKey = $"{options.ProjectionName}:{partitionKey}";
+            
+            // Load checkpoint on startup
+            var checkpoint = await _checkpointStore.GetCheckpointAsync(checkpointKey, ct);
+            var eventsProcessedSinceCheckpoint = 0;
+            var currentPosition = checkpoint ?? 0;
+            
+            _logger.LogInformation(
+                "Partition worker started for {ProjectionName}:{PartitionKey}, resuming from checkpoint {Checkpoint}",
+                options.ProjectionName,
+                partitionKey,
+                checkpoint?.ToString() ?? "beginning");
+            
+            await foreach (var workItem in channel.Reader.ReadAllAsync(ct))
+            {
+                try
+                {
+                    // Process the event
+                    await ProcessWorkItemAsync(workItem, ct);
+                    
+                    // Track position and checkpoint
+                    currentPosition++;
+                    eventsProcessedSinceCheckpoint++;
+                    
+                    // Persist checkpoint after batch size reached
+                    if (eventsProcessedSinceCheckpoint >= options.CheckpointBatchSize)
+                    {
+                        await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, ct);
+                        
+                        _logger.LogDebug(
+                            "Checkpoint saved for {ProjectionName}:{PartitionKey} at position {Position}",
+                            options.ProjectionName,
+                            partitionKey,
+                            currentPosition);
+                        
+                        eventsProcessedSinceCheckpoint = 0;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(
+                        ex,
+                        "Error processing event in partition {ProjectionName}:{PartitionKey}",
+                        options.ProjectionName,
+                        partitionKey);
+                    // Continue processing next event
+                }
+            }
+            
+            // Final checkpoint flush on shutdown
+            if (eventsProcessedSinceCheckpoint > 0)
+            {
+                await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, ct);
+                
+                _logger.LogInformation(
+                    "Final checkpoint saved for {ProjectionName}:{PartitionKey} at position {Position}",
+                    options.ProjectionName,
+                    partitionKey,
+                    currentPosition);
+            }
+            
+            _logger.LogInformation(
+                "Partition worker stopped for {ProjectionName}:{PartitionKey}",
+                options.ProjectionName,
+                partitionKey);
+        }
+        finally
+        {
+            // Release semaphore
+            semaphore.Release();
+        }
+    }
+
+    /// <summary>
+    /// Processes a single work item by invoking the projection handler.
+    /// </summary>
+    private async Task ProcessWorkItemAsync(WorkItem workItem, CancellationToken ct)
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var handler = scope.ServiceProvider.GetRequiredService(workItem.HandlerServiceType);
+        
+        // Check if it's a regular or partitioned handler and invoke appropriately
+        if (workItem.Cache.RegularHandlerInterface.IsAssignableFrom(workItem.HandlerServiceType))
+        {
+            var projectTask = (ValueTask)workItem.Cache.RegularProjectMethod.Invoke(handler, new[] { workItem.Event, ct })!;
+            await projectTask;
+        }
+        else if (workItem.Cache.PartitionedHandlerInterface.IsAssignableFrom(workItem.HandlerServiceType))
+        {
+            var projectTask = (ValueTask)workItem.Cache.PartitionedProjectMethod.Invoke(handler, new[] { workItem.Event, ct })!;
+            await projectTask;
+        }
+    }
+
+    /// <summary>
+    /// Represents work to be processed by a partition worker.
+    /// </summary>
+    private class WorkItem
+    {
+        public Type HandlerServiceType { get; set; } = null!;
+        public Type EventType { get; set; } = null!;
+        public object Event { get; set; } = null!;
+        public ReflectionCache Cache { get; set; } = null!;
+    }
+
+    /// <summary>
+    /// Represents a partition worker with its channel and task.
+    /// </summary>
+    private class PartitionWorker
+    {
+        public Channel<WorkItem> Channel { get; set; } = null!;
+        public Task Task { get; set; } = null!;
     }
 
     /// <summary>
@@ -208,6 +483,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
         public Type PartitionedHandlerInterface { get; }
         public MethodInfo RegularProjectMethod { get; }
         public MethodInfo PartitionedProjectMethod { get; }
+        public MethodInfo? GetPartitionKeyMethod { get; }
 
         public ReflectionCache(Type eventType)
         {
@@ -227,6 +503,9 @@ internal class DefaultProjectionEngine : IProjectionEngine
             // Cache ProjectAsync methods
             RegularProjectMethod = RegularHandlerInterface.GetMethod(nameof(IProjectionHandler<object>.ProjectAsync))!;
             PartitionedProjectMethod = PartitionedHandlerInterface.GetMethod(nameof(IPartitionedProjectionHandler<object>.ProjectAsync))!;
+            
+            // Cache GetPartitionKey method for partitioned handlers
+            GetPartitionKeyMethod = PartitionedHandlerInterface.GetMethod(nameof(IPartitionedProjectionHandler<object>.GetPartitionKey));
         }
     }
 }
