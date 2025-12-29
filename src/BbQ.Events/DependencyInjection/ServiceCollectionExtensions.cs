@@ -79,24 +79,19 @@ public static class ServiceCollectionExtensions
 
             // Register for each IProjectionHandler<TEvent> interface it implements
             var projectionType = typeof(TProjection);
-            var interfaces = projectionType.GetInterfaces();
+            var projectionInterfaces = projectionType.GetInterfaces()
+                .Where(iface => iface.IsGenericType &&
+                    (iface.GetGenericTypeDefinition() == typeof(IProjectionHandler<>) ||
+                     iface.GetGenericTypeDefinition() == typeof(IPartitionedProjectionHandler<>)));
 
-            foreach (var iface in interfaces)
+            foreach (var iface in projectionInterfaces)
             {
-                if (iface.IsGenericType)
-                {
-                    var genericTypeDef = iface.GetGenericTypeDefinition();
-                    if (genericTypeDef == typeof(IProjectionHandler<>) || 
-                        genericTypeDef == typeof(IPartitionedProjectionHandler<>))
-                    {
-                        // Register the interface to resolve to the projection instance
-                        services.Add(new ServiceDescriptor(iface, sp => sp.GetRequiredService<TProjection>(), lifetime));
-                        
-                        // Register in the projection handler registry for the engine to discover
-                        var eventType = iface.GenericTypeArguments[0];
-                        ProjectionHandlerRegistry.Register(eventType, iface);
-                    }
-                }
+                // Register the interface to resolve to the projection instance
+                services.Add(new ServiceDescriptor(iface, sp => sp.GetRequiredService<TProjection>(), lifetime));
+                
+                // Register in the projection handler registry for the engine to discover
+                var eventType = iface.GenericTypeArguments[0];
+                ProjectionHandlerRegistry.Register(eventType, iface);
             }
 
             return services;
@@ -175,23 +170,19 @@ public static class ServiceCollectionExtensions
                 services.Add(new ServiceDescriptor(projectionType, projectionType, lifetime));
 
                 // Register for each IProjectionHandler<TEvent> or IPartitionedProjectionHandler<TEvent> interface
-                var interfaces = projectionType.GetInterfaces();
-                foreach (var iface in interfaces)
+                var projectionInterfaces = projectionType.GetInterfaces()
+                    .Where(iface => iface.IsGenericType &&
+                        (iface.GetGenericTypeDefinition() == typeof(IProjectionHandler<>) ||
+                         iface.GetGenericTypeDefinition() == typeof(IPartitionedProjectionHandler<>)));
+
+                foreach (var iface in projectionInterfaces)
                 {
-                    if (iface.IsGenericType)
-                    {
-                        var genericTypeDef = iface.GetGenericTypeDefinition();
-                        if (genericTypeDef == typeof(IProjectionHandler<>) || 
-                            genericTypeDef == typeof(IPartitionedProjectionHandler<>))
-                        {
-                            // Register the interface to resolve to the projection instance
-                            services.Add(new ServiceDescriptor(iface, sp => sp.GetRequiredService(projectionType), lifetime));
-                            
-                            // Register in the projection handler registry for the engine to discover
-                            var eventType = iface.GenericTypeArguments[0];
-                            ProjectionHandlerRegistry.Register(eventType, iface);
-                        }
-                    }
+                    // Register the interface to resolve to the projection instance
+                    services.Add(new ServiceDescriptor(iface, sp => sp.GetRequiredService(projectionType), lifetime));
+                    
+                    // Register in the projection handler registry for the engine to discover
+                    var eventType = iface.GenericTypeArguments[0];
+                    ProjectionHandlerRegistry.Register(eventType, iface);
                 }
             }
 

@@ -1,5 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
+using System.Reflection;
 
 namespace BbQ.Events;
 
@@ -27,6 +29,9 @@ internal class DefaultProjectionEngine : IProjectionEngine
     private readonly IEventBus _eventBus;
     private readonly IProjectionCheckpointStore _checkpointStore;
     private readonly ILogger<DefaultProjectionEngine> _logger;
+    
+    // Cache reflection calls for performance
+    private static readonly ConcurrentDictionary<Type, ReflectionCache> _reflectionCache = new();
 
     public DefaultProjectionEngine(
         IServiceProvider serviceProvider,
@@ -36,7 +41,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
     {
         _serviceProvider = serviceProvider;
         _eventBus = eventBus;
-        _checkpointStore = checkpointStore;
+        _checkpointStore = checkpointStore; // Kept for future extensibility
         _logger = logger;
     }
 
@@ -57,15 +62,13 @@ internal class DefaultProjectionEngine : IProjectionEngine
         _logger.LogInformation("Starting projection engine with {HandlerCount} event type(s) registered", 
             eventTypes.Count);
 
-        var tasks = new List<Task>();
-
-        foreach (var eventType in eventTypes)
-        {
-            var handlerServiceTypes = ProjectionHandlerRegistry.GetHandlers(eventType);
-            // Create a task for each event type subscription
-            var task = ProcessEventStreamAsync(eventType, handlerServiceTypes, ct);
-            tasks.Add(task);
-        }
+        var tasks = eventTypes
+            .Select(eventType =>
+            {
+                var handlerServiceTypes = ProjectionHandlerRegistry.GetHandlers(eventType);
+                return ProcessEventStreamAsync(eventType, handlerServiceTypes, ct);
+            })
+            .ToList();
 
         try
         {
@@ -88,32 +91,20 @@ internal class DefaultProjectionEngine : IProjectionEngine
 
         try
         {
+            // Get or create cached reflection info
+            var cache = _reflectionCache.GetOrAdd(eventType, type => new ReflectionCache(type));
+            
             // Use reflection to call Subscribe<TEvent> on the event bus
-            var subscribeMethod = typeof(IEventBus)
-                .GetMethod(nameof(IEventBus.Subscribe))!
-                .MakeGenericMethod(eventType);
-
-            var eventStream = subscribeMethod.Invoke(_eventBus, new object[] { ct });
+            var eventStream = cache.SubscribeMethod.Invoke(_eventBus, new object[] { ct });
             
             if (eventStream == null)
             {
                 _logger.LogError("Subscribe returned null for event type {EventType}", eventType.Name);
                 return;
             }
-
-            // The eventStream is an IAsyncEnumerable<TEvent>
-            // We need to get its GetAsyncEnumerator method
-            var asyncEnumerableType = typeof(IAsyncEnumerable<>).MakeGenericType(eventType);
-            var getEnumeratorMethod = asyncEnumerableType.GetMethod("GetAsyncEnumerator");
-            
-            if (getEnumeratorMethod == null)
-            {
-                _logger.LogError("Could not find GetAsyncEnumerator for event type {EventType}", eventType.Name);
-                return;
-            }
             
             // Call GetAsyncEnumerator with the CancellationToken
-            var enumerator = getEnumeratorMethod.Invoke(eventStream, new object[] { ct });
+            var enumerator = cache.GetEnumeratorMethod.Invoke(eventStream, new object[] { ct });
             
             if (enumerator == null)
             {
@@ -121,7 +112,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
                 return;
             }
 
-            // Get MoveNextAsync and Current from the enumerator
+            // Get MoveNextAsync and Current from the enumerator (these are instance-specific)
             var enumeratorType = enumerator.GetType();
             var moveNextMethod = enumeratorType.GetMethod("MoveNextAsync");
             var currentProperty = enumeratorType.GetProperty("Current");
@@ -150,7 +141,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
                 var currentEvent = currentProperty.GetValue(enumerator);
                 if (currentEvent != null)
                 {
-                    await DispatchEventToHandlersAsync(eventType, currentEvent, handlerServiceTypes, ct);
+                    await DispatchEventToHandlersAsync(eventType, currentEvent, handlerServiceTypes, cache, ct);
                 }
             }
         }
@@ -165,7 +156,12 @@ internal class DefaultProjectionEngine : IProjectionEngine
         }
     }
 
-    private async Task DispatchEventToHandlersAsync(Type eventType, object @event, List<Type> handlerServiceTypes, CancellationToken ct)
+    private async Task DispatchEventToHandlersAsync(
+        Type eventType, 
+        object @event, 
+        List<Type> handlerServiceTypes, 
+        ReflectionCache cache,
+        CancellationToken ct)
     {
         // Use a single scope for all handlers processing this event
         using var scope = _serviceProvider.CreateScope();
@@ -177,23 +173,16 @@ internal class DefaultProjectionEngine : IProjectionEngine
                 var handler = scope.ServiceProvider.GetRequiredService(handlerServiceType);
 
                 // Check if it's a regular projection handler
-                var regularHandlerInterface = typeof(IProjectionHandler<>).MakeGenericType(eventType);
-                if (regularHandlerInterface.IsAssignableFrom(handlerServiceType))
+                if (cache.RegularHandlerInterface.IsAssignableFrom(handlerServiceType))
                 {
-                    var projectMethod = regularHandlerInterface.GetMethod(nameof(IProjectionHandler<object>.ProjectAsync))!;
-                    var projectTask = (ValueTask)projectMethod.Invoke(handler, new[] { @event, ct })!;
+                    var projectTask = (ValueTask)cache.RegularProjectMethod.Invoke(handler, new[] { @event, ct })!;
                     await projectTask;
                 }
                 // Check if it's a partitioned projection handler
-                else
+                else if (cache.PartitionedHandlerInterface.IsAssignableFrom(handlerServiceType))
                 {
-                    var partitionedHandlerInterface = typeof(IPartitionedProjectionHandler<>).MakeGenericType(eventType);
-                    if (partitionedHandlerInterface.IsAssignableFrom(handlerServiceType))
-                    {
-                        var projectMethod = partitionedHandlerInterface.GetMethod(nameof(IPartitionedProjectionHandler<object>.ProjectAsync))!;
-                        var projectTask = (ValueTask)projectMethod.Invoke(handler, new[] { @event, ct })!;
-                        await projectTask;
-                    }
+                    var projectTask = (ValueTask)cache.PartitionedProjectMethod.Invoke(handler, new[] { @event, ct })!;
+                    await projectTask;
                 }
 
                 _logger.LogDebug("Successfully projected {EventType} to {HandlerType}", 
@@ -205,6 +194,39 @@ internal class DefaultProjectionEngine : IProjectionEngine
                     eventType.Name, handlerServiceType.Name);
                 // Continue processing other handlers
             }
+        }
+    }
+
+    /// <summary>
+    /// Caches reflection information for a specific event type to avoid repeated reflection lookups.
+    /// </summary>
+    private class ReflectionCache
+    {
+        public MethodInfo SubscribeMethod { get; }
+        public MethodInfo GetEnumeratorMethod { get; }
+        public Type RegularHandlerInterface { get; }
+        public Type PartitionedHandlerInterface { get; }
+        public MethodInfo RegularProjectMethod { get; }
+        public MethodInfo PartitionedProjectMethod { get; }
+
+        public ReflectionCache(Type eventType)
+        {
+            // Cache Subscribe<TEvent> method
+            SubscribeMethod = typeof(IEventBus)
+                .GetMethod(nameof(IEventBus.Subscribe))!
+                .MakeGenericMethod(eventType);
+
+            // Cache GetAsyncEnumerator method
+            var asyncEnumerableType = typeof(IAsyncEnumerable<>).MakeGenericType(eventType);
+            GetEnumeratorMethod = asyncEnumerableType.GetMethod("GetAsyncEnumerator")!;
+
+            // Cache handler interface types
+            RegularHandlerInterface = typeof(IProjectionHandler<>).MakeGenericType(eventType);
+            PartitionedHandlerInterface = typeof(IPartitionedProjectionHandler<>).MakeGenericType(eventType);
+
+            // Cache ProjectAsync methods
+            RegularProjectMethod = RegularHandlerInterface.GetMethod(nameof(IProjectionHandler<object>.ProjectAsync))!;
+            PartitionedProjectMethod = PartitionedHandlerInterface.GetMethod(nameof(IPartitionedProjectionHandler<object>.ProjectAsync))!;
         }
     }
 }
