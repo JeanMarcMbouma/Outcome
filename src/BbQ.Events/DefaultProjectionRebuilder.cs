@@ -57,7 +57,9 @@ internal class DefaultProjectionRebuilder : IProjectionRebuilder
     {
         if (string.IsNullOrWhiteSpace(projectionName))
         {
-            throw new ArgumentException("Projection name cannot be null or empty", nameof(projectionName));
+            throw new ArgumentException(
+                $"Projection name '{projectionName}' cannot be null, empty, or whitespace.",
+                nameof(projectionName));
         }
 
         _logger.LogInformation("Resetting projection: {ProjectionName}", projectionName);
