@@ -84,7 +84,11 @@ public class ProjectionStartupModeTests
     }
 
     [Test]
-    public void AddProjection_WithResumeMode_CanBeRegistered()
+    [TestCase(ProjectionStartupMode.Resume)]
+    [TestCase(ProjectionStartupMode.Replay)]
+    [TestCase(ProjectionStartupMode.CatchUp)]
+    [TestCase(ProjectionStartupMode.LiveOnly)]
+    public void AddProjection_WithStartupMode_CanBeRegisteredAndConfigured(ProjectionStartupMode mode)
     {
         // Arrange
         var services = new ServiceCollection();
@@ -94,77 +98,19 @@ public class ProjectionStartupModeTests
         // Act
         services.AddProjection<TestUserProfileProjection>(options =>
         {
-            options.StartupMode = ProjectionStartupMode.Resume;
+            options.StartupMode = mode;
         });
 
         var provider = services.BuildServiceProvider();
 
-        // Assert
+        // Assert - projection can be resolved
         var projection = provider.GetService<TestUserProfileProjection>();
         Assert.That(projection, Is.Not.Null);
-    }
-
-    [Test]
-    public void AddProjection_WithReplayMode_CanBeRegistered()
-    {
-        // Arrange
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddInMemoryEventBus();
-
-        // Act
-        services.AddProjection<TestUserProfileProjection>(options =>
-        {
-            options.StartupMode = ProjectionStartupMode.Replay;
-        });
-
-        var provider = services.BuildServiceProvider();
-
-        // Assert
-        var projection = provider.GetService<TestUserProfileProjection>();
-        Assert.That(projection, Is.Not.Null);
-    }
-
-    [Test]
-    public void AddProjection_WithCatchUpMode_CanBeRegistered()
-    {
-        // Arrange
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddInMemoryEventBus();
-
-        // Act
-        services.AddProjection<TestUserProfileProjection>(options =>
-        {
-            options.StartupMode = ProjectionStartupMode.CatchUp;
-        });
-
-        var provider = services.BuildServiceProvider();
-
-        // Assert
-        var projection = provider.GetService<TestUserProfileProjection>();
-        Assert.That(projection, Is.Not.Null);
-    }
-
-    [Test]
-    public void AddProjection_WithLiveOnlyMode_CanBeRegistered()
-    {
-        // Arrange
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddInMemoryEventBus();
-
-        // Act
-        services.AddProjection<TestUserProfileProjection>(options =>
-        {
-            options.StartupMode = ProjectionStartupMode.LiveOnly;
-        });
-
-        var provider = services.BuildServiceProvider();
-
-        // Assert
-        var projection = provider.GetService<TestUserProfileProjection>();
-        Assert.That(projection, Is.Not.Null);
+        
+        // Assert - startup mode is correctly configured
+        var registeredOptions = ProjectionHandlerRegistry.GetProjectionOptions(nameof(TestUserProfileProjection));
+        Assert.That(registeredOptions, Is.Not.Null);
+        Assert.That(registeredOptions.StartupMode, Is.EqualTo(mode));
     }
 
     [Test]

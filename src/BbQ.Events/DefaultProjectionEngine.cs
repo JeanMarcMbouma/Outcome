@@ -405,14 +405,18 @@ internal class DefaultProjectionEngine : IProjectionEngine
                     // Ignore checkpoint and rebuild from scratch
                     checkpoint = null;
                     startupModeDescription = "Replay from beginning";
-                    // Optionally reset the checkpoint in storage for clarity
+                    // Reset the checkpoint in storage to ensure clean replay
                     await _checkpointStore.ResetCheckpointAsync(checkpointKey, ct);
                     break;
                     
                 case ProjectionStartupMode.CatchUp:
                 case ProjectionStartupMode.LiveOnly:
                     // Start from current position (skip historical events)
-                    // In a live event stream, this means starting fresh without loading checkpoint
+                    // NOTE: In a live event stream context, both CatchUp and LiveOnly
+                    // behave identically - they start processing from now onwards.
+                    // CatchUp is semantically different (fast-forward to near-real-time
+                    // before processing), but in a live-only event bus, there are no
+                    // historical events to skip, so the behavior is the same.
                     checkpoint = null;
                     startupModeDescription = options.StartupMode == ProjectionStartupMode.CatchUp 
                         ? "CatchUp - starting near-real-time" 

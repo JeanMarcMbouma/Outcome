@@ -41,6 +41,10 @@ public enum ProjectionStartupMode
     /// The projection will skip to a recent position in the event stream
     /// (near the current time) and then process events normally.
     /// This is useful for new projections that don't need full historical data.
+    /// 
+    /// Note: In a live-only event bus context (like InMemoryEventBus), this
+    /// behaves identically to LiveOnly since there are no historical events
+    /// to skip. The distinction is more relevant with persistent event stores.
     /// </summary>
     CatchUp = 2,
 
@@ -49,6 +53,10 @@ public enum ProjectionStartupMode
     /// The projection will start from the current position in the event stream,
     /// ignoring all historical events that occurred before startup.
     /// This is useful for projections that only need to track future activity.
+    /// 
+    /// Note: In a live-only event bus context (like InMemoryEventBus), this
+    /// behaves identically to CatchUp since there are no historical events
+    /// to skip. The distinction is more relevant with persistent event stores.
     /// </summary>
     LiveOnly = 3
 }
