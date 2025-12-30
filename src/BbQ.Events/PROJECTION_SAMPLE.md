@@ -142,6 +142,72 @@ services.AddScoped<IUserProfileRepository, UserProfileRepository>();
 services.AddScoped<ILoginStatsRepository, LoginStatsRepository>();
 ```
 
+## Projection Startup Modes
+
+Projections can start in different modes depending on your deployment needs:
+
+```csharp
+// Resume mode (default): Continue from last checkpoint
+services.AddProjection<UserProfileProjection>(options => 
+{
+    options.StartupMode = ProjectionStartupMode.Resume;
+});
+
+// Replay mode: Rebuild from scratch, ignoring checkpoint
+services.AddProjection<UserProfileProjection>(options => 
+{
+    options.StartupMode = ProjectionStartupMode.Replay;
+});
+
+// CatchUp mode: Fast-forward to near-real-time
+services.AddProjection<UserProfileProjection>(options => 
+{
+    options.StartupMode = ProjectionStartupMode.CatchUp;
+});
+
+// LiveOnly mode: Process only new events
+services.AddProjection<UserProfileProjection>(options => 
+{
+    options.StartupMode = ProjectionStartupMode.LiveOnly;
+});
+```
+
+You can also configure startup modes via the `[Projection]` attribute:
+
+```csharp
+// Replay mode on every startup (useful for development)
+[Projection(StartupMode = ProjectionStartupMode.Replay)]
+public class UserProfileProjection : IProjectionHandler<UserRegistered>
+{
+    // ...
+}
+
+// Live-only mode for real-time analytics
+[Projection(StartupMode = ProjectionStartupMode.LiveOnly)]
+public class RealtimeAnalyticsProjection : IProjectionHandler<UserActivity>
+{
+    // ...
+}
+```
+
+**Startup Mode Behaviors:**
+
+- **Resume** (default): Loads the last checkpoint and continues from where it left off. This is the standard behavior for production projections.
+
+- **Replay**: Ignores any existing checkpoint and rebuilds the projection from the beginning of the event stream. Useful for:
+  - Recovering from corrupted projection state
+  - Rebuilding after schema changes
+  - Testing projection logic with historical data
+
+- **CatchUp**: Starts from a recent position near the current time, then processes events normally. Useful for:
+  - New projections that don't need full historical data
+  - Getting projections up to speed quickly
+
+- **LiveOnly**: Processes only new events from the current moment, ignoring all historical events. Useful for:
+  - Real-time analytics and monitoring
+  - Projections that only track future activity
+  - Development and testing scenarios
+
 ## Running the Projection Engine
 
 ### As a Background Service
