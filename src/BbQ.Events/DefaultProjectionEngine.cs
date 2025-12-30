@@ -31,6 +31,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
     private readonly IServiceProvider _serviceProvider;
     private readonly IEventBus _eventBus;
     private readonly IProjectionCheckpointStore _checkpointStore;
+    private readonly IProjectionMonitor? _monitor;
     private readonly ILogger<DefaultProjectionEngine> _logger;
     
     // Cache reflection calls for performance
@@ -39,6 +40,9 @@ internal class DefaultProjectionEngine : IProjectionEngine
     // Track partition workers: (projectionName, partitionKey) -> worker task
     private readonly ConcurrentDictionary<string, PartitionWorker> _partitionWorkers = new();
     
+    // Track worker count per projection for efficient monitoring
+    private readonly ConcurrentDictionary<string, int> _workerCountByProjection = new();
+    
     // Semaphore for controlling parallelism across all partitions
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _projectionSemaphores = new();
 
@@ -46,11 +50,13 @@ internal class DefaultProjectionEngine : IProjectionEngine
         IServiceProvider serviceProvider,
         IEventBus eventBus,
         IProjectionCheckpointStore checkpointStore,
-        ILogger<DefaultProjectionEngine> logger)
+        ILogger<DefaultProjectionEngine> logger,
+        IProjectionMonitor? monitor)
     {
         _serviceProvider = serviceProvider;
         _eventBus = eventBus;
         _checkpointStore = checkpointStore;
+        _monitor = monitor;
         _logger = logger;
     }
 
@@ -344,6 +350,15 @@ internal class DefaultProjectionEngine : IProjectionEngine
                 SingleWriter = false
             });
             
+            // Increment worker count for this projection
+            // Note: Worker count only grows as new partitions are discovered
+            // since partition workers are long-lived and persist until engine shutdown
+            var currentWorkerCount = _workerCountByProjection.AddOrUpdate(
+                options.ProjectionName,
+                1,
+                (_, count) => count + 1);
+            _monitor?.RecordWorkerCount(options.ProjectionName, currentWorkerCount);
+            
             // Start worker task with CancellationToken.None - shutdown via channel completion
             var task = Task.Run(
                 async () => await ProcessPartitionAsync(
@@ -452,10 +467,16 @@ internal class DefaultProjectionEngine : IProjectionEngine
                     currentPosition++;
                     eventsProcessedSinceCheckpoint++;
                     
+                    // Record event processed for monitoring
+                    _monitor?.RecordEventProcessed(options.ProjectionName, partitionKey, currentPosition);
+                    
                     // Persist checkpoint after batch size reached
                     if (eventsProcessedSinceCheckpoint >= options.CheckpointBatchSize)
                     {
                         await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, ct);
+                        
+                        // Record checkpoint written for monitoring
+                        _monitor?.RecordCheckpointWritten(options.ProjectionName, partitionKey, currentPosition);
                         
                         _logger.LogDebug(
                             "Checkpoint saved for {ProjectionName}:{PartitionKey} at position {Position}",
@@ -488,6 +509,9 @@ internal class DefaultProjectionEngine : IProjectionEngine
                 try
                 {
                     await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, ct);
+                    
+                    // Record final checkpoint written for monitoring
+                    _monitor?.RecordCheckpointWritten(options.ProjectionName, partitionKey, currentPosition);
                     
                     _logger.LogInformation(
                         "Final checkpoint saved for {ProjectionName}:{PartitionKey} at position {Position}",

@@ -7,10 +7,15 @@ namespace BbQ.Events.DependencyInjection;
 /// <summary>
 /// Extension methods for registering event bus and projection components in the dependency injection container.
 /// </summary>
+/// <remarks>
+/// This static class uses C# 14 extension types to add event bus and projection registration methods
+/// to IServiceCollection.
+/// </remarks>
 public static class ServiceCollectionExtensions
 {
     extension(IServiceCollection services)
     {
+
         /// <summary>
         /// Registers the in-memory event bus for pub/sub functionality.
         /// </summary>
@@ -56,6 +61,7 @@ public static class ServiceCollectionExtensions
         /// Registers a projection handler with the dependency injection container.
         /// </summary>
         /// <typeparam name="TProjection">The projection handler type</typeparam>
+        /// <param name="services">The service collection to register with</param>
         /// <param name="lifetime">The lifetime to use for the projection handler (default: Scoped)</param>
         /// <returns>The service collection for chaining</returns>
         /// <remarks>
@@ -83,6 +89,7 @@ public static class ServiceCollectionExtensions
         /// Registers a projection handler with the dependency injection container with custom options.
         /// </summary>
         /// <typeparam name="TProjection">The projection handler type</typeparam>
+        /// <param name="services">The service collection to register with</param>
         /// <param name="configureOptions">Action to configure projection options</param>
         /// <param name="lifetime">The lifetime to use for the projection handler (default: Scoped)</param>
         /// <returns>The service collection for chaining</returns>
@@ -148,7 +155,8 @@ public static class ServiceCollectionExtensions
         /// <remarks>
         /// This method registers:
         /// 1. IProjectionCheckpointStore as a singleton (in-memory implementation)
-        /// 2. IProjectionEngine as a singleton
+        /// 2. IProjectionMonitor as a singleton (in-memory implementation)
+        /// 3. IProjectionEngine as a singleton
         /// 
         /// The projection engine must be run manually or as a hosted service:
         /// <code>
@@ -166,6 +174,9 @@ public static class ServiceCollectionExtensions
         {
             // Register checkpoint store if not already registered
             services.TryAddSingleton<IProjectionCheckpointStore, InMemoryProjectionCheckpointStore>();
+            
+            // Register projection monitor if not already registered
+            services.TryAddSingleton<IProjectionMonitor, InMemoryProjectionMonitor>();
             
             // Register the projection engine
             services.TryAddSingleton<IProjectionEngine, DefaultProjectionEngine>();
