@@ -411,12 +411,14 @@ internal class DefaultProjectionEngine : IProjectionEngine
                     
                 case ProjectionStartupMode.CatchUp:
                 case ProjectionStartupMode.LiveOnly:
-                    // Start from current position (skip historical events)
-                    // NOTE: In a live event stream context, both CatchUp and LiveOnly
-                    // behave identically - they start processing from now onwards.
-                    // CatchUp is semantically different (fast-forward to near-real-time
-                    // before processing), but in a live-only event bus, there are no
-                    // historical events to skip, so the behavior is the same.
+                    // Delegate starting position to the event source by not providing a checkpoint.
+                    // NOTE: In a live-only event bus, this effectively means "new events only"
+                    // because there are no historical events to replay. In an event-store-backed
+                    // implementation, however, a null checkpoint typically means "from the
+                    // beginning of the stream" rather than "from the current position".
+                    // If true "start from now" semantics are required, the implementation
+                    // of the event source / subscription must determine and use the current
+                    // position explicitly.
                     checkpoint = null;
                     startupModeDescription = options.StartupMode == ProjectionStartupMode.CatchUp 
                         ? "CatchUp - starting near-real-time" 
