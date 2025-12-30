@@ -42,7 +42,7 @@ public class ProjectionStartupModeTests
             options.StartupMode = ProjectionStartupMode.Replay;
         });
 
-        var provider = services.BuildServiceProvider();
+        services.BuildServiceProvider();
 
         // Assert
         var registeredOptions = ProjectionHandlerRegistry.GetProjectionOptions(nameof(TestUserProfileProjection));

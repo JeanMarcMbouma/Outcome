@@ -199,14 +199,17 @@ public class RealtimeAnalyticsProjection : IProjectionHandler<UserActivity>
   - Rebuilding after schema changes
   - Testing projection logic with historical data
 
-- **CatchUp**: Starts from a recent position near the current time, then processes events normally. Useful for:
-  - New projections that don't need full historical data
-  - Getting projections up to speed quickly
+- **CatchUp**: Currently behaves like **Replay** in the default implementation (starts from the beginning). This mode is intended for future use when event store query capabilities are added, allowing projections to:
+  - Skip most of the old history and quickly catch up from a recent point
+  - Get new projections up to speed without processing the entire stream
+  
+  Note: With InMemoryEventBus, since there are no historical events, the behavior effectively means "process events as they arrive".
 
-- **LiveOnly**: Processes only new events from the current moment, ignoring all historical events. Useful for:
-  - Real-time analytics and monitoring
-  - Projections that only track future activity
+- **LiveOnly**: Currently behaves like **Replay** with persistent event stores (starts from the beginning). With InMemoryEventBus (which doesn't persist historical events), it effectively means "process only events that arrive after startup". This mode is intended for:
+  - Real-time analytics and monitoring that only care about future activity
   - Development and testing scenarios
+  
+  Note: Full "start from now" semantics require event source support for determining the current position in persistent event stores.
 
 ## Running the Projection Engine
 
