@@ -237,10 +237,13 @@ services.AddProjectionEngine();
 var monitor = serviceProvider.GetRequiredService<IProjectionMonitor>();
 var metrics = monitor.GetMetrics("UserProjection", "_default");
 
-Console.WriteLine($"Lag: {metrics.Lag} events");
-Console.WriteLine($"Throughput: {metrics.EventsPerSecond:F2} events/sec");
-Console.WriteLine($"Workers: {metrics.WorkerCount}");
-Console.WriteLine($"Checkpoints written: {metrics.CheckpointsWritten}");
+if (metrics != null)
+{
+    Console.WriteLine($"Lag: {metrics.Lag} events");
+    Console.WriteLine($"Throughput: {metrics.EventsPerSecond:F2} events/sec");
+    Console.WriteLine($"Workers: {metrics.WorkerCount}");
+    Console.WriteLine($"Checkpoints written: {metrics.CheckpointsWritten}");
+}
 ```
 
 For production monitoring, implement a custom `IProjectionMonitor`:

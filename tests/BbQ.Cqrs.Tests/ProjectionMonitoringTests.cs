@@ -196,9 +196,10 @@ public class ProjectionMonitoringTests
         var monitor = provider.GetRequiredService<IProjectionMonitor>();
         var engine = provider.GetRequiredService<IProjectionEngine>();
         
-        // Assert - Verify that monitor is properly registered and can be resolved
+        // Assert - Verify that services are properly registered and can be resolved
         Assert.That(monitor, Is.Not.Null, "Monitor should be registered via AddProjectionEngine");
         Assert.That(monitor, Is.InstanceOf<InMemoryProjectionMonitor>(), "Should use InMemoryProjectionMonitor by default");
+        Assert.That(engine, Is.Not.Null, "Engine should be registered via AddProjectionEngine");
         
         // Verify we can manually record metrics
         monitor.RecordEventProcessed("TestProjection", "_default", 1);
@@ -209,6 +210,77 @@ public class ProjectionMonitoringTests
         Assert.That(metrics, Is.Not.Null);
         Assert.That(metrics!.EventsProcessed, Is.EqualTo(2));
         Assert.That(metrics.CheckpointsWritten, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void InMemoryProjectionMonitor_ThreadSafety_ConcurrentUpdates()
+    {
+        // Arrange
+        var monitor = new InMemoryProjectionMonitor();
+        const int threadCount = 10;
+        const int operationsPerThread = 100;
+        
+        // Act - Multiple threads updating the same projection concurrently
+        var tasks = Enumerable.Range(0, threadCount).Select(threadId => Task.Run(() =>
+        {
+            for (int i = 0; i < operationsPerThread; i++)
+            {
+                monitor.RecordEventProcessed("TestProjection", "partition-1", threadId * operationsPerThread + i);
+                
+                if (i % 10 == 0)
+                {
+                    monitor.RecordCheckpointWritten("TestProjection", "partition-1", threadId * operationsPerThread + i);
+                }
+                
+                if (i % 5 == 0)
+                {
+                    monitor.RecordLag("TestProjection", "partition-1", threadId * operationsPerThread + i, 
+                        threadId * operationsPerThread + i + 100);
+                }
+            }
+        })).ToArray();
+        
+        Task.WaitAll(tasks);
+        
+        // Assert - Verify no data loss occurred
+        var metrics = monitor.GetMetrics("TestProjection", "partition-1");
+        Assert.That(metrics, Is.Not.Null);
+        Assert.That(metrics!.EventsProcessed, Is.EqualTo(threadCount * operationsPerThread), 
+            "All event increments should be counted despite concurrent access");
+        Assert.That(metrics.CheckpointsWritten, Is.GreaterThanOrEqualTo(threadCount * (operationsPerThread / 10)), 
+            "All checkpoint increments should be counted");
+        Assert.That(metrics.CurrentPosition, Is.GreaterThan(0), "Position should be updated");
+        Assert.That(metrics.LatestEventPosition, Is.GreaterThan(0), "Latest position should be updated");
+    }
+
+    [Test]
+    public void InMemoryProjectionMonitor_ThreadSafety_ConcurrentPartitionCreation()
+    {
+        // Arrange
+        var monitor = new InMemoryProjectionMonitor();
+        const int threadCount = 20;
+        
+        // Act - Multiple threads creating different partitions concurrently
+        var tasks = Enumerable.Range(0, threadCount).Select(threadId => Task.Run(() =>
+        {
+            monitor.RecordEventProcessed("TestProjection", $"partition-{threadId}", threadId);
+        })).ToArray();
+        
+        Task.WaitAll(tasks);
+        
+        // Assert - Verify all partitions were created
+        var allMetrics = monitor.GetAllMetrics().ToList();
+        Assert.That(allMetrics.Count, Is.EqualTo(threadCount), 
+            "All partitions should be created without data loss");
+        
+        // Verify worker count can be updated across all partitions
+        monitor.RecordWorkerCount("TestProjection", 42);
+        
+        foreach (var metrics in allMetrics)
+        {
+            Assert.That(metrics.WorkerCount, Is.EqualTo(42), 
+                "Worker count should be updated for all partitions");
+        }
     }
 
     // Test projection for monitoring tests

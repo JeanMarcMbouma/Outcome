@@ -30,7 +30,7 @@ namespace BbQ.Events;
 public class InMemoryProjectionMonitor : IProjectionMonitor
 {
     private readonly ConcurrentDictionary<string, ProjectionMetrics> _metrics = new();
-    private readonly ConcurrentDictionary<string, ConcurrentBag<string>> _partitionsByProjection = new();
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _partitionsByProjection = new();
 
     /// <summary>
     /// Records that an event was successfully processed.
@@ -40,9 +40,9 @@ public class InMemoryProjectionMonitor : IProjectionMonitor
         var key = GetKey(projectionName, partitionKey);
         var metrics = _metrics.GetOrAdd(key, _ =>
         {
-            // Track partition for this projection
-            var bag = _partitionsByProjection.GetOrAdd(projectionName, _ => new ConcurrentBag<string>());
-            bag.Add(key);
+            // Track partition for this projection (using ConcurrentDictionary as a Set to avoid duplicates)
+            var partitions = _partitionsByProjection.GetOrAdd(projectionName, _ => new ConcurrentDictionary<string, byte>());
+            partitions.TryAdd(key, 0);
             
             return new ProjectionMetrics
             {
@@ -52,14 +52,7 @@ public class InMemoryProjectionMonitor : IProjectionMonitor
         });
 
         metrics.CurrentPosition = currentPosition;
-        metrics.EventsProcessed++;
-        metrics.LastEventProcessedTime = DateTime.UtcNow;
-        
-        // Set start time on first event
-        if (!metrics.ProcessingStartTime.HasValue)
-        {
-            metrics.ProcessingStartTime = DateTime.UtcNow;
-        }
+        metrics.IncrementEventsProcessed();
     }
 
     /// <summary>
@@ -74,8 +67,7 @@ public class InMemoryProjectionMonitor : IProjectionMonitor
             PartitionKey = partitionKey
         });
 
-        metrics.CheckpointsWritten++;
-        metrics.LastCheckpointTime = DateTime.UtcNow;
+        metrics.IncrementCheckpointsWritten();
     }
 
     /// <summary>
@@ -90,8 +82,7 @@ public class InMemoryProjectionMonitor : IProjectionMonitor
             PartitionKey = partitionKey
         });
 
-        metrics.CurrentPosition = currentPosition;
-        metrics.LatestEventPosition = latestPosition;
+        metrics.UpdatePositions(currentPosition, latestPosition);
     }
 
     /// <summary>
@@ -102,7 +93,7 @@ public class InMemoryProjectionMonitor : IProjectionMonitor
         // Update all tracked partitions for this projection efficiently
         if (_partitionsByProjection.TryGetValue(projectionName, out var partitionKeys))
         {
-            foreach (var key in partitionKeys)
+            foreach (var key in partitionKeys.Keys.Where(k => _metrics.ContainsKey(k)))
             {
                 if (_metrics.TryGetValue(key, out var metrics))
                 {
