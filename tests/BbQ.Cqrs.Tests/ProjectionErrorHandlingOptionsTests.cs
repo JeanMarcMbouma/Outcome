@@ -93,4 +93,144 @@ public class ProjectionErrorHandlingOptionsTests
         Assert.That(strategies, Contains.Item(ProjectionErrorHandlingStrategy.Skip));
         Assert.That(strategies, Contains.Item(ProjectionErrorHandlingStrategy.Stop));
     }
+
+    [Test]
+    public void Validate_WithDefaultValues_DoesNotThrow()
+    {
+        // Arrange
+        var options = new ProjectionErrorHandlingOptions();
+        
+        // Act & Assert
+        Assert.DoesNotThrow(() => options.Validate());
+    }
+
+    [Test]
+    public void Validate_WithZeroMaxRetryAttempts_ThrowsArgumentOutOfRangeException()
+    {
+        // Arrange
+        var options = new ProjectionErrorHandlingOptions
+        {
+            MaxRetryAttempts = 0
+        };
+        
+        // Act & Assert
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(() => options.Validate());
+        Assert.That(ex.ParamName, Is.EqualTo("MaxRetryAttempts"));
+    }
+
+    [Test]
+    public void Validate_WithNegativeMaxRetryAttempts_ThrowsArgumentOutOfRangeException()
+    {
+        // Arrange
+        var options = new ProjectionErrorHandlingOptions
+        {
+            MaxRetryAttempts = -1
+        };
+        
+        // Act & Assert
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(() => options.Validate());
+        Assert.That(ex.ParamName, Is.EqualTo("MaxRetryAttempts"));
+    }
+
+    [Test]
+    public void Validate_WithZeroInitialRetryDelayMs_ThrowsArgumentOutOfRangeException()
+    {
+        // Arrange
+        var options = new ProjectionErrorHandlingOptions
+        {
+            InitialRetryDelayMs = 0
+        };
+        
+        // Act & Assert
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(() => options.Validate());
+        Assert.That(ex.ParamName, Is.EqualTo("InitialRetryDelayMs"));
+    }
+
+    [Test]
+    public void Validate_WithNegativeInitialRetryDelayMs_ThrowsArgumentOutOfRangeException()
+    {
+        // Arrange
+        var options = new ProjectionErrorHandlingOptions
+        {
+            InitialRetryDelayMs = -1
+        };
+        
+        // Act & Assert
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(() => options.Validate());
+        Assert.That(ex.ParamName, Is.EqualTo("InitialRetryDelayMs"));
+    }
+
+    [Test]
+    public void Validate_WithZeroMaxRetryDelayMs_ThrowsArgumentOutOfRangeException()
+    {
+        // Arrange
+        var options = new ProjectionErrorHandlingOptions
+        {
+            MaxRetryDelayMs = 0
+        };
+        
+        // Act & Assert
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(() => options.Validate());
+        Assert.That(ex.ParamName, Is.EqualTo("MaxRetryDelayMs"));
+    }
+
+    [Test]
+    public void Validate_WithNegativeMaxRetryDelayMs_ThrowsArgumentOutOfRangeException()
+    {
+        // Arrange
+        var options = new ProjectionErrorHandlingOptions
+        {
+            MaxRetryDelayMs = -1
+        };
+        
+        // Act & Assert
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(() => options.Validate());
+        Assert.That(ex.ParamName, Is.EqualTo("MaxRetryDelayMs"));
+    }
+
+    [Test]
+    public void Validate_WithInitialDelayGreaterThanMaxDelay_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var options = new ProjectionErrorHandlingOptions
+        {
+            InitialRetryDelayMs = 5000,
+            MaxRetryDelayMs = 1000
+        };
+        
+        // Act & Assert
+        var ex = Assert.Throws<InvalidOperationException>(() => options.Validate());
+        Assert.That(ex.Message, Does.Contain("InitialRetryDelayMs cannot be greater than MaxRetryDelayMs"));
+    }
+
+    [Test]
+    public void Validate_WithFallbackStrategySetToRetry_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var options = new ProjectionErrorHandlingOptions
+        {
+            FallbackStrategy = ProjectionErrorHandlingStrategy.Retry
+        };
+        
+        // Act & Assert
+        var ex = Assert.Throws<InvalidOperationException>(() => options.Validate());
+        Assert.That(ex.Message, Does.Contain("FallbackStrategy cannot be set to Retry"));
+    }
+
+    [Test]
+    public void Validate_WithValidConfiguration_DoesNotThrow()
+    {
+        // Arrange
+        var options = new ProjectionErrorHandlingOptions
+        {
+            Strategy = ProjectionErrorHandlingStrategy.Retry,
+            MaxRetryAttempts = 5,
+            InitialRetryDelayMs = 500,
+            MaxRetryDelayMs = 10000,
+            FallbackStrategy = ProjectionErrorHandlingStrategy.Stop
+        };
+        
+        // Act & Assert
+        Assert.DoesNotThrow(() => options.Validate());
+    }
 }
