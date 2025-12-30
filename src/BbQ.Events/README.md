@@ -9,6 +9,7 @@ Event-driven architecture support with strongly-typed pub/sub and projections fo
 - **Event subscribers** (`IEventSubscriber<TEvent>`) for consuming event streams
 - **Projection support** for building read models and materialized views
 - **Partitioned projections** for parallel event processing
+- **Projection monitoring** via `IProjectionMonitor` for observability (events/sec, lag, worker count, checkpoints)
 - **In-memory event bus** for single-process applications
 - **Thread-safe** implementation using `System.Threading.Channels`
 - **Storage-agnostic** design - extend for distributed scenarios
@@ -217,6 +218,66 @@ The default projection engine:
 - Provides checkpoint storage infrastructure (IProjectionCheckpointStore)
 - Handles errors gracefully and continues processing
 - Can be extended for batch processing, parallel processing, and automatic checkpointing
+- **Tracks metrics and health via IProjectionMonitor** (events/sec, lag, worker count, checkpoints)
+
+### Projection Monitoring
+
+The projection monitoring system tracks:
+- **Events processed per second** - throughput metrics
+- **Per-partition lag** - how far behind the projection is
+- **Active worker count** - number of concurrent workers
+- **Checkpoint frequency** - how often checkpoints are written
+
+Example usage:
+```csharp
+// Monitor is automatically registered with AddProjectionEngine()
+services.AddProjectionEngine();
+
+// Query metrics at runtime
+var monitor = serviceProvider.GetRequiredService<IProjectionMonitor>();
+var metrics = monitor.GetMetrics("UserProjection", "_default");
+
+Console.WriteLine($"Lag: {metrics.Lag} events");
+Console.WriteLine($"Throughput: {metrics.EventsPerSecond:F2} events/sec");
+Console.WriteLine($"Workers: {metrics.WorkerCount}");
+Console.WriteLine($"Checkpoints written: {metrics.CheckpointsWritten}");
+```
+
+For production monitoring, implement a custom `IProjectionMonitor`:
+```csharp
+public class PrometheusProjectionMonitor : IProjectionMonitor
+{
+    private readonly Counter _eventsProcessed = Metrics.CreateCounter(
+        "projection_events_processed_total", 
+        "Total events processed by projection",
+        new CounterConfiguration { LabelNames = new[] { "projection", "partition" } });
+    
+    private readonly Gauge _lag = Metrics.CreateGauge(
+        "projection_lag", 
+        "Lag between current and latest position",
+        new GaugeConfiguration { LabelNames = new[] { "projection", "partition" } });
+    
+    public void RecordEventProcessed(string projectionName, string partitionKey, long currentPosition)
+    {
+        _eventsProcessed.WithLabels(projectionName, partitionKey).Inc();
+    }
+    
+    public void RecordLag(string projectionName, string partitionKey, long currentPosition, long? latestPosition)
+    {
+        if (latestPosition.HasValue)
+        {
+            var lag = Math.Max(0, latestPosition.Value - currentPosition);
+            _lag.WithLabels(projectionName, partitionKey).Set(lag);
+        }
+    }
+    
+    // Implement other methods...
+}
+
+// Register custom monitor
+services.AddSingleton<IProjectionMonitor, PrometheusProjectionMonitor>();
+services.AddProjectionEngine();
+```
 
 ### Distributed Systems
 
