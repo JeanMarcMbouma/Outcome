@@ -76,6 +76,11 @@ public class ProjectionMetrics
     public DateTime? LastCheckpointTime { get; set; }
 
     /// <summary>
+    /// Gets or sets the timestamp when the projection started processing (first event).
+    /// </summary>
+    public DateTime? ProcessingStartTime { get; set; }
+
+    /// <summary>
     /// Gets or sets the timestamp when the last event was processed.
     /// </summary>
     public DateTime? LastEventProcessedTime { get; set; }
@@ -90,20 +95,21 @@ public class ProjectionMetrics
     public int WorkerCount { get; set; }
 
     /// <summary>
-    /// Gets the events processed per second based on recent activity.
+    /// Gets the events processed per second based on total processing time.
     /// </summary>
     /// <remarks>
-    /// This is calculated as EventsProcessed / (time since startup or last reset).
-    /// Returns 0 if no events have been processed or if LastEventProcessedTime is null.
+    /// This is calculated as EventsProcessed / (time elapsed since first event).
+    /// Returns 0 if no events have been processed or if ProcessingStartTime is null.
+    /// The calculation provides average throughput over the lifetime of the projection.
     /// </remarks>
     public double EventsPerSecond
     {
         get
         {
-            if (!LastEventProcessedTime.HasValue || EventsProcessed == 0)
+            if (!ProcessingStartTime.HasValue || EventsProcessed == 0)
                 return 0;
 
-            var elapsed = DateTime.UtcNow - LastEventProcessedTime.Value;
+            var elapsed = DateTime.UtcNow - ProcessingStartTime.Value;
             return elapsed.TotalSeconds > 0 
                 ? EventsProcessed / elapsed.TotalSeconds 
                 : 0;

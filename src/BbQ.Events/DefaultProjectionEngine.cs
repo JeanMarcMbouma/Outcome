@@ -40,6 +40,9 @@ internal class DefaultProjectionEngine : IProjectionEngine
     // Track partition workers: (projectionName, partitionKey) -> worker task
     private readonly ConcurrentDictionary<string, PartitionWorker> _partitionWorkers = new();
     
+    // Track worker count per projection for efficient monitoring
+    private readonly ConcurrentDictionary<string, int> _workerCountByProjection = new();
+    
     // Semaphore for controlling parallelism across all partitions
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _projectionSemaphores = new();
 
@@ -347,9 +350,12 @@ internal class DefaultProjectionEngine : IProjectionEngine
                 SingleWriter = false
             });
             
-            // Update worker count for monitoring
-            var currentWorkerCount = _partitionWorkers.Count(w => w.Key.StartsWith(options.ProjectionName + ":"));
-            _monitor?.RecordWorkerCount(options.ProjectionName, currentWorkerCount + 1);
+            // Increment worker count for this projection
+            var currentWorkerCount = _workerCountByProjection.AddOrUpdate(
+                options.ProjectionName,
+                1,
+                (_, count) => count + 1);
+            _monitor?.RecordWorkerCount(options.ProjectionName, currentWorkerCount);
             
             // Start worker task with CancellationToken.None - shutdown via channel completion
             var task = Task.Run(

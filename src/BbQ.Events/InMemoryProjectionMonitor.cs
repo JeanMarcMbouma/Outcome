@@ -30,6 +30,7 @@ namespace BbQ.Events;
 public class InMemoryProjectionMonitor : IProjectionMonitor
 {
     private readonly ConcurrentDictionary<string, ProjectionMetrics> _metrics = new();
+    private readonly ConcurrentDictionary<string, List<string>> _partitionsByProjection = new();
 
     /// <summary>
     /// Records that an event was successfully processed.
@@ -37,15 +38,30 @@ public class InMemoryProjectionMonitor : IProjectionMonitor
     public void RecordEventProcessed(string projectionName, string partitionKey, long currentPosition)
     {
         var key = GetKey(projectionName, partitionKey);
-        var metrics = _metrics.GetOrAdd(key, _ => new ProjectionMetrics
+        var metrics = _metrics.GetOrAdd(key, _ =>
         {
-            ProjectionName = projectionName,
-            PartitionKey = partitionKey
+            // Track partition for this projection
+            _partitionsByProjection.AddOrUpdate(
+                projectionName,
+                new List<string> { key },
+                (_, list) => { lock (list) { if (!list.Contains(key)) list.Add(key); } return list; });
+            
+            return new ProjectionMetrics
+            {
+                ProjectionName = projectionName,
+                PartitionKey = partitionKey
+            };
         });
 
         metrics.CurrentPosition = currentPosition;
         metrics.EventsProcessed++;
         metrics.LastEventProcessedTime = DateTime.UtcNow;
+        
+        // Set start time on first event
+        if (!metrics.ProcessingStartTime.HasValue)
+        {
+            metrics.ProcessingStartTime = DateTime.UtcNow;
+        }
     }
 
     /// <summary>
@@ -85,10 +101,16 @@ public class InMemoryProjectionMonitor : IProjectionMonitor
     /// </summary>
     public void RecordWorkerCount(string projectionName, int workerCount)
     {
-        // Update all partitions for this projection
-        foreach (var kvp in _metrics.Where(m => m.Value.ProjectionName == projectionName))
+        // Update all tracked partitions for this projection efficiently
+        if (_partitionsByProjection.TryGetValue(projectionName, out var partitionKeys))
         {
-            kvp.Value.WorkerCount = workerCount;
+            foreach (var key in partitionKeys)
+            {
+                if (_metrics.TryGetValue(key, out var metrics))
+                {
+                    metrics.WorkerCount = workerCount;
+                }
+            }
         }
     }
 
