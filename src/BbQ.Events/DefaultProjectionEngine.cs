@@ -426,21 +426,16 @@ internal class DefaultProjectionEngine : IProjectionEngine
         string partitionKey,
         CancellationToken ct)
     {
-        bool writeSucceeded;
-        
         // Use different write strategies based on backpressure mode
         if (options.BackpressureStrategy == BackpressureStrategy.Block)
         {
             // Block mode: use WriteAsync which waits for space
             await channel.Writer.WriteAsync(item, ct);
-            writeSucceeded = true;
         }
         else
         {
             // Drop modes: use TryWrite which drops immediately if full
-            writeSucceeded = channel.Writer.TryWrite(item);
-            
-            if (!writeSucceeded)
+            if (!channel.Writer.TryWrite(item))
             {
                 _logger.LogWarning(
                     "Event dropped for projection {ProjectionName}:{PartitionKey} due to backpressure (strategy: {Strategy}, capacity: {Capacity})",
