@@ -305,7 +305,8 @@ internal class DefaultProjectionEngine : IProjectionEngine
             ProjectionName = concreteType.Name,
             MaxDegreeOfParallelism = attribute?.MaxDegreeOfParallelism ?? 1,
             CheckpointBatchSize = attribute?.CheckpointBatchSize ?? 100,
-            StartupMode = attribute?.StartupMode ?? ProjectionStartupMode.Resume
+            StartupMode = attribute?.StartupMode ?? ProjectionStartupMode.Resume,
+            // ErrorHandling is already initialized by property initializer to default values
         };
     }
 
