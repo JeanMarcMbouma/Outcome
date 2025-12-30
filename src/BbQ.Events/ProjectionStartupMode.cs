@@ -12,7 +12,7 @@ namespace BbQ.Events;
 /// 
 /// Usage:
 /// <code>
-/// services.AddProjection&lt;UserProfileProjection&gt;(options =&gt; 
+/// services.AddProjection<UserProfileProjection>(options => 
 /// {
 ///     options.StartupMode = ProjectionStartupMode.Replay;
 /// });
