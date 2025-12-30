@@ -163,6 +163,79 @@ public class UserStatisticsProjection : IPartitionedProjectionHandler<UserActivi
 }
 ```
 
+### Error Handling & Retry Policies (NEW)
+
+Configure how projections handle errors during event processing:
+
+```csharp
+services.AddProjection<UserProfileProjection>(options =>
+{
+    // Configure error handling strategy
+    options.ErrorHandling.Strategy = ProjectionErrorHandlingStrategy.Retry;
+    options.ErrorHandling.MaxRetryAttempts = 3;
+    options.ErrorHandling.InitialRetryDelayMs = 1000; // 1 second
+    options.ErrorHandling.MaxRetryDelayMs = 30000;    // 30 seconds (cap)
+    options.ErrorHandling.FallbackStrategy = ProjectionErrorHandlingStrategy.Skip;
+});
+```
+
+**Available Strategies:**
+
+1. **Retry** (Default) - Retries with exponential backoff for transient failures
+   - Attempts: `MaxRetryAttempts` (default: 3)
+   - Delay: Starts at `InitialRetryDelayMs` (default: 1000ms), doubles each retry up to `MaxRetryDelayMs` (default: 30000ms)
+   - After exhausting retries, uses `FallbackStrategy` (default: Skip)
+
+2. **Skip** - Logs error and continues processing (event is marked as processed)
+   - Best for non-critical events or when availability is more important than consistency
+   - Event is checkpointed and won't be reprocessed
+
+3. **Stop** - Halts the projection worker for manual intervention
+   - Best when data consistency is critical
+   - Worker must be manually restarted
+
+**Examples:**
+
+```csharp
+// Retry transient failures, skip after exhaustion
+services.AddProjection<UserProfileProjection>(options =>
+{
+    options.ErrorHandling.Strategy = ProjectionErrorHandlingStrategy.Retry;
+    options.ErrorHandling.MaxRetryAttempts = 5;
+    options.ErrorHandling.FallbackStrategy = ProjectionErrorHandlingStrategy.Skip;
+});
+
+// Skip failed events immediately
+services.AddProjection<AnalyticsProjection>(options =>
+{
+    options.ErrorHandling.Strategy = ProjectionErrorHandlingStrategy.Skip;
+});
+
+// Stop on any error for critical projections
+services.AddProjection<FinancialProjection>(options =>
+{
+    options.ErrorHandling.Strategy = ProjectionErrorHandlingStrategy.Stop;
+});
+```
+
+**Structured Logging:**
+
+All error handling strategies provide structured logging with event details:
+- Event type and handler information
+- Attempt count and retry delays
+- Error messages and stack traces
+- Projection and partition context
+
+```csharp
+// Example log output
+// [Warning] Error processing event for UserProjection:user-123 at position 456. 
+//           Attempt 2 of 3. Retrying in 2000ms
+// [Error] Skipping failed event for AnalyticsProjection:_default at position 789. 
+//         Event type: UserActivity, Handler: UserActivityProjection
+// [Critical] Stopping projection worker for FinancialProjection:_default at position 1011. 
+//            Manual intervention required.
+```
+
 **Note:** The default projection engine processes events sequentially. Implement a custom IProjectionEngine to leverage partition keys for parallel processing.
 
 📖 **See [PROJECTION_SAMPLE.md](PROJECTION_SAMPLE.md) for complete examples and best practices.**
