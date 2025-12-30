@@ -8,24 +8,39 @@ namespace BbQ.Events;
 /// </summary>
 public static class ProjectionHandlerRegistry
 {
-    private static readonly ConcurrentDictionary<Type, List<HandlerRegistration>> _handlers = new();
+    private static readonly ConcurrentDictionary<Type, ConcurrentBag<HandlerRegistration>> _handlers = new();
+    private static readonly ConcurrentDictionary<string, ProjectionOptions> _projectionOptions = new();
 
     /// <summary>
     /// Registers a projection handler service type for a specific event type.
     /// </summary>
-    public static void Register(Type eventType, Type handlerServiceType, Type concreteType)
+    public static void Register(Type eventType, Type handlerServiceType, Type concreteType, ProjectionOptions? options = null)
     {
         _handlers.AddOrUpdate(
             eventType,
-            _ => new List<HandlerRegistration> { new(handlerServiceType, concreteType) },
-            (_, list) =>
+            _ => new ConcurrentBag<HandlerRegistration> { new(handlerServiceType, concreteType) },
+            (_, bag) =>
             {
-                if (!list.Any(r => r.HandlerServiceType == handlerServiceType))
+                if (!bag.Any(r => r.HandlerServiceType == handlerServiceType))
                 {
-                    list.Add(new HandlerRegistration(handlerServiceType, concreteType));
+                    bag.Add(new HandlerRegistration(handlerServiceType, concreteType));
                 }
-                return list;
+                return bag;
             });
+        
+        // Store options if provided
+        if (options != null)
+        {
+            _projectionOptions[concreteType.Name] = options;
+        }
+    }
+    
+    /// <summary>
+    /// Gets projection options for a concrete type, returns null if not found.
+    /// </summary>
+    public static ProjectionOptions? GetProjectionOptions(string projectionName)
+    {
+        return _projectionOptions.TryGetValue(projectionName, out var options) ? options : null;
     }
 
     /// <summary>
@@ -64,6 +79,7 @@ public static class ProjectionHandlerRegistry
     public static void Clear()
     {
         _handlers.Clear();
+        _projectionOptions.Clear();
     }
 
     /// <summary>

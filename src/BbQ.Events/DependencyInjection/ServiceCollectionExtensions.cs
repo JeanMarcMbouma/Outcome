@@ -56,13 +56,15 @@ public static class ServiceCollectionExtensions
         /// Registers a projection handler with the dependency injection container.
         /// </summary>
         /// <typeparam name="TProjection">The projection handler type</typeparam>
-        /// <param name="services">The service collection to register with</param>
         /// <param name="lifetime">The lifetime to use for the projection handler (default: Scoped)</param>
         /// <returns>The service collection for chaining</returns>
         /// <remarks>
         /// This method registers the projection handler for all event types it handles.
         /// The projection must implement at least one IProjectionHandler&lt;TEvent&gt; or
         /// IPartitionedProjectionHandler&lt;TEvent&gt; interface.
+        /// 
+        /// Projection options are read from the [Projection] attribute if present. 
+        /// For manual registration without the attribute, use the overload that accepts an options configuration.
         /// 
         /// Example usage:
         /// <code>
@@ -72,6 +74,39 @@ public static class ServiceCollectionExtensions
         /// </code>
         /// </remarks>
         public IServiceCollection AddProjection<TProjection>(ServiceLifetime lifetime = ServiceLifetime.Scoped)
+            where TProjection : class
+        {
+            return services.AddProjection<TProjection>(null, lifetime);
+        }
+        
+        /// <summary>
+        /// Registers a projection handler with the dependency injection container with custom options.
+        /// </summary>
+        /// <typeparam name="TProjection">The projection handler type</typeparam>
+        /// <param name="configureOptions">Action to configure projection options</param>
+        /// <param name="lifetime">The lifetime to use for the projection handler (default: Scoped)</param>
+        /// <returns>The service collection for chaining</returns>
+        /// <remarks>
+        /// This method registers the projection handler and allows you to configure options programmatically.
+        /// Options configured here take precedence over the [Projection] attribute.
+        /// 
+        /// This overload is intended for manual registration scenarios. When using source generators,
+        /// prefer configuring options via the [Projection] attribute instead.
+        /// 
+        /// Example usage:
+        /// <code>
+        /// services.AddInMemoryEventBus();
+        /// services.AddProjection&lt;UserProfileProjection&gt;(options =&gt; 
+        /// {
+        ///     options.MaxDegreeOfParallelism = 4;
+        ///     options.CheckpointBatchSize = 50;
+        /// });
+        /// services.AddProjectionEngine();
+        /// </code>
+        /// </remarks>
+        public IServiceCollection AddProjection<TProjection>(
+            Action<ProjectionOptions>? configureOptions,
+            ServiceLifetime lifetime = ServiceLifetime.Scoped)
             where TProjection : class
         {
             // Register the projection handler itself
@@ -84,6 +119,14 @@ public static class ServiceCollectionExtensions
                     (iface.GetGenericTypeDefinition() == typeof(IProjectionHandler<>) ||
                      iface.GetGenericTypeDefinition() == typeof(IPartitionedProjectionHandler<>)));
 
+            // Configure options
+            ProjectionOptions? options = null;
+            if (configureOptions != null)
+            {
+                options = new ProjectionOptions { ProjectionName = projectionType.Name };
+                configureOptions(options);
+            }
+
             foreach (var iface in projectionInterfaces)
             {
                 // Register the interface to resolve to the projection instance
@@ -91,7 +134,7 @@ public static class ServiceCollectionExtensions
                 
                 // Register in the projection handler registry for the engine to discover
                 var eventType = iface.GenericTypeArguments[0];
-                ProjectionHandlerRegistry.Register(eventType, iface, projectionType);
+                ProjectionHandlerRegistry.Register(eventType, iface, projectionType, options);
             }
 
             return services;

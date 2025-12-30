@@ -43,7 +43,7 @@ public class PartitionedProjectionEngineTests
         var eventPublisher = provider.GetRequiredService<IEventPublisher>();
         var engine = provider.GetRequiredService<IProjectionEngine>();
         
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         var engineTask = Task.Run(() => engine.RunAsync(cts.Token));
         
         // Act - Give engine time to start and subscribe
@@ -90,7 +90,7 @@ public class PartitionedProjectionEngineTests
         var eventPublisher = provider.GetRequiredService<IEventPublisher>();
         var engine = provider.GetRequiredService<IProjectionEngine>();
         
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         var engineTask = Task.Run(() => engine.RunAsync(cts.Token));
         
         // Act - Give engine time to start and subscribe
@@ -145,7 +145,7 @@ public class PartitionedProjectionEngineTests
         var engine = provider.GetRequiredService<IProjectionEngine>();
         var checkpointStore = provider.GetRequiredService<IProjectionCheckpointStore>();
         
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         var engineTask = Task.Run(() => engine.RunAsync(cts.Token));
         
         // Act - Give engine time to start and subscribe
@@ -197,7 +197,7 @@ public class PartitionedProjectionEngineTests
         var eventPublisher = provider.GetRequiredService<IEventPublisher>();
         var engine = provider.GetRequiredService<IProjectionEngine>();
         
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         var engineTask = Task.Run(() => engine.RunAsync(cts.Token));
         
         // Act - Give engine time to start and subscribe
@@ -238,7 +238,7 @@ public class PartitionedProjectionEngineTests
         var eventPublisher = provider.GetRequiredService<IEventPublisher>();
         var engine = provider.GetRequiredService<IProjectionEngine>();
         
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         var engineTask = Task.Run(() => engine.RunAsync(cts.Token));
         
         // Act - Give engine time to start and subscribe
@@ -281,7 +281,7 @@ public class PartitionedProjectionEngineTests
         var eventPublisher = provider.GetRequiredService<IEventPublisher>();
         var engine = provider.GetRequiredService<IProjectionEngine>();
         
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         var engineTask = Task.Run(() => engine.RunAsync(cts.Token));
         
         // Act - Give engine time to start and subscribe
