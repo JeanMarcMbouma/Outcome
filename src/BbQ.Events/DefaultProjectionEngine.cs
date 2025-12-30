@@ -22,10 +22,12 @@ namespace BbQ.Events;
 /// - Provides graceful shutdown with checkpoint flushing
 /// - Dispatches to all registered handlers for each event type
 /// - Logs errors but continues processing other handlers
-/// - Uses a single DI scope per event for efficiency
+/// - Creates a DI scope per event for handler resolution and processing
 /// </remarks>
 internal class DefaultProjectionEngine : IProjectionEngine
 {
+    private const string DefaultPartitionKey = "_default";
+    
     private readonly IServiceProvider _serviceProvider;
     private readonly IEventBus _eventBus;
     private readonly IProjectionCheckpointStore _checkpointStore;
@@ -229,8 +231,14 @@ internal class DefaultProjectionEngine : IProjectionEngine
                     // Get projection options
                     var options = GetProjectionOptions(registration.ConcreteType);
                     
-                    // Extract partition key
-                    var partitionKey = (string)cache.GetPartitionKeyMethod!.Invoke(handler, new[] { @event })!;
+                    // Extract and validate partition key
+                    var partitionKeyObj = cache.GetPartitionKeyMethod!.Invoke(handler, new[] { @event });
+                    if (partitionKeyObj is not string partitionKey || string.IsNullOrEmpty(partitionKey))
+                    {
+                        throw new InvalidOperationException(
+                            $"Projection handler '{handlerServiceType.Name}' returned an invalid partition key for event type '{eventType.Name}'. " +
+                            "Partition keys must be non-null, non-empty strings.");
+                    }
                     
                     // Route event to partition worker
                     await RouteToPartitionWorkerAsync(
@@ -253,7 +261,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
                         handlerServiceType,
                         eventType,
                         @event,
-                        "_default",
+                        DefaultPartitionKey,
                         options,
                         cache,
                         ct);
@@ -272,10 +280,18 @@ internal class DefaultProjectionEngine : IProjectionEngine
     }
 
     /// <summary>
-    /// Gets projection options for a handler, either from attribute or defaults.
+    /// Gets projection options for a handler, checking registry first, then attribute, then defaults.
     /// </summary>
     private ProjectionOptions GetProjectionOptions(Type concreteType)
     {
+        // Check if options were registered programmatically
+        var registeredOptions = ProjectionHandlerRegistry.GetProjectionOptions(concreteType.Name);
+        if (registeredOptions != null)
+        {
+            return registeredOptions;
+        }
+        
+        // Fall back to reading from attribute
         var attribute = concreteType.GetCustomAttribute<ProjectionAttribute>();
         
         return new ProjectionOptions
@@ -327,15 +343,15 @@ internal class DefaultProjectionEngine : IProjectionEngine
                 SingleWriter = false
             });
             
-            // Start worker task
+            // Start worker task with CancellationToken.None - shutdown via channel completion
             var task = Task.Run(
                 async () => await ProcessPartitionAsync(
                     options,
                     partitionKey,
                     channel,
                     semaphore,
-                    ct),
-                ct);
+                    CancellationToken.None),
+                CancellationToken.None);
             
             return new PartitionWorker
             {
@@ -366,13 +382,10 @@ internal class DefaultProjectionEngine : IProjectionEngine
         SemaphoreSlim semaphore,
         CancellationToken ct)
     {
-        // Acquire semaphore to respect parallelism limit
-        await semaphore.WaitAsync(ct);
+        var checkpointKey = $"{options.ProjectionName}:{partitionKey}";
         
         try
         {
-            var checkpointKey = $"{options.ProjectionName}:{partitionKey}";
-            
             // Load checkpoint on startup
             var checkpoint = await _checkpointStore.GetCheckpointAsync(checkpointKey, ct);
             var eventsProcessedSinceCheckpoint = 0;
@@ -386,12 +399,15 @@ internal class DefaultProjectionEngine : IProjectionEngine
             
             await foreach (var workItem in channel.Reader.ReadAllAsync(ct))
             {
+                // Acquire semaphore before processing each event
+                await semaphore.WaitAsync(ct);
+                
                 try
                 {
                     // Process the event
                     await ProcessWorkItemAsync(workItem, ct);
                     
-                    // Track position and checkpoint
+                    // Track position and checkpoint ONLY after successful processing
                     currentPosition++;
                     eventsProcessedSinceCheckpoint++;
                     
@@ -413,23 +429,40 @@ internal class DefaultProjectionEngine : IProjectionEngine
                 {
                     _logger.LogError(
                         ex,
-                        "Error processing event in partition {ProjectionName}:{PartitionKey}",
+                        "Error processing event in partition {ProjectionName}:{PartitionKey}. Event will not be checkpointed.",
                         options.ProjectionName,
                         partitionKey);
-                    // Continue processing next event
+                    // Do NOT increment position on failure - event should be retried on restart
+                }
+                finally
+                {
+                    // Release semaphore after processing this event
+                    semaphore.Release();
                 }
             }
             
             // Final checkpoint flush on shutdown
             if (eventsProcessedSinceCheckpoint > 0)
             {
-                await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, ct);
-                
-                _logger.LogInformation(
-                    "Final checkpoint saved for {ProjectionName}:{PartitionKey} at position {Position}",
-                    options.ProjectionName,
-                    partitionKey,
-                    currentPosition);
+                try
+                {
+                    await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, ct);
+                    
+                    _logger.LogInformation(
+                        "Final checkpoint saved for {ProjectionName}:{PartitionKey} at position {Position}",
+                        options.ProjectionName,
+                        partitionKey,
+                        currentPosition);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(
+                        ex,
+                        "Failed to save final checkpoint for {ProjectionName}:{PartitionKey} at position {Position}",
+                        options.ProjectionName,
+                        partitionKey,
+                        currentPosition);
+                }
             }
             
             _logger.LogInformation(
@@ -437,10 +470,14 @@ internal class DefaultProjectionEngine : IProjectionEngine
                 options.ProjectionName,
                 partitionKey);
         }
-        finally
+        catch (Exception ex)
         {
-            // Release semaphore
-            semaphore.Release();
+            _logger.LogError(
+                ex,
+                "Fatal error in partition worker for {ProjectionName}:{PartitionKey}",
+                options.ProjectionName,
+                partitionKey);
+            throw;
         }
     }
 

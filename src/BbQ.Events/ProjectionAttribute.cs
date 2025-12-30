@@ -11,7 +11,21 @@ namespace BbQ.Events;
 /// - Requires the class to implement at least one IProjectionHandler&lt;TEvent&gt; or IPartitionedProjectionHandler&lt;TEvent&gt;
 /// - Optionally configures projection behavior via MaxDegreeOfParallelism and CheckpointBatchSize
 /// 
-/// Usage:
+/// **IMPORTANT:** When manually registering projections (not using source generators), prefer configuring 
+/// options via the AddProjection overload that accepts a configuration lambda instead of using this attribute:
+/// 
+/// <code>
+/// // Preferred for manual registration
+/// services.AddProjection&lt;UserProfileProjection&gt;(options =&gt; 
+/// {
+///     options.MaxDegreeOfParallelism = 4;
+///     options.CheckpointBatchSize = 50;
+/// });
+/// 
+/// // Using attribute is fine when projections are discovered by source generators
+/// </code>
+/// 
+/// Usage with source generators:
 /// <code>
 /// [Projection]
 /// public class UserProfileProjection :
@@ -31,13 +45,6 @@ namespace BbQ.Events;
 /// Projections are automatically registered when using:
 /// <code>
 /// services.AddProjectionsFromAssembly(typeof(Program).Assembly);
-/// </code>
-/// 
-/// Or manually registered:
-/// <code>
-/// services.AddInMemoryEventBus();
-/// services.AddProjection&lt;UserProfileProjection&gt;();
-/// services.AddProjectionEngine();
 /// </code>
 /// </remarks>
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]

@@ -8,8 +8,8 @@ namespace BbQ.Events;
 /// - Parallelism control via MaxDegreeOfParallelism
 /// - Checkpoint batching via CheckpointBatchSize
 /// 
-/// Options can be specified via the [Projection] attribute or configured
-/// globally for all projections.
+/// Options can be specified via the [Projection] attribute when using source generators,
+/// or configured programmatically when manually registering projections.
 /// </remarks>
 public class ProjectionOptions
 {
@@ -19,12 +19,14 @@ public class ProjectionOptions
     /// <remarks>
     /// Default: 1 (sequential processing)
     /// 
-    /// This limits the number of concurrent partition workers:
-    /// - 1: All partitions processed sequentially
-    /// - N: Up to N partitions processed in parallel
-    /// - 0 or negative: Unlimited parallelism (use with caution)
+    /// This value limits the number of concurrent event processing operations:
+    /// - 1: Effectively sequential processing
+    /// - N (&gt; 1): Up to N events may be processed concurrently across different partitions.
+    ///   Within each partition, events are always processed sequentially.
+    /// - 0 or negative: Capped at 1000 concurrent operations
     /// 
-    /// Within each partition, events are always processed sequentially to maintain ordering.
+    /// The semaphore is acquired per-event, not per-worker, so this accurately controls
+    /// concurrent processing load.
     /// </remarks>
     public int MaxDegreeOfParallelism { get; set; } = 1;
 
