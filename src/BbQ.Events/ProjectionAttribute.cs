@@ -68,4 +68,16 @@ public sealed class ProjectionAttribute : Attribute
     /// Default: ProjectionStartupMode.Resume
     /// </summary>
     public ProjectionStartupMode StartupMode { get; set; } = ProjectionStartupMode.Resume;
+
+    /// <summary>
+    /// Maximum number of events that can be queued per partition before backpressure is applied.
+    /// Default: 1000
+    /// </summary>
+    public int ChannelCapacity { get; set; } = 1000;
+
+    /// <summary>
+    /// Strategy for handling backpressure when event queue reaches capacity.
+    /// Default: BackpressureStrategy.Block
+    /// </summary>
+    public BackpressureStrategy BackpressureStrategy { get; set; } = BackpressureStrategy.Block;
 }
