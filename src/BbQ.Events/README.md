@@ -10,6 +10,7 @@ Event-driven architecture support with strongly-typed pub/sub and projections fo
 - **Projection support** for building read models and materialized views
 - **Partitioned projections** for parallel event processing
 - **Projection monitoring** via `IProjectionMonitor` for observability (events/sec, lag, worker count, checkpoints)
+- **Projection replay API** via `IProjectionRebuilder` for resetting and rebuilding projections
 - **In-memory event bus** for single-process applications
 - **Thread-safe** implementation using `System.Threading.Channels`
 - **Storage-agnostic** design - extend for distributed scenarios
@@ -282,6 +283,134 @@ services.AddSingleton<IProjectionMonitor, PrometheusProjectionMonitor>();
 services.AddProjectionEngine();
 ```
 
+### Projection Replay API
+
+The projection rebuilder provides APIs to reset projection checkpoints and rebuild projections from scratch. This is useful for:
+- Rebuilding projections after schema changes
+- Recovering from corrupted projection state
+- Testing projection logic
+- Migrating to new projection implementations
+
+The `IProjectionRebuilder` is automatically registered when you call `AddProjectionEngine()`.
+
+#### Reset All Projections
+
+```csharp
+var rebuilder = serviceProvider.GetRequiredService<IProjectionRebuilder>();
+
+// Reset all registered projections
+await rebuilder.ResetAllProjectionsAsync(cancellationToken);
+
+// Restart projection engine to begin rebuild
+await engine.RunAsync(cancellationToken);
+```
+
+#### Reset a Single Projection
+
+```csharp
+var rebuilder = serviceProvider.GetRequiredService<IProjectionRebuilder>();
+
+// Reset a specific projection
+await rebuilder.ResetProjectionAsync("UserProfileProjection", cancellationToken);
+
+// Restart projection engine to begin rebuild
+await engine.RunAsync(cancellationToken);
+```
+
+#### Reset a Single Partition
+
+For partitioned projections, you can reset individual partitions without affecting others:
+
+```csharp
+var rebuilder = serviceProvider.GetRequiredService<IProjectionRebuilder>();
+
+// Reset a specific partition
+await rebuilder.ResetPartitionAsync("UserStatisticsProjection", "user-123", cancellationToken);
+
+// Restart projection engine to begin rebuild
+await engine.RunAsync(cancellationToken);
+```
+
+#### List Registered Projections
+
+Useful for CLI tools and management UIs:
+
+```csharp
+var rebuilder = serviceProvider.GetRequiredService<IProjectionRebuilder>();
+
+// Get all registered projection names
+var projections = rebuilder.GetRegisteredProjections();
+foreach (var projection in projections)
+{
+    Console.WriteLine($"Projection: {projection}");
+}
+```
+
+#### CLI-Friendly Usage
+
+The rebuilder API is designed to be easily integrated into CLI applications:
+
+```csharp
+using BbQ.Events;
+using BbQ.Events.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
+
+// Configure services
+var services = new ServiceCollection();
+services.AddLogging();
+services.AddInMemoryEventBus();
+services.AddProjectionsFromAssembly(typeof(Program).Assembly);
+services.AddProjectionEngine();
+
+var provider = services.BuildServiceProvider();
+var rebuilder = provider.GetRequiredService<IProjectionRebuilder>();
+
+// Parse command-line arguments
+if (args.Length == 0 || args[0] == "list")
+{
+    // List all projections
+    Console.WriteLine("Registered projections:");
+    foreach (var projection in rebuilder.GetRegisteredProjections())
+    {
+        Console.WriteLine($"  - {projection}");
+    }
+}
+else if (args[0] == "reset-all")
+{
+    // Reset all projections
+    Console.WriteLine("Resetting all projections...");
+    await rebuilder.ResetAllProjectionsAsync();
+    Console.WriteLine("All projections reset. Restart the projection engine to rebuild.");
+}
+else if (args[0] == "reset" && args.Length >= 2)
+{
+    // Reset a specific projection
+    var projectionName = args[1];
+    Console.WriteLine($"Resetting projection: {projectionName}...");
+    await rebuilder.ResetProjectionAsync(projectionName);
+    Console.WriteLine($"Projection {projectionName} reset. Restart the projection engine to rebuild.");
+}
+else if (args[0] == "reset-partition" && args.Length >= 3)
+{
+    // Reset a specific partition
+    var projectionName = args[1];
+    var partitionKey = args[2];
+    Console.WriteLine($"Resetting partition {partitionKey} of projection {projectionName}...");
+    await rebuilder.ResetPartitionAsync(projectionName, partitionKey);
+    Console.WriteLine($"Partition {partitionKey} reset. Restart the projection engine to rebuild.");
+}
+else
+{
+    Console.WriteLine("Usage:");
+    Console.WriteLine("  list                           - List all registered projections");
+    Console.WriteLine("  reset-all                      - Reset all projections");
+    Console.WriteLine("  reset <projection-name>        - Reset a specific projection");
+    Console.WriteLine("  reset-partition <projection-name> <partition-key> - Reset a specific partition");
+}
+```
+
+**Note:** After resetting checkpoints, you must restart the projection engine (or projections) for the changes to take effect. The rebuilder only manages checkpoints - it does not modify projection state or read models directly.
+
 ### Distributed Systems
 
 For multi-process or distributed systems, implement `IEventBus` with your preferred message broker:
@@ -306,6 +435,9 @@ Transforms events into read models. Can handle multiple event types and optional
 
 ### Projection Engine
 Orchestrates projection execution from live event streams. Provides infrastructure for checkpointing via IProjectionCheckpointStore.
+
+### Projection Rebuilder
+Manages projection checkpoints for rebuilding projections from scratch. Supports resetting all projections, single projections, or individual partitions.
 
 ### Event Bus
 Central hub combining publishing and subscribing capabilities.
