@@ -157,6 +157,7 @@ public static class ServiceCollectionExtensions
         /// 1. IProjectionCheckpointStore as a singleton (in-memory implementation)
         /// 2. IProjectionMonitor as a singleton (in-memory implementation)
         /// 3. IProjectionEngine as a singleton
+        /// 4. IProjectionRebuilder as a singleton
         /// 
         /// The projection engine must be run manually or as a hosted service:
         /// <code>
@@ -180,6 +181,9 @@ public static class ServiceCollectionExtensions
             
             // Register the projection engine
             services.TryAddSingleton<IProjectionEngine, DefaultProjectionEngine>();
+            
+            // Register the projection rebuilder
+            services.TryAddSingleton<IProjectionRebuilder, DefaultProjectionRebuilder>();
             
             return services;
         }
