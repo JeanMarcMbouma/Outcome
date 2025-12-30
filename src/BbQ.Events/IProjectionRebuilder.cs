@@ -67,11 +67,19 @@ public interface IProjectionRebuilder
     /// <remarks>
     /// This method:
     /// - Resets the checkpoint for the specified projection
-    /// - For partitioned projections, resets all partitions
+    /// - For non-partitioned projections, clears the main checkpoint
+    /// - For partitioned projections, clears the main projection checkpoint only
+    /// - Does not automatically reset individual partition checkpoints
     /// - Does not modify projection state or read models
     /// 
     /// The projection name should match the name used when registering the projection,
     /// which is typically the class name (e.g., "UserProfileProjection").
+    /// 
+    /// For partitioned projections: This method resets the main projection checkpoint,
+    /// but existing partition checkpoints (created dynamically as events are processed)
+    /// remain unchanged. To reset individual partitions, use ResetPartitionAsync.
+    /// To reset all checkpoints including partitions, first call ResetProjectionAsync,
+    /// then call ResetPartitionAsync for each known partition.
     /// 
     /// After calling this method, restart the projection engine or projection
     /// to begin the rebuild process.
@@ -80,6 +88,10 @@ public interface IProjectionRebuilder
     /// <code>
     /// // Reset a specific projection
     /// await rebuilder.ResetProjectionAsync("UserProfileProjection", ct);
+    /// 
+    /// // For partitioned projections, also reset known partitions if needed
+    /// await rebuilder.ResetPartitionAsync("UserStatisticsProjection", "user-123", ct);
+    /// await rebuilder.ResetPartitionAsync("UserStatisticsProjection", "user-456", ct);
     /// 
     /// // Restart projection engine to begin rebuild
     /// await engine.RunAsync(ct);
