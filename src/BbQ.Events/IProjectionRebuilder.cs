@@ -40,8 +40,8 @@ public interface IProjectionRebuilder
     /// <returns>A task that completes when all projections have been reset</returns>
     /// <remarks>
     /// This method:
-    /// - Resets checkpoints for all registered projections
-    /// - Resets all partitions for partitioned projections
+    /// - Resets the main projection checkpoints for all registered projections
+    /// - For partitioned projections, resets only the main projection checkpoint and does not reset individual partition checkpoints
     /// - Does not modify projection state or read models
     /// 
     /// After calling this method, restart the projection engine or projections
