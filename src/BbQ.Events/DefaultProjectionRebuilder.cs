@@ -85,14 +85,20 @@ internal class DefaultProjectionRebuilder : IProjectionRebuilder
     /// </summary>
     public async ValueTask ResetPartitionAsync(string projectionName, string partitionKey, CancellationToken ct = default)
     {
+        var projectionNameValue = projectionName ?? "<null>";
         if (string.IsNullOrWhiteSpace(projectionName))
         {
-            throw new ArgumentException("Projection name cannot be null or empty", nameof(projectionName));
+            throw new ArgumentException(
+                $"Parameter '{nameof(projectionName)}' cannot be null or whitespace. Actual value: '{projectionNameValue}'.",
+                nameof(projectionName));
         }
 
+        var partitionKeyValue = partitionKey ?? "<null>";
         if (string.IsNullOrWhiteSpace(partitionKey))
         {
-            throw new ArgumentException("Partition key cannot be null or empty", nameof(partitionKey));
+            throw new ArgumentException(
+                $"Parameter '{nameof(partitionKey)}' cannot be null or whitespace. Actual value: '{partitionKeyValue}'.",
+                nameof(partitionKey));
         }
 
         var checkpointKey = $"{projectionName}:{partitionKey}";
