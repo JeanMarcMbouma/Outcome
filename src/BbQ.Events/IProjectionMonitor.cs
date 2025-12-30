@@ -88,6 +88,21 @@ public interface IProjectionMonitor
     void RecordWorkerCount(string projectionName, int workerCount);
 
     /// <summary>
+    /// Records the current queue depth for a partition.
+    /// </summary>
+    /// <param name="projectionName">The name of the projection</param>
+    /// <param name="partitionKey">The partition key</param>
+    /// <param name="queueDepth">The current number of events waiting in the queue</param>
+    void RecordQueueDepth(string projectionName, string partitionKey, int queueDepth);
+
+    /// <summary>
+    /// Records that an event was dropped due to backpressure.
+    /// </summary>
+    /// <param name="projectionName">The name of the projection</param>
+    /// <param name="partitionKey">The partition key</param>
+    void RecordEventDropped(string projectionName, string partitionKey);
+
+    /// <summary>
     /// Gets the current metrics for a specific projection partition.
     /// </summary>
     /// <param name="projectionName">The name of the projection</param>

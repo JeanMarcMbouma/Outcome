@@ -104,6 +104,36 @@ public class InMemoryProjectionMonitor : IProjectionMonitor
     }
 
     /// <summary>
+    /// Records the current queue depth for a partition.
+    /// </summary>
+    public void RecordQueueDepth(string projectionName, string partitionKey, int queueDepth)
+    {
+        var key = GetKey(projectionName, partitionKey);
+        var metrics = _metrics.GetOrAdd(key, _ => new ProjectionMetrics
+        {
+            ProjectionName = projectionName,
+            PartitionKey = partitionKey
+        });
+
+        metrics.QueueDepth = queueDepth;
+    }
+
+    /// <summary>
+    /// Records that an event was dropped due to backpressure.
+    /// </summary>
+    public void RecordEventDropped(string projectionName, string partitionKey)
+    {
+        var key = GetKey(projectionName, partitionKey);
+        var metrics = _metrics.GetOrAdd(key, _ => new ProjectionMetrics
+        {
+            ProjectionName = projectionName,
+            PartitionKey = partitionKey
+        });
+
+        metrics.IncrementEventsDropped();
+    }
+
+    /// <summary>
     /// Gets the current metrics for a specific projection partition.
     /// </summary>
     public ProjectionMetrics? GetMetrics(string projectionName, string partitionKey)

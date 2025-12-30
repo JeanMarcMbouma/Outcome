@@ -34,6 +34,8 @@ public class ProjectionMetrics
     private DateTime? _processingStartTime;
     private DateTime? _lastEventProcessedTime;
     private int _workerCount;
+    private int _queueDepth;
+    private int _eventsDropped;
 
     /// <summary>
     /// Gets or sets the name of the projection.
@@ -151,6 +153,51 @@ public class ProjectionMetrics
     }
 
     /// <summary>
+    /// Gets or sets the current queue depth (number of events waiting to be processed).
+    /// </summary>
+    /// <remarks>
+    /// This metric indicates how many events are currently buffered in the partition
+    /// worker's channel waiting to be processed. A consistently high queue depth
+    /// indicates backpressure - the projection is falling behind event ingestion.
+    /// 
+    /// Use this metric to:
+    /// - Detect processing bottlenecks
+    /// - Tune ChannelCapacity and MaxDegreeOfParallelism
+    /// - Alert on queue saturation (approaching ChannelCapacity)
+    /// - Identify when to scale up processing resources
+    /// 
+    /// A healthy system typically has low queue depth (0-10% of capacity).
+    /// High queue depth (>50% of capacity) warrants investigation.
+    /// </remarks>
+    public int QueueDepth
+    {
+        get { lock (_lock) return _queueDepth; }
+        set { lock (_lock) _queueDepth = value; }
+    }
+
+    /// <summary>
+    /// Gets or sets the total number of events dropped due to backpressure.
+    /// </summary>
+    /// <remarks>
+    /// This counter is incremented when events are dropped because the queue
+    /// reached capacity and the BackpressureStrategy is set to DropNewest or DropOldest.
+    /// 
+    /// A non-zero value indicates:
+    /// - Processing cannot keep pace with ingestion
+    /// - Data loss is occurring
+    /// - ChannelCapacity may need to be increased
+    /// - MaxDegreeOfParallelism may need to be tuned
+    /// - Consider switching to Block strategy if data loss is unacceptable
+    /// 
+    /// This metric is critical for monitoring data integrity in projections.
+    /// </remarks>
+    public int EventsDropped
+    {
+        get { lock (_lock) return _eventsDropped; }
+        set { lock (_lock) _eventsDropped = value; }
+    }
+
+    /// <summary>
     /// Gets the events processed per second based on total processing time.
     /// </summary>
     /// <remarks>
@@ -214,6 +261,17 @@ public class ProjectionMetrics
         {
             _currentPosition = currentPosition;
             _latestEventPosition = latestPosition;
+        }
+    }
+
+    /// <summary>
+    /// Atomically increments the events dropped counter.
+    /// </summary>
+    internal void IncrementEventsDropped()
+    {
+        lock (_lock)
+        {
+            _eventsDropped++;
         }
     }
 }

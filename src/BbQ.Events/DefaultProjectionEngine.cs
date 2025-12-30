@@ -306,6 +306,8 @@ internal class DefaultProjectionEngine : IProjectionEngine
             MaxDegreeOfParallelism = attribute?.MaxDegreeOfParallelism ?? 1,
             CheckpointBatchSize = attribute?.CheckpointBatchSize ?? 100,
             StartupMode = attribute?.StartupMode ?? ProjectionStartupMode.Resume,
+            ChannelCapacity = attribute?.ChannelCapacity ?? 1000,
+            BackpressureStrategy = attribute?.BackpressureStrategy ?? BackpressureStrategy.Block,
             // ErrorHandling is already initialized by property initializer to default values
         };
     }
@@ -344,12 +346,8 @@ internal class DefaultProjectionEngine : IProjectionEngine
                     return new SemaphoreSlim(maxCount, maxCount);
                 });
             
-            // Create channel for this partition
-            var channel = Channel.CreateUnbounded<WorkItem>(new UnboundedChannelOptions
-            {
-                SingleReader = true,
-                SingleWriter = false
-            });
+            // Create channel for this partition with backpressure control
+            var channel = CreateChannelWithBackpressure<WorkItem>(options);
             
             // Increment worker count for this projection
             // Note: Worker count only grows as new partitions are discovered
@@ -377,7 +375,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
             };
         });
         
-        // Enqueue event to worker channel
+        // Enqueue event to worker channel with backpressure handling
         var workItem = new WorkItem
         {
             HandlerServiceType = handlerServiceType,
@@ -386,7 +384,73 @@ internal class DefaultProjectionEngine : IProjectionEngine
             Cache = cache
         };
         
-        await worker.Channel.Writer.WriteAsync(workItem, ct);
+        await WriteToChannelWithBackpressureAsync(worker.Channel, workItem, options, partitionKey, ct);
+    }
+
+    /// <summary>
+    /// Creates a channel with the configured backpressure strategy.
+    /// </summary>
+    private Channel<T> CreateChannelWithBackpressure<T>(ProjectionOptions options)
+    {
+        return options.BackpressureStrategy switch
+        {
+            BackpressureStrategy.Block => Channel.CreateBounded<T>(new BoundedChannelOptions(options.ChannelCapacity)
+            {
+                FullMode = BoundedChannelFullMode.Wait,
+                SingleReader = true,
+                SingleWriter = false
+            }),
+            BackpressureStrategy.DropNewest => Channel.CreateBounded<T>(new BoundedChannelOptions(options.ChannelCapacity)
+            {
+                FullMode = BoundedChannelFullMode.DropWrite,
+                SingleReader = true,
+                SingleWriter = false
+            }),
+            BackpressureStrategy.DropOldest => Channel.CreateBounded<T>(new BoundedChannelOptions(options.ChannelCapacity)
+            {
+                FullMode = BoundedChannelFullMode.DropOldest,
+                SingleReader = true,
+                SingleWriter = false
+            }),
+            _ => throw new InvalidOperationException($"Unknown backpressure strategy: {options.BackpressureStrategy}")
+        };
+    }
+
+    /// <summary>
+    /// Writes to a channel with backpressure handling and monitoring.
+    /// </summary>
+    private async Task WriteToChannelWithBackpressureAsync<T>(
+        Channel<T> channel,
+        T item,
+        ProjectionOptions options,
+        string partitionKey,
+        CancellationToken ct)
+    {
+        // Use different write strategies based on backpressure mode
+        if (options.BackpressureStrategy == BackpressureStrategy.Block)
+        {
+            // Block mode: use WriteAsync which waits for space
+            await channel.Writer.WriteAsync(item, ct);
+        }
+        else
+        {
+            // Drop modes: use TryWrite which drops immediately if full
+            if (!channel.Writer.TryWrite(item))
+            {
+                _logger.LogWarning(
+                    "Event dropped for projection {ProjectionName}:{PartitionKey} due to backpressure (strategy: {Strategy}, capacity: {Capacity})",
+                    options.ProjectionName,
+                    partitionKey,
+                    options.BackpressureStrategy,
+                    options.ChannelCapacity);
+                
+                _monitor?.RecordEventDropped(options.ProjectionName, partitionKey);
+            }
+        }
+        
+        // Record queue depth for monitoring
+        var queueDepth = channel.Reader.Count;
+        _monitor?.RecordQueueDepth(options.ProjectionName, partitionKey, queueDepth);
     }
 
     /// <summary>
@@ -485,6 +549,10 @@ internal class DefaultProjectionEngine : IProjectionEngine
                     
                     // Record event processed for monitoring
                     _monitor?.RecordEventProcessed(options.ProjectionName, partitionKey, currentPosition);
+                    
+                    // Record current queue depth for monitoring
+                    var queueDepth = channel.Reader.Count;
+                    _monitor?.RecordQueueDepth(options.ProjectionName, partitionKey, queueDepth);
                     
                     // Persist checkpoint after batch size reached
                     if (eventsProcessedSinceCheckpoint >= options.CheckpointBatchSize)

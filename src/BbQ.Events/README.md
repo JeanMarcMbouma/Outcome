@@ -9,7 +9,8 @@ Event-driven architecture support with strongly-typed pub/sub and projections fo
 - **Event subscribers** (`IEventSubscriber<TEvent>`) for consuming event streams
 - **Projection support** for building read models and materialized views
 - **Partitioned projections** for parallel event processing
-- **Projection monitoring** via `IProjectionMonitor` for observability (events/sec, lag, worker count, checkpoints)
+- **Backpressure & flow control** - bounded channels with configurable strategies (Block, DropNewest, DropOldest)
+- **Projection monitoring** via `IProjectionMonitor` for observability (events/sec, lag, worker count, checkpoints, queue depth)
 - **Projection replay API** via `IProjectionRebuilder` for resetting and rebuilding projections
 - **In-memory event bus** for single-process applications
 - **Thread-safe** implementation using `System.Threading.Channels`
@@ -236,6 +237,85 @@ All error handling strategies provide structured logging with event details:
 //            Manual intervention required.
 ```
 
+### Backpressure & Flow Control (NEW)
+
+Prevent unbounded memory growth when event ingestion outpaces projection processing:
+
+```csharp
+services.AddProjection<UserProfileProjection>(options =>
+{
+    // Configure channel capacity (default: 1000)
+    options.ChannelCapacity = 500;
+    
+    // Configure backpressure strategy (default: Block)
+    options.BackpressureStrategy = BackpressureStrategy.Block;
+});
+```
+
+**Available Strategies:**
+
+1. **Block** (Default) - Applies backpressure to event publishers
+   - Most reliable: no events are dropped
+   - May slow down event ingestion when queue reaches capacity
+   - Best for critical projections where data loss is unacceptable
+
+2. **DropNewest** - Drops incoming events when queue is full
+   - Preserves older events in the queue
+   - Useful for debugging scenarios
+   - ⚠️ **Recommended for debugging only** - may cause data loss
+
+3. **DropOldest** - Drops oldest queued events when full
+   - Always processes most recent events
+   - Good for real-time dashboards and monitoring
+   - ⚠️ **May skip important state transitions**
+
+**Examples:**
+
+```csharp
+// Critical projection - block on backpressure
+services.AddProjection<FinancialProjection>(options =>
+{
+    options.ChannelCapacity = 100;
+    options.BackpressureStrategy = BackpressureStrategy.Block;
+});
+
+// Real-time dashboard - prefer recent events
+services.AddProjection<DashboardProjection>(options =>
+{
+    options.ChannelCapacity = 50;
+    options.BackpressureStrategy = BackpressureStrategy.DropOldest;
+});
+
+// High-throughput projection - large buffer
+services.AddProjection<AnalyticsProjection>(options =>
+{
+    options.ChannelCapacity = 5000;
+    options.BackpressureStrategy = BackpressureStrategy.Block;
+});
+```
+
+**Monitoring Queue Depth:**
+
+The projection monitor tracks queue depth and dropped events:
+
+```csharp
+var monitor = serviceProvider.GetRequiredService<IProjectionMonitor>();
+var metrics = monitor.GetMetrics("UserProjection", "_default");
+
+Console.WriteLine($"Queue Depth: {metrics.QueueDepth}");
+Console.WriteLine($"Events Dropped: {metrics.EventsDropped}");
+Console.WriteLine($"Events Processed: {metrics.EventsProcessed}");
+```
+
+**Best Practices:**
+
+- Start with default settings (1000 capacity, Block strategy)
+- Monitor queue depth metrics to detect backpressure
+- Tune `ChannelCapacity` based on ingestion rate and processing speed
+- Use `MaxDegreeOfParallelism` to increase throughput for partitioned projections
+- Consider Block strategy for critical projections
+- Use Drop strategies only when data loss is acceptable
+
 **Note:** The default projection engine processes events sequentially. Implement a custom IProjectionEngine to leverage partition keys for parallel processing.
 
 📖 **See [PROJECTION_SAMPLE.md](PROJECTION_SAMPLE.md) for complete examples and best practices.**
@@ -301,6 +381,8 @@ The projection monitoring system tracks:
 - **Per-partition lag** - how far behind the projection is
 - **Active worker count** - number of concurrent workers
 - **Checkpoint frequency** - how often checkpoints are written
+- **Queue depth** - number of events waiting to be processed (NEW)
+- **Events dropped** - total events dropped due to backpressure (NEW)
 
 Example usage:
 ```csharp
@@ -317,6 +399,8 @@ if (metrics != null)
     Console.WriteLine($"Throughput: {metrics.EventsPerSecond:F2} events/sec");
     Console.WriteLine($"Workers: {metrics.WorkerCount}");
     Console.WriteLine($"Checkpoints written: {metrics.CheckpointsWritten}");
+    Console.WriteLine($"Queue depth: {metrics.QueueDepth}");
+    Console.WriteLine($"Events dropped: {metrics.EventsDropped}");
 }
 ```
 
