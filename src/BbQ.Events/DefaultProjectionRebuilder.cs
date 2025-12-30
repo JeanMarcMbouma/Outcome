@@ -65,11 +65,15 @@ internal class DefaultProjectionRebuilder : IProjectionRebuilder
         // Reset the main projection checkpoint (for non-partitioned projections)
         await _checkpointStore.ResetCheckpointAsync(projectionName, ct);
 
-        // Note: For partitioned projections, this resets the default partition.
-        // Individual partitions are tracked with keys like "ProjectionName:PartitionKey"
-        // and are created dynamically. We cannot enumerate all partitions without
-        // additional infrastructure, so we only reset the main checkpoint here.
-        // Partitions can be reset individually using ResetPartitionAsync if needed.
+        // Note: For partitioned projections, this resets the main checkpoint only.
+        // Individual partition checkpoints are tracked with keys like "ProjectionName:PartitionKey"
+        // and are created dynamically as events are processed. We cannot enumerate all
+        // partitions without additional infrastructure (e.g., a partition registry or database query).
+        // 
+        // To reset individual partitions, callers should use ResetPartitionAsync with known
+        // partition keys. This design provides flexibility - you can reset the main checkpoint
+        // while preserving partition checkpoints if desired, or reset both by calling
+        // ResetPartitionAsync for each partition separately.
 
         _logger.LogInformation("Successfully reset projection: {ProjectionName}", projectionName);
     }
