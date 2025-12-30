@@ -31,6 +31,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
     private readonly IServiceProvider _serviceProvider;
     private readonly IEventBus _eventBus;
     private readonly IProjectionCheckpointStore _checkpointStore;
+    private readonly IProjectionMonitor? _monitor;
     private readonly ILogger<DefaultProjectionEngine> _logger;
     
     // Cache reflection calls for performance
@@ -46,11 +47,13 @@ internal class DefaultProjectionEngine : IProjectionEngine
         IServiceProvider serviceProvider,
         IEventBus eventBus,
         IProjectionCheckpointStore checkpointStore,
-        ILogger<DefaultProjectionEngine> logger)
+        ILogger<DefaultProjectionEngine> logger,
+        IProjectionMonitor? monitor)
     {
         _serviceProvider = serviceProvider;
         _eventBus = eventBus;
         _checkpointStore = checkpointStore;
+        _monitor = monitor;
         _logger = logger;
     }
 
@@ -344,6 +347,10 @@ internal class DefaultProjectionEngine : IProjectionEngine
                 SingleWriter = false
             });
             
+            // Update worker count for monitoring
+            var currentWorkerCount = _partitionWorkers.Count(w => w.Key.StartsWith(options.ProjectionName + ":"));
+            _monitor?.RecordWorkerCount(options.ProjectionName, currentWorkerCount + 1);
+            
             // Start worker task with CancellationToken.None - shutdown via channel completion
             var task = Task.Run(
                 async () => await ProcessPartitionAsync(
@@ -452,10 +459,16 @@ internal class DefaultProjectionEngine : IProjectionEngine
                     currentPosition++;
                     eventsProcessedSinceCheckpoint++;
                     
+                    // Record event processed for monitoring
+                    _monitor?.RecordEventProcessed(options.ProjectionName, partitionKey, currentPosition);
+                    
                     // Persist checkpoint after batch size reached
                     if (eventsProcessedSinceCheckpoint >= options.CheckpointBatchSize)
                     {
                         await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, ct);
+                        
+                        // Record checkpoint written for monitoring
+                        _monitor?.RecordCheckpointWritten(options.ProjectionName, partitionKey, currentPosition);
                         
                         _logger.LogDebug(
                             "Checkpoint saved for {ProjectionName}:{PartitionKey} at position {Position}",
@@ -488,6 +501,9 @@ internal class DefaultProjectionEngine : IProjectionEngine
                 try
                 {
                     await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, ct);
+                    
+                    // Record final checkpoint written for monitoring
+                    _monitor?.RecordCheckpointWritten(options.ProjectionName, partitionKey, currentPosition);
                     
                     _logger.LogInformation(
                         "Final checkpoint saved for {ProjectionName}:{PartitionKey} at position {Position}",
