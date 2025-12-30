@@ -389,7 +389,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
         {
             // Determine starting position based on startup mode
             long? checkpoint = null;
-            string startupModeDescription = options.StartupMode.ToString();
+            string startupModeDescription;
             
             switch (options.StartupMode)
             {

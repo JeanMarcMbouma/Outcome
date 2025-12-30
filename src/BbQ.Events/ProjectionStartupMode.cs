@@ -38,25 +38,34 @@ public enum ProjectionStartupMode
 
     /// <summary>
     /// Fast-forward to near-real-time, then switch to live processing.
-    /// The projection will skip to a recent position in the event stream
-    /// (near the current time) and then process events normally.
-    /// This is useful for new projections that don't need full historical data.
     /// 
-    /// Note: In a live-only event bus context (like InMemoryEventBus), this
-    /// behaves identically to LiveOnly since there are no historical events
-    /// to skip. The distinction is more relevant with persistent event stores.
+    /// CURRENT BEHAVIOR: In the default implementation, this mode starts from the 
+    /// beginning of the event stream (same as Replay) because determining "near-real-time" 
+    /// position requires event store query capabilities not yet implemented.
+    /// 
+    /// INTENDED BEHAVIOR: The projection should skip to a recent position in the 
+    /// event stream (near the current time) and then process events normally.
+    /// This will be useful for new projections that don't need full historical data.
+    /// 
+    /// Note: The distinction from LiveOnly is more relevant with persistent event 
+    /// stores where historical events exist.
     /// </summary>
     CatchUp = 2,
 
     /// <summary>
     /// Process only new events, ignoring historical events.
-    /// The projection will start from the current position in the event stream,
-    /// ignoring all historical events that occurred before startup.
-    /// This is useful for projections that only need to track future activity.
     /// 
-    /// Note: In a live-only event bus context (like InMemoryEventBus), this
-    /// behaves identically to CatchUp since there are no historical events
-    /// to skip. The distinction is more relevant with persistent event stores.
+    /// CURRENT BEHAVIOR: In the default implementation with InMemoryEventBus (which 
+    /// doesn't persist historical events), this starts processing from the first event 
+    /// received after startup, effectively achieving "live-only" behavior. With a 
+    /// persistent event store, this mode currently starts from the beginning like Replay.
+    /// 
+    /// INTENDED BEHAVIOR: The projection should start from the current position in the 
+    /// event stream, ignoring all historical events that occurred before startup.
+    /// This will be useful for projections that only need to track future activity.
+    /// 
+    /// Note: Full implementation requires event source support for determining and 
+    /// starting from "current position" in persistent event stores.
     /// </summary>
     LiveOnly = 3
 }
