@@ -71,6 +71,58 @@ public class ProjectionErrorHandlingOptions
     /// Options:
     /// - Skip: Continue processing after logging the failure
     /// - Stop: Stop the projection worker for manual intervention
+    /// 
+    /// Note: FallbackStrategy cannot be set to Retry as that would create an infinite loop.
     /// </remarks>
     public ProjectionErrorHandlingStrategy FallbackStrategy { get; set; } = ProjectionErrorHandlingStrategy.Skip;
+    
+    /// <summary>
+    /// Validates the current configuration values to ensure they are within sensible ranges.
+    /// </summary>
+    /// <exception cref="System.ArgumentOutOfRangeException">
+    /// Thrown when any of <see cref="MaxRetryAttempts"/>, <see cref="InitialRetryDelayMs"/>,
+    /// or <see cref="MaxRetryDelayMs"/> is less than or equal to zero.
+    /// </exception>
+    /// <exception cref="System.InvalidOperationException">
+    /// Thrown when <see cref="InitialRetryDelayMs"/> is greater than <see cref="MaxRetryDelayMs"/>,
+    /// or when <see cref="FallbackStrategy"/> is set to Retry.
+    /// </exception>
+    public void Validate()
+    {
+        if (MaxRetryAttempts <= 0)
+        {
+            throw new System.ArgumentOutOfRangeException(
+                nameof(MaxRetryAttempts),
+                MaxRetryAttempts,
+                "MaxRetryAttempts must be greater than zero.");
+        }
+
+        if (InitialRetryDelayMs <= 0)
+        {
+            throw new System.ArgumentOutOfRangeException(
+                nameof(InitialRetryDelayMs),
+                InitialRetryDelayMs,
+                "InitialRetryDelayMs must be greater than zero.");
+        }
+
+        if (MaxRetryDelayMs <= 0)
+        {
+            throw new System.ArgumentOutOfRangeException(
+                nameof(MaxRetryDelayMs),
+                MaxRetryDelayMs,
+                "MaxRetryDelayMs must be greater than zero.");
+        }
+
+        if (InitialRetryDelayMs > MaxRetryDelayMs)
+        {
+            throw new System.InvalidOperationException(
+                "InitialRetryDelayMs cannot be greater than MaxRetryDelayMs.");
+        }
+
+        if (FallbackStrategy == ProjectionErrorHandlingStrategy.Retry)
+        {
+            throw new System.InvalidOperationException(
+                "FallbackStrategy cannot be set to Retry. Use Skip or Stop instead.");
+        }
+    }
 }

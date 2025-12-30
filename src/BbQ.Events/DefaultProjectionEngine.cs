@@ -566,6 +566,9 @@ internal class DefaultProjectionEngine : IProjectionEngine
     {
         var errorHandling = options.ErrorHandling;
         
+        // Validate configuration before use
+        errorHandling.Validate();
+        
         // If strategy is not Retry, process once
         if (errorHandling.Strategy != ProjectionErrorHandlingStrategy.Retry)
         {
@@ -583,7 +586,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
                     partitionKey,
                     currentPosition,
                     errorHandling.Strategy,
-                    0);
+                    1);
             }
         }
         
@@ -591,7 +594,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
         var attempt = 0;
         var delay = errorHandling.InitialRetryDelayMs;
         
-        while (attempt <= errorHandling.MaxRetryAttempts)
+        while (attempt < errorHandling.MaxRetryAttempts)
         {
             try
             {
@@ -615,7 +618,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
                 attempt++;
                 
                 // If we've exhausted retries, use fallback strategy
-                if (attempt > errorHandling.MaxRetryAttempts)
+                if (attempt >= errorHandling.MaxRetryAttempts)
                 {
                     _logger.LogError(
                         ex,
@@ -648,7 +651,15 @@ internal class DefaultProjectionEngine : IProjectionEngine
                     delay);
                 
                 // Wait before retrying
-                await Task.Delay(delay, ct);
+                try
+                {
+                    await Task.Delay(delay, ct);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Propagate cancellation instead of treating it as a retryable error
+                    throw;
+                }
                 
                 // Calculate next delay with exponential backoff
                 delay = Math.Min(delay * 2, errorHandling.MaxRetryDelayMs);
