@@ -30,7 +30,7 @@ namespace BbQ.Events;
 public class InMemoryProjectionMonitor : IProjectionMonitor
 {
     private readonly ConcurrentDictionary<string, ProjectionMetrics> _metrics = new();
-    private readonly ConcurrentDictionary<string, List<string>> _partitionsByProjection = new();
+    private readonly ConcurrentDictionary<string, ConcurrentBag<string>> _partitionsByProjection = new();
 
     /// <summary>
     /// Records that an event was successfully processed.
@@ -41,10 +41,8 @@ public class InMemoryProjectionMonitor : IProjectionMonitor
         var metrics = _metrics.GetOrAdd(key, _ =>
         {
             // Track partition for this projection
-            _partitionsByProjection.AddOrUpdate(
-                projectionName,
-                new List<string> { key },
-                (_, list) => { lock (list) { if (!list.Contains(key)) list.Add(key); } return list; });
+            var bag = _partitionsByProjection.GetOrAdd(projectionName, _ => new ConcurrentBag<string>());
+            bag.Add(key);
             
             return new ProjectionMetrics
             {

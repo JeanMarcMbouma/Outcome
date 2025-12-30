@@ -90,7 +90,9 @@ public class ProjectionMetrics
     /// </summary>
     /// <remarks>
     /// For partitioned projections with MaxDegreeOfParallelism > 1, this represents
-    /// the number of concurrent workers processing different partitions.
+    /// the number of concurrent partition workers processing different partitions.
+    /// Worker count grows as new partitions are discovered and remains constant
+    /// until the projection engine shuts down, as partition workers are long-lived.
     /// </remarks>
     public int WorkerCount { get; set; }
 

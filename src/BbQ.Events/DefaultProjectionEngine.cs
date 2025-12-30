@@ -351,6 +351,8 @@ internal class DefaultProjectionEngine : IProjectionEngine
             });
             
             // Increment worker count for this projection
+            // Note: Worker count only grows as new partitions are discovered
+            // since partition workers are long-lived and persist until engine shutdown
             var currentWorkerCount = _workerCountByProjection.AddOrUpdate(
                 options.ProjectionName,
                 1,
