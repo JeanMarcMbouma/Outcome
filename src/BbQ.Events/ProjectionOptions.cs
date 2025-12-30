@@ -69,4 +69,19 @@ public class ProjectionOptions
     /// Changing it after startup requires restarting the engine.
     /// </remarks>
     public ProjectionStartupMode StartupMode { get; set; } = ProjectionStartupMode.Resume;
+
+    /// <summary>
+    /// Configuration for error handling during event processing.
+    /// </summary>
+    /// <remarks>
+    /// Default: Retry with 3 attempts, exponential backoff, fallback to Skip
+    /// 
+    /// Controls how the projection responds to processing failures:
+    /// - Retry: Retries with exponential backoff for transient failures
+    /// - Skip: Logs and continues, marking event as processed
+    /// - Stop: Halts projection worker for manual intervention
+    /// 
+    /// Configure per-projection based on business requirements and failure tolerance.
+    /// </remarks>
+    public ProjectionErrorHandlingOptions ErrorHandling { get; set; } = new ProjectionErrorHandlingOptions();
 }

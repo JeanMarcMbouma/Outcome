@@ -460,8 +460,23 @@ internal class DefaultProjectionEngine : IProjectionEngine
                 
                 try
                 {
-                    // Process the event
-                    await ProcessWorkItemAsync(workItem, ct);
+                    // Process the event with error handling
+                    var shouldContinue = await ProcessWorkItemWithErrorHandlingAsync(
+                        workItem, 
+                        options, 
+                        partitionKey, 
+                        currentPosition,
+                        ct);
+                    
+                    // If error handling strategy is Stop and processing failed, exit worker
+                    if (!shouldContinue)
+                    {
+                        _logger.LogWarning(
+                            "Stopping projection worker for {ProjectionName}:{PartitionKey} due to error handling policy",
+                            options.ProjectionName,
+                            partitionKey);
+                        return;
+                    }
                     
                     // Track position and checkpoint ONLY after successful processing
                     currentPosition++;
@@ -486,15 +501,6 @@ internal class DefaultProjectionEngine : IProjectionEngine
                         
                         eventsProcessedSinceCheckpoint = 0;
                     }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(
-                        ex,
-                        "Error processing event in partition {ProjectionName}:{PartitionKey}. Event will not be checkpointed.",
-                        options.ProjectionName,
-                        partitionKey);
-                    // Do NOT increment position on failure - event should be retried on restart
                 }
                 finally
                 {
@@ -543,6 +549,181 @@ internal class DefaultProjectionEngine : IProjectionEngine
                 options.ProjectionName,
                 partitionKey);
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Processes a work item with error handling according to the projection's error handling strategy.
+    /// </summary>
+    /// <returns>True if processing should continue, False if the worker should stop.</returns>
+    private async Task<bool> ProcessWorkItemWithErrorHandlingAsync(
+        WorkItem workItem,
+        ProjectionOptions options,
+        string partitionKey,
+        long currentPosition,
+        CancellationToken ct)
+    {
+        var errorHandling = options.ErrorHandling;
+        
+        // If strategy is not Retry, process once
+        if (errorHandling.Strategy != ProjectionErrorHandlingStrategy.Retry)
+        {
+            try
+            {
+                await ProcessWorkItemAsync(workItem, ct);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                return await HandleProcessingErrorAsync(
+                    ex,
+                    workItem,
+                    options,
+                    partitionKey,
+                    currentPosition,
+                    errorHandling.Strategy,
+                    0);
+            }
+        }
+        
+        // Retry strategy - attempt processing with exponential backoff
+        var attempt = 0;
+        var delay = errorHandling.InitialRetryDelayMs;
+        
+        while (attempt <= errorHandling.MaxRetryAttempts)
+        {
+            try
+            {
+                await ProcessWorkItemAsync(workItem, ct);
+                
+                // Success - log retry success if this wasn't the first attempt
+                if (attempt > 0)
+                {
+                    _logger.LogInformation(
+                        "Successfully processed event for {ProjectionName}:{PartitionKey} at position {Position} after {Attempts} retry attempt(s)",
+                        options.ProjectionName,
+                        partitionKey,
+                        currentPosition,
+                        attempt);
+                }
+                
+                return true;
+            }
+            catch (Exception ex)
+            {
+                attempt++;
+                
+                // If we've exhausted retries, use fallback strategy
+                if (attempt > errorHandling.MaxRetryAttempts)
+                {
+                    _logger.LogError(
+                        ex,
+                        "Failed to process event for {ProjectionName}:{PartitionKey} at position {Position} after {MaxAttempts} attempts. Using fallback strategy: {FallbackStrategy}",
+                        options.ProjectionName,
+                        partitionKey,
+                        currentPosition,
+                        errorHandling.MaxRetryAttempts,
+                        errorHandling.FallbackStrategy);
+                    
+                    return await HandleProcessingErrorAsync(
+                        ex,
+                        workItem,
+                        options,
+                        partitionKey,
+                        currentPosition,
+                        errorHandling.FallbackStrategy,
+                        attempt);
+                }
+                
+                // Log retry attempt with structured data
+                _logger.LogWarning(
+                    ex,
+                    "Error processing event for {ProjectionName}:{PartitionKey} at position {Position}. Attempt {Attempt} of {MaxAttempts}. Retrying in {DelayMs}ms",
+                    options.ProjectionName,
+                    partitionKey,
+                    currentPosition,
+                    attempt,
+                    errorHandling.MaxRetryAttempts,
+                    delay);
+                
+                // Wait before retrying
+                await Task.Delay(delay, ct);
+                
+                // Calculate next delay with exponential backoff
+                delay = Math.Min(delay * 2, errorHandling.MaxRetryDelayMs);
+            }
+        }
+        
+        // Should never reach here, but return false to be safe
+        return false;
+    }
+
+    /// <summary>
+    /// Handles a processing error according to the specified strategy.
+    /// </summary>
+    /// <returns>True if processing should continue, False if the worker should stop.</returns>
+    private async Task<bool> HandleProcessingErrorAsync(
+        Exception ex,
+        WorkItem workItem,
+        ProjectionOptions options,
+        string partitionKey,
+        long currentPosition,
+        ProjectionErrorHandlingStrategy strategy,
+        int totalAttempts)
+    {
+        switch (strategy)
+        {
+            case ProjectionErrorHandlingStrategy.Skip:
+                // Log structured error and continue
+                _logger.LogError(
+                    ex,
+                    "Skipping failed event for {ProjectionName}:{PartitionKey} at position {Position} after {TotalAttempts} attempt(s). " +
+                    "Event type: {EventType}, Handler: {HandlerType}. Error: {ErrorMessage}",
+                    options.ProjectionName,
+                    partitionKey,
+                    currentPosition,
+                    totalAttempts,
+                    workItem.EventType.Name,
+                    workItem.HandlerServiceType.Name,
+                    ex.Message);
+                
+                return true; // Continue processing
+                
+            case ProjectionErrorHandlingStrategy.Stop:
+                // Log structured error and stop
+                _logger.LogCritical(
+                    ex,
+                    "Stopping projection worker for {ProjectionName}:{PartitionKey} at position {Position} after {TotalAttempts} attempt(s). " +
+                    "Event type: {EventType}, Handler: {HandlerType}. Error: {ErrorMessage}",
+                    options.ProjectionName,
+                    partitionKey,
+                    currentPosition,
+                    totalAttempts,
+                    workItem.EventType.Name,
+                    workItem.HandlerServiceType.Name,
+                    ex.Message);
+                
+                return false; // Stop worker
+                
+            case ProjectionErrorHandlingStrategy.Retry:
+                // This should not happen as Retry is handled in the calling method
+                _logger.LogError(
+                    ex,
+                    "Unexpected Retry strategy in error handler for {ProjectionName}:{PartitionKey} at position {Position}",
+                    options.ProjectionName,
+                    partitionKey,
+                    currentPosition);
+                return false;
+                
+            default:
+                _logger.LogError(
+                    ex,
+                    "Unknown error handling strategy {Strategy} for {ProjectionName}:{PartitionKey} at position {Position}. Stopping worker.",
+                    strategy,
+                    options.ProjectionName,
+                    partitionKey,
+                    currentPosition);
+                return false;
         }
     }
 
