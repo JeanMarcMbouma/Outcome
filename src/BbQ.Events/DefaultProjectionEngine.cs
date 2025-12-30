@@ -298,7 +298,8 @@ internal class DefaultProjectionEngine : IProjectionEngine
         {
             ProjectionName = concreteType.Name,
             MaxDegreeOfParallelism = attribute?.MaxDegreeOfParallelism ?? 1,
-            CheckpointBatchSize = attribute?.CheckpointBatchSize ?? 100
+            CheckpointBatchSize = attribute?.CheckpointBatchSize ?? 100,
+            StartupMode = attribute?.StartupMode ?? ProjectionStartupMode.Resume
         };
     }
 
@@ -386,16 +387,50 @@ internal class DefaultProjectionEngine : IProjectionEngine
         
         try
         {
-            // Load checkpoint on startup
-            var checkpoint = await _checkpointStore.GetCheckpointAsync(checkpointKey, ct);
+            // Determine starting position based on startup mode
+            long? checkpoint = null;
+            string startupModeDescription = options.StartupMode.ToString();
+            
+            switch (options.StartupMode)
+            {
+                case ProjectionStartupMode.Resume:
+                    // Load checkpoint and resume from last position
+                    checkpoint = await _checkpointStore.GetCheckpointAsync(checkpointKey, ct);
+                    startupModeDescription = checkpoint.HasValue 
+                        ? $"Resume from checkpoint {checkpoint.Value}" 
+                        : "Resume from beginning";
+                    break;
+                    
+                case ProjectionStartupMode.Replay:
+                    // Ignore checkpoint and rebuild from scratch
+                    checkpoint = null;
+                    startupModeDescription = "Replay from beginning";
+                    // Optionally reset the checkpoint in storage for clarity
+                    await _checkpointStore.ResetCheckpointAsync(checkpointKey, ct);
+                    break;
+                    
+                case ProjectionStartupMode.CatchUp:
+                case ProjectionStartupMode.LiveOnly:
+                    // Start from current position (skip historical events)
+                    // In a live event stream, this means starting fresh without loading checkpoint
+                    checkpoint = null;
+                    startupModeDescription = options.StartupMode == ProjectionStartupMode.CatchUp 
+                        ? "CatchUp - starting near-real-time" 
+                        : "LiveOnly - processing new events only";
+                    break;
+                    
+                default:
+                    throw new InvalidOperationException($"Unknown startup mode: {options.StartupMode}");
+            }
+            
             var eventsProcessedSinceCheckpoint = 0;
             var currentPosition = checkpoint ?? 0;
             
             _logger.LogInformation(
-                "Partition worker started for {ProjectionName}:{PartitionKey}, resuming from checkpoint {Checkpoint}",
+                "Partition worker started for {ProjectionName}:{PartitionKey} in {StartupMode} mode",
                 options.ProjectionName,
                 partitionKey,
-                checkpoint?.ToString() ?? "beginning");
+                startupModeDescription);
             
             await foreach (var workItem in channel.Reader.ReadAllAsync(ct))
             {

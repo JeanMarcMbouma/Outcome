@@ -9,7 +9,7 @@ namespace BbQ.Events;
 /// - Enables automatic discovery of projection handlers
 /// - Works with source generators to generate registration code
 /// - Requires the class to implement at least one IProjectionHandler&lt;TEvent&gt; or IPartitionedProjectionHandler&lt;TEvent&gt;
-/// - Optionally configures projection behavior via MaxDegreeOfParallelism and CheckpointBatchSize
+/// - Optionally configures projection behavior via MaxDegreeOfParallelism, CheckpointBatchSize, and StartupMode
 /// 
 /// **IMPORTANT:** When manually registering projections (not using source generators), prefer configuring 
 /// options via the AddProjection overload that accepts a configuration lambda instead of using this attribute:
@@ -20,6 +20,7 @@ namespace BbQ.Events;
 /// {
 ///     options.MaxDegreeOfParallelism = 4;
 ///     options.CheckpointBatchSize = 50;
+///     options.StartupMode = ProjectionStartupMode.Replay;
 /// });
 /// 
 /// // Using attribute is fine when projections are discovered by source generators
@@ -35,7 +36,7 @@ namespace BbQ.Events;
 ///     // Implementation...
 /// }
 /// 
-/// [Projection(MaxDegreeOfParallelism = 4, CheckpointBatchSize = 50)]
+/// [Projection(MaxDegreeOfParallelism = 4, CheckpointBatchSize = 50, StartupMode = ProjectionStartupMode.LiveOnly)]
 /// public class UserStatisticsProjection : IPartitionedProjectionHandler&lt;UserActivity&gt;
 /// {
 ///     // Implementation...
@@ -61,4 +62,10 @@ public sealed class ProjectionAttribute : Attribute
     /// Default: 100
     /// </summary>
     public int CheckpointBatchSize { get; set; } = 100;
+
+    /// <summary>
+    /// Defines how the projection should start processing events.
+    /// Default: ProjectionStartupMode.Resume
+    /// </summary>
+    public ProjectionStartupMode StartupMode { get; set; } = ProjectionStartupMode.Resume;
 }

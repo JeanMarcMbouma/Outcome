@@ -52,4 +52,21 @@ public class ProjectionOptions
     /// This is set automatically by the engine based on the projection handler type name.
     /// </remarks>
     public string ProjectionName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Defines how the projection should start processing events.
+    /// </summary>
+    /// <remarks>
+    /// Default: ProjectionStartupMode.Resume
+    /// 
+    /// Startup modes:
+    /// - Resume: Continue from the last checkpoint (default)
+    /// - Replay: Rebuild from the beginning, ignoring checkpoints
+    /// - CatchUp: Fast-forward to near-real-time, then switch to live
+    /// - LiveOnly: Process only new events, ignoring historical events
+    /// 
+    /// This setting is evaluated when the projection engine starts up.
+    /// Changing it after startup requires restarting the engine.
+    /// </remarks>
+    public ProjectionStartupMode StartupMode { get; set; } = ProjectionStartupMode.Resume;
 }
