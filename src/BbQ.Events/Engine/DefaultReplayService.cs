@@ -70,21 +70,27 @@ internal class DefaultReplayService : IReplayService
             options.CheckpointMode);
 
         // Verify projection exists
-        var registeredProjections = ProjectionHandlerRegistry.GetEventTypes()
-            .SelectMany(eventType => ProjectionHandlerRegistry.GetHandlers(eventType))
-            .Select(handlerType => ProjectionHandlerRegistry.GetHandlerRegistration(
-                ProjectionHandlerRegistry.GetEventTypes().First(et =>
-                    ProjectionHandlerRegistry.GetHandlers(et).Contains(handlerType)), handlerType))
-            .Where(reg => reg != null)
-            .Select(reg => reg!.ConcreteType.Name)
-            .Distinct()
-            .ToList();
+        var eventTypes = ProjectionHandlerRegistry.GetEventTypes().ToList();
+        var registeredProjections = new HashSet<string>();
+
+        foreach (var eventType in eventTypes)
+        {
+            var handlers = ProjectionHandlerRegistry.GetHandlers(eventType);
+            foreach (var handlerType in handlers)
+            {
+                var registration = ProjectionHandlerRegistry.GetHandlerRegistration(eventType, handlerType);
+                if (registration != null)
+                {
+                    registeredProjections.Add(registration.ConcreteType.Name);
+                }
+            }
+        }
 
         if (!registeredProjections.Contains(projectionName))
         {
             throw new InvalidOperationException(
                 $"Projection '{projectionName}' is not registered. " +
-                $"Registered projections: {string.Join(", ", registeredProjections)}");
+                $"Registered projections: {string.Join(", ", registeredProjections.OrderBy(p => p))}");
         }
 
         // Build checkpoint key (includes partition if specified)
