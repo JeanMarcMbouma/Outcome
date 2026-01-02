@@ -161,6 +161,7 @@ public static class ServiceCollectionExtensions
         /// 2. IProjectionMonitor as a singleton (in-memory implementation)
         /// 3. IProjectionEngine as a singleton
         /// 4. IProjectionRebuilder as a singleton
+        /// 5. IReplayService as a singleton
         /// 
         /// The projection engine must be run manually or as a hosted service:
         /// <code>
@@ -187,6 +188,9 @@ public static class ServiceCollectionExtensions
             
             // Register the projection rebuilder
             services.TryAddSingleton<IProjectionRebuilder, DefaultProjectionRebuilder>();
+            
+            // Register the replay service
+            services.TryAddSingleton<IReplayService, DefaultReplayService>();
             
             return services;
         }
