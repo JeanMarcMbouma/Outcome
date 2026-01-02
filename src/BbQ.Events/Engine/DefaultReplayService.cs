@@ -352,8 +352,8 @@ internal class DefaultReplayService : IReplayService
                         var getPartitionKeyMethod = partitionedInterface.GetMethod("GetPartitionKey");
                         if (getPartitionKeyMethod != null)
                         {
-                            var partitionKey = getPartitionKeyMethod.Invoke(handler, new[] { (object)@event }) as string;
-                            if (partitionKey != options.Partition)
+                            var partitionKeyResult = getPartitionKeyMethod.Invoke(handler, new[] { (object)@event });
+                            if (partitionKeyResult is string partitionKey && partitionKey != options.Partition)
                             {
                                 shouldSkipEvent = true;
                                 break;
@@ -380,8 +380,11 @@ internal class DefaultReplayService : IReplayService
                     var projectMethod = handlerType.GetMethod("ProjectAsync");
                     if (projectMethod != null)
                     {
-                        var projectTask = (ValueTask)projectMethod.Invoke(handler, new object[] { @event!, cancellationToken })!;
-                        await projectTask;
+                        var result = projectMethod.Invoke(handler, new object[] { @event!, cancellationToken });
+                        if (result is ValueTask projectTask)
+                        {
+                            await projectTask;
+                        }
                     }
                 }
                 catch (Exception ex)
