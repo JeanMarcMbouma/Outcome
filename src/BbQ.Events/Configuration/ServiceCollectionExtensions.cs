@@ -1,8 +1,11 @@
-using BbQ.Events;
+using BbQ.Events.Checkpointing;
+using BbQ.Events.Engine;
+using BbQ.Events.Events;
+using BbQ.Events.Projections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace BbQ.Events.DependencyInjection;
+namespace BbQ.Events.Configuration;
 
 /// <summary>
 /// Extension methods for registering event bus and projection components in the dependency injection container.

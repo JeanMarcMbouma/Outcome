@@ -1,7 +1,7 @@
 // -------------------------------
 // Projection handler contracts
 // -------------------------------
-namespace BbQ.Events;
+namespace BbQ.Events.Projections;
 
 /// <summary>
 /// Handler interface for projecting events into read models or materialized views.

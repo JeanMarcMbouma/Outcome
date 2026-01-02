@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 
-namespace BbQ.Events;
+namespace BbQ.Events.Events;
 
 /// <summary>
 /// In-memory implementation of IEventStore for testing projection engines.

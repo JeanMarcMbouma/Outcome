@@ -1,6 +1,7 @@
+using BbQ.Events.Checkpointing;
 using Microsoft.Extensions.Logging;
 
-namespace BbQ.Events;
+namespace BbQ.Events.Engine;
 
 /// <summary>
 /// Default implementation of the projection rebuilder.

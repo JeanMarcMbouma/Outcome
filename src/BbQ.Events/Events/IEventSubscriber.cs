@@ -1,7 +1,7 @@
 // -------------------------------
 // Event/Pub-Sub contracts
 // -------------------------------
-namespace BbQ.Events;
+namespace BbQ.Events.Events;
 
 /// <summary>
 /// Subscriber interface for consuming events as a stream.

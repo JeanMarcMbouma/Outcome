@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 
-namespace BbQ.Events;
+namespace BbQ.Events.Engine;
 
 /// <summary>
 /// In-memory implementation of IProjectionMonitor for tracking projection metrics.

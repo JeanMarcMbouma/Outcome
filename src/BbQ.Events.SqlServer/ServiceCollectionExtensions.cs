@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using BbQ.Events;
+using BbQ.Events.Checkpointing;
 
 namespace BbQ.Events.SqlServer;
 

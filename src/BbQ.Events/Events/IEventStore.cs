@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-namespace BbQ.Events;
+namespace BbQ.Events.Events;
 
 /// <summary>
 /// Interface for an event store that supports appending events and reading them sequentially.

@@ -1,4 +1,4 @@
-namespace BbQ.Events;
+namespace BbQ.Events.Engine;
 
 /// <summary>
 /// Represents metrics for a single projection or partition.

@@ -1,4 +1,4 @@
-namespace BbQ.Events;
+namespace BbQ.Events.Checkpointing;
 
 /// <summary>
 /// Storage interface for managing projection checkpoints.

@@ -1,4 +1,6 @@
-namespace BbQ.Events;
+using BbQ.Events.Engine;
+
+namespace BbQ.Events.Projections;
 
 /// <summary>
 /// Marks a class as a projection for automatic registration and discovery.

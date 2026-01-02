@@ -80,7 +80,7 @@ namespace BbQ.Events.SourceGenerators
                 var interfaceName = iface.ToDisplayString();
                 
                 // Check for IEventHandler<TEvent>
-                if (interfaceName.StartsWith("BbQ.Events.IEventHandler<") && iface.TypeArguments.Length == 1)
+                if (interfaceName.StartsWith("BbQ.Events.Events.IEventHandler<") && iface.TypeArguments.Length == 1)
                 {
                     var eventType = iface.TypeArguments[0];
                     
@@ -93,7 +93,7 @@ namespace BbQ.Events.SourceGenerators
                     };
                 }
                 // Check for IEventSubscriber<TEvent>
-                else if (interfaceName.StartsWith("BbQ.Events.IEventSubscriber<") && iface.TypeArguments.Length == 1)
+                else if (interfaceName.StartsWith("BbQ.Events.Events.IEventSubscriber<") && iface.TypeArguments.Length == 1)
                 {
                     var eventType = iface.TypeArguments[0];
                     
@@ -122,7 +122,7 @@ namespace BbQ.Events.SourceGenerators
             // Check for [Projection] attribute
             var attributes = classSymbol.GetAttributes();
             var hasProjectionAttr = attributes.Any(a => 
-                a.AttributeClass?.ToDisplayString() == "BbQ.Events.ProjectionAttribute");
+                a.AttributeClass?.ToDisplayString() == "BbQ.Events.Projections.ProjectionAttribute");
 
             if (!hasProjectionAttr)
                 return null;
@@ -136,7 +136,7 @@ namespace BbQ.Events.SourceGenerators
                 var interfaceName = iface.ToDisplayString();
                 
                 // Check for IProjectionHandler<TEvent>
-                if (interfaceName.StartsWith("BbQ.Events.IProjectionHandler<") && iface.TypeArguments.Length == 1)
+                if (interfaceName.StartsWith("BbQ.Events.Projections.IProjectionHandler<") && iface.TypeArguments.Length == 1)
                 {
                     var eventType = iface.TypeArguments[0];
                     eventTypes.Add(new EventTypeInfo
@@ -146,7 +146,7 @@ namespace BbQ.Events.SourceGenerators
                     });
                 }
                 // Check for IPartitionedProjectionHandler<TEvent>
-                else if (interfaceName.StartsWith("BbQ.Events.IPartitionedProjectionHandler<") && iface.TypeArguments.Length == 1)
+                else if (interfaceName.StartsWith("BbQ.Events.Projections.IPartitionedProjectionHandler<") && iface.TypeArguments.Length == 1)
                 {
                     var eventType = iface.TypeArguments[0];
                     eventTypes.Add(new EventTypeInfo
@@ -191,9 +191,10 @@ namespace BbQ.Events.SourceGenerators
             sb.AppendLine();
             sb.AppendLine("using Microsoft.Extensions.DependencyInjection;");
             sb.AppendLine("using Microsoft.Extensions.DependencyInjection.Extensions;");
-            sb.AppendLine("using BbQ.Events;");
+            sb.AppendLine("using BbQ.Events.Events;");
+            sb.AppendLine("using BbQ.Events.Projections;");
             sb.AppendLine();
-            sb.AppendLine("namespace BbQ.Events.DependencyInjection");
+            sb.AppendLine("namespace BbQ.Events.Configuration");
             sb.AppendLine("{");
             sb.AppendLine("    /// <summary>");
             sb.AppendLine($"    /// Auto-generated extension methods for registering event handlers and subscribers in {assemblyName}.");
