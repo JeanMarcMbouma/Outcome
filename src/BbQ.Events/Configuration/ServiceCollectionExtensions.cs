@@ -11,7 +11,7 @@ namespace BbQ.Events.Configuration;
 /// Extension methods for registering event bus and projection components in the dependency injection container.
 /// </summary>
 /// <remarks>
-/// This static class uses C# 14 extension types to add event bus and projection registration methods
+/// This static class uses extension types to add event bus and projection registration methods
 /// to IServiceCollection.
 /// </remarks>
 public static class ServiceCollectionExtensions
