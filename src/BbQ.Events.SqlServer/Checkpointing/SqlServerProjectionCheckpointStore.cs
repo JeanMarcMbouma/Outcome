@@ -1,7 +1,7 @@
 using BbQ.Events.Checkpointing;
 using Microsoft.Data.SqlClient;
 
-namespace BbQ.Events.SqlServer;
+namespace BbQ.Events.SqlServer.Checkpointing;
 
 /// <summary>
 /// SQL Server implementation of projection checkpoint storage.
