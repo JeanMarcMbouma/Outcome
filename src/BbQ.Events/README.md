@@ -12,6 +12,7 @@ Event-driven architecture support with strongly-typed pub/sub and projections fo
 - **Backpressure & flow control** - bounded channels with configurable strategies (Block, DropNewest, DropOldest)
 - **Projection monitoring** via `IProjectionMonitor` for observability (events/sec, lag, worker count, checkpoints, queue depth)
 - **Projection replay API** via `IProjectionRebuilder` for resetting and rebuilding projections
+- **Advanced replay service** via `IReplayService` for controlled replay with event ranges, dry runs, and checkpoint strategies
 - **In-memory event bus** for single-process applications
 - **Thread-safe** implementation using `System.Threading.Channels`
 - **Storage-agnostic** design - extend for distributed scenarios
@@ -568,6 +569,249 @@ else
 
 **Note:** After resetting checkpoints, you must restart the projection engine (or projections) for the changes to take effect. The rebuilder only manages checkpoints - it does not modify projection state or read models directly.
 
+### Projection Replay API (NEW)
+
+The replay service provides comprehensive control over replaying projections from historical events. Unlike simple checkpoint resets, replay offers fine-grained control over replay boundaries, batch processing, and checkpoint strategies.
+
+The `IReplayService` is automatically registered when you call `AddProjectionEngine()`.
+
+#### What is Replay?
+
+Replay is the process of rebuilding a projection by reprocessing historical events. This is useful for:
+- **Rebuilding projections** after schema or logic changes
+- **Validating projection logic** with historical data
+- **Recovering from corrupted read models**
+- **Testing with specific event ranges**
+- **Incremental replay** in stages
+
+#### Replay vs. Checkpoint Reset
+
+| Feature | Checkpoint Reset (`IProjectionRebuilder`) | Replay (`IReplayService`) |
+|---------|-------------------------------------------|---------------------------|
+| **Purpose** | Reset checkpoint and restart engine | Orchestrate controlled replay |
+| **Event Range** | All events from beginning | Configurable (FromPosition, ToPosition) |
+| **Batch Control** | Uses projection defaults | Configurable per replay |
+| **Dry Run** | No | Yes (test without checkpoint writes) |
+| **Checkpoint Strategy** | Normal | Configurable (Normal, FinalOnly, None) |
+| **Partition Support** | Yes | Yes |
+
+#### Basic Replay from Scratch
+
+```csharp
+var replayService = serviceProvider.GetRequiredService<IReplayService>();
+
+// Replay from the beginning
+await replayService.ReplayAsync(
+    "UserProfileProjection",
+    new ReplayOptions { FromPosition = 0 },
+    cancellationToken);
+```
+
+#### Replay a Specific Range
+
+```csharp
+// Replay events 1000-2000
+await replayService.ReplayAsync(
+    "OrderProjection",
+    new ReplayOptions
+    {
+        FromPosition = 1000,
+        ToPosition = 2000,
+        BatchSize = 100  // Checkpoint every 100 events
+    },
+    cancellationToken);
+```
+
+#### Resume from Last Checkpoint
+
+```csharp
+// Continue from last checkpoint position
+await replayService.ReplayAsync(
+    "UserProfileProjection",
+    new ReplayOptions
+    {
+        FromCheckpoint = true,  // Resume from saved position
+        ToPosition = 5000       // Process up to position 5000
+    },
+    cancellationToken);
+```
+
+#### Dry Run Replay
+
+Test replay without modifying checkpoints:
+
+```csharp
+// Test replay without checkpoint writes
+await replayService.ReplayAsync(
+    "InventoryProjection",
+    new ReplayOptions
+    {
+        FromPosition = 0,
+        DryRun = true  // Process events but don't save checkpoints
+    },
+    cancellationToken);
+```
+
+#### Replay a Specific Partition
+
+For partitioned projections, replay only one partition:
+
+```csharp
+// Replay a single partition
+await replayService.ReplayAsync(
+    "UserStatisticsProjection",
+    new ReplayOptions
+    {
+        Partition = "user-123",  // Only this partition
+        FromPosition = 0
+    },
+    cancellationToken);
+```
+
+#### Checkpoint Strategies
+
+Control when checkpoints are written during replay:
+
+```csharp
+// Write checkpoint only after replay completes
+await replayService.ReplayAsync(
+    "UserProfileProjection",
+    new ReplayOptions
+    {
+        FromPosition = 0,
+        CheckpointMode = CheckpointMode.FinalOnly  // Single checkpoint at end
+    },
+    cancellationToken);
+
+// Never write checkpoints (similar to dry run)
+await replayService.ReplayAsync(
+    "AnalyticsProjection",
+    new ReplayOptions
+    {
+        FromPosition = 0,
+        CheckpointMode = CheckpointMode.None  // No checkpoints written
+    },
+    cancellationToken);
+
+// Normal checkpoint strategy (default)
+await replayService.ReplayAsync(
+    "OrderProjection",
+    new ReplayOptions
+    {
+        FromPosition = 0,
+        BatchSize = 100,
+        CheckpointMode = CheckpointMode.Normal  // Checkpoint every BatchSize events
+    },
+    cancellationToken);
+```
+
+#### ReplayOptions Reference
+
+```csharp
+public class ReplayOptions
+{
+    // Resume from last saved checkpoint (default: false)
+    public bool FromCheckpoint { get; set; }
+    
+    // Start replay from this position (overrides FromCheckpoint)
+    public long? FromPosition { get; set; }
+    
+    // Stop replay at this position (inclusive)
+    public long? ToPosition { get; set; }
+    
+    // Number of events before checkpointing (null = use projection default)
+    public int? BatchSize { get; set; }
+    
+    // Replay only this partition (for partitioned projections)
+    public string? Partition { get; set; }
+    
+    // Process events without persisting checkpoints (default: false)
+    public bool DryRun { get; set; }
+    
+    // Control when checkpoints are written (default: Normal)
+    public CheckpointMode CheckpointMode { get; set; }
+}
+
+public enum CheckpointMode
+{
+    Normal,      // Write checkpoints according to BatchSize (default)
+    FinalOnly,   // Write checkpoint only after replay completes
+    None         // Never write checkpoints
+}
+```
+
+#### Validation
+
+Replay options are validated automatically:
+
+```csharp
+var options = new ReplayOptions
+{
+    FromPosition = 100,
+    ToPosition = 50  // Error: FromPosition > ToPosition
+};
+
+// Throws InvalidOperationException
+await replayService.ReplayAsync("UserProjection", options, cancellationToken);
+```
+
+Validation rules:
+- `FromPosition` and `ToPosition` must be non-negative
+- `FromPosition` cannot be greater than `ToPosition`
+- `BatchSize` must be positive (if specified)
+- Projection must be registered
+
+#### CLI-Friendly Usage
+
+```csharp
+// Parse command-line arguments for replay
+if (args[0] == "replay")
+{
+    var projectionName = args[1];
+    var fromPos = long.Parse(args[2]);
+    var toPos = args.Length > 3 ? long.Parse(args[3]) : (long?)null;
+    
+    Console.WriteLine($"Replaying {projectionName} from {fromPos} to {toPos?.ToString() ?? "end"}...");
+    
+    await replayService.ReplayAsync(
+        projectionName,
+        new ReplayOptions
+        {
+            FromPosition = fromPos,
+            ToPosition = toPos,
+            BatchSize = 100
+        },
+        cancellationToken);
+    
+    Console.WriteLine("Replay complete!");
+}
+```
+
+#### Best Practices
+
+1. **Use Dry Run First**: Test replay with `DryRun = true` before committing
+2. **Start Small**: Replay a limited range first (`ToPosition`)
+3. **Monitor Progress**: Check logs for replay progress and errors
+4. **Batch Size**: Tune `BatchSize` for performance vs. recovery granularity
+5. **Partition Replay**: Replay specific partitions to reduce scope
+6. **FinalOnly for Large Replays**: Reduce checkpoint overhead with `CheckpointMode.FinalOnly`
+7. **Backup Read Models**: Back up read models before replay if needed
+
+#### Event Store Integration
+
+**Note:** This initial implementation validates replay configuration and manages checkpoint state. Full event streaming replay will be available when event store integration is implemented. For now, use `ProjectionStartupMode.Replay` to replay from checkpoints when restarting the projection engine.
+
+```csharp
+// Current approach: Use StartupMode.Replay
+services.AddProjection<UserProfileProjection>(options =>
+{
+    options.StartupMode = ProjectionStartupMode.Replay;
+});
+
+// Future: Direct event streaming replay
+// await replayService.ReplayAsync("UserProfileProjection", options, ct);
+```
+
 ### Distributed Systems
 
 For multi-process or distributed systems, implement `IEventBus` with your preferred message broker:
@@ -595,6 +839,9 @@ Orchestrates projection execution from live event streams. Provides infrastructu
 
 ### Projection Rebuilder
 Manages projection checkpoints for rebuilding projections from scratch. Supports resetting all projections, single projections, or individual partitions.
+
+### Replay Service
+Orchestrates controlled replay of projections with fine-grained control over event ranges, batch processing, dry runs, and checkpoint strategies. Useful for testing, validation, and incremental replay scenarios.
 
 ### Event Bus
 Central hub combining publishing and subscribing capabilities.
