@@ -356,8 +356,15 @@ internal class DefaultReplayService : IReplayService
         bool normalCheckpointing,
         CancellationToken cancellationToken)
     {
-        // Create partition handler once if partition filtering is needed (more efficient than per-event)
-        object? partitionHandler = null;
+        // Cache GetMethod results for handlers to avoid repeated reflection calls
+        var handlerMethods = new Dictionary<Type, System.Reflection.MethodInfo?>();
+        foreach (var handlerType in handlers)
+        {
+            handlerMethods[handlerType] = handlerType.GetMethod("ProjectAsync");
+        }
+
+        // For partition filtering: determine partition key per event inline (stateless operation)
+        Type? partitionedHandlerType = null;
         System.Reflection.MethodInfo? getPartitionKeyMethod = null;
         
         if (!string.IsNullOrEmpty(options.Partition))
@@ -370,8 +377,7 @@ internal class DefaultReplayService : IReplayService
 
                 if (partitionedInterface != null)
                 {
-                    using var scope = _serviceProvider.CreateScope();
-                    partitionHandler = scope.ServiceProvider.GetRequiredService(handlerType);
+                    partitionedHandlerType = handlerType;
                     getPartitionKeyMethod = partitionedInterface.GetMethod("GetPartitionKey");
                     break;
                 }
@@ -398,9 +404,11 @@ internal class DefaultReplayService : IReplayService
                 break;
             }
 
-            // Filter by partition if specified
-            if (!string.IsNullOrEmpty(options.Partition) && getPartitionKeyMethod != null && partitionHandler != null)
+            // Filter by partition if specified (create handler per event for stateless partition key check)
+            if (!string.IsNullOrEmpty(options.Partition) && getPartitionKeyMethod != null && partitionedHandlerType != null)
             {
+                using var partitionScope = _serviceProvider.CreateScope();
+                var partitionHandler = partitionScope.ServiceProvider.GetRequiredService(partitionedHandlerType);
                 var partitionKeyResult = getPartitionKeyMethod.Invoke(partitionHandler, new[] { (object)@event });
                 if (partitionKeyResult is string partitionKey && partitionKey != options.Partition)
                 {
@@ -416,9 +424,8 @@ internal class DefaultReplayService : IReplayService
                     using var scope = _serviceProvider.CreateScope();
                     var handler = scope.ServiceProvider.GetRequiredService(handlerType);
 
-                    // Find and invoke ProjectAsync method
-                    var projectMethod = handlerType.GetMethod("ProjectAsync");
-                    if (projectMethod != null)
+                    // Use cached ProjectAsync method
+                    if (handlerMethods.TryGetValue(handlerType, out var projectMethod) && projectMethod != null)
                     {
                         try
                         {
