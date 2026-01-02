@@ -31,6 +31,7 @@ public class PostgreSqlEventStore : IEventStore
 {
     private readonly PostgreSqlEventStoreOptions _options;
     private readonly JsonSerializerOptions _jsonOptions;
+    private static readonly string MachineName = Environment.MachineName;
 
     /// <summary>
     /// Creates a new PostgreSQL event store.
@@ -176,7 +177,7 @@ public class PostgreSqlEventStore : IEventStore
         var metadata = new Dictionary<string, object>
         {
             ["timestamp"] = DateTime.UtcNow,
-            ["server"] = Environment.MachineName
+            ["server"] = MachineName
         };
 
         return PostgreSqlHelpers.SerializeToJson(metadata, _jsonOptions);

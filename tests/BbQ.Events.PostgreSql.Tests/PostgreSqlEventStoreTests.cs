@@ -50,14 +50,22 @@ public class PostgreSqlEventStoreTests
 
                 // Create test database if it doesn't exist
                 var createDbCommand = postgresConnection.CreateCommand();
-                createDbCommand.CommandText = $@"
-                    SELECT 1 FROM pg_database WHERE datname = '{testDatabase}'";
+                createDbCommand.CommandText = @"SELECT 1 FROM pg_database WHERE datname = @testDatabase";
+                createDbCommand.Parameters.AddWithValue("@testDatabase", testDatabase ?? "bbqeventstest");
                 
                 var exists = await createDbCommand.ExecuteScalarAsync();
                 
-                if (exists == null)
+                if (exists == null && !string.IsNullOrEmpty(testDatabase))
                 {
+                    // PostgreSQL doesn't support parameters for CREATE DATABASE, so we need to validate the name
+                    // Database names can only contain alphanumeric characters and underscores
+                    if (!System.Text.RegularExpressions.Regex.IsMatch(testDatabase, @"^[a-zA-Z0-9_]+$"))
+                    {
+                        throw new InvalidOperationException($"Invalid database name: {testDatabase}");
+                    }
+                    
                     createDbCommand.CommandText = $@"CREATE DATABASE {testDatabase}";
+                    createDbCommand.Parameters.Clear();
                     
                     try
                     {

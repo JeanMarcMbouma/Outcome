@@ -29,25 +29,7 @@ internal static class PostgreSqlConstants
     public const string PartitionKey = "partition_key";
 
     // SQL queries - Events
-    public const string AppendEventSql = @"
-        -- Insert or update stream metadata and capture the new position atomically
-        INSERT INTO bbq_streams (stream_name, current_position, version, created_utc, last_updated_utc)
-        VALUES (@stream_name, 0, 1, NOW(), NOW())
-        ON CONFLICT (stream_name)
-        DO UPDATE SET 
-            current_position = bbq_streams.current_position + 1,
-            version = bbq_streams.version + 1,
-            last_updated_utc = NOW()
-        RETURNING current_position INTO @new_position;
-
-        -- Insert the event
-        INSERT INTO bbq_events (stream_name, position, event_type, event_data, metadata, created_utc)
-        VALUES (@stream_name, @new_position, @event_type, @event_data, @metadata, NOW());
-
-        -- Return the position
-        SELECT @new_position AS position;";
-
-    // Simplified approach using CTE
+    // Uses CTE (Common Table Expression) for atomic upsert and event insertion
     public const string AppendEventSqlSimplified = @"
         WITH updated_stream AS (
             INSERT INTO bbq_streams (stream_name, current_position, version, created_utc, last_updated_utc)
