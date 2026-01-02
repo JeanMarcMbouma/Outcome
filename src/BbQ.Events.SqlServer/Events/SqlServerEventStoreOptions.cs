@@ -28,13 +28,4 @@ public class SqlServerEventStoreOptions
     /// Default is false.
     /// </remarks>
     public bool IncludeMetadata { get; set; } = false;
-
-    /// <summary>
-    /// Gets or sets the batch size for reading events.
-    /// </summary>
-    /// <remarks>
-    /// When reading large numbers of events, they are fetched in batches.
-    /// Default is 1000 events per batch.
-    /// </remarks>
-    public int ReadBatchSize { get; set; } = 1000;
 }

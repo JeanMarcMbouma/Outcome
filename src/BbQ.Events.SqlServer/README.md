@@ -112,7 +112,6 @@ services.UseSqlServerEventStore(options =>
 {
     options.ConnectionString = "Server=localhost;Database=MyApp;Integrated Security=true";
     options.IncludeMetadata = true;        // Include metadata (timestamp, server, etc.)
-    options.ReadBatchSize = 500;           // Batch size for reading events
     options.JsonSerializerOptions = new JsonSerializerOptions
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase

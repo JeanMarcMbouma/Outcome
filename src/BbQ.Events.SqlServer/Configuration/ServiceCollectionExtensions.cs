@@ -103,7 +103,6 @@ public static class ServiceCollectionExtensions
     /// {
     ///     options.ConnectionString = "Server=localhost;Database=MyDb;Integrated Security=true";
     ///     options.IncludeMetadata = true;
-    ///     options.ReadBatchSize = 500;
     /// });
     /// </code>
     /// </remarks>
@@ -121,7 +120,7 @@ public static class ServiceCollectionExtensions
 
         if (string.IsNullOrWhiteSpace(options.ConnectionString))
         {
-            throw new ArgumentException("Connection string must be provided in options", nameof(configureOptions));
+            throw new ArgumentException("Connection string must be configured via the configureOptions action.", nameof(configureOptions));
         }
 
         // Replace any existing IEventStore registration

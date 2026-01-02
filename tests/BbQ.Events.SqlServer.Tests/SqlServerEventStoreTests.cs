@@ -57,9 +57,10 @@ public class SqlServerEventStoreTests
                 {
                     await createDbCommand.ExecuteNonQueryAsync();
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Ignore errors - database might already exist or we might not have permission
+                    // Log the error so issues like missing permissions are visible in test output
+                    TestContext.WriteLine($"Warning: Failed to create test database 'BbQEventsTest'. Exception: {ex.Message}");
                 }
             }
 
@@ -462,5 +463,133 @@ public class SqlServerEventStoreTests
             var position = await _store!.GetStreamPositionAsync(stream);
             Assert.That(position, Is.EqualTo(eventsPerStream - 1));
         }
+    }
+
+    [Test]
+    public async Task IncludeMetadata_WhenEnabled_StoresMetadataWithEvents()
+    {
+        // Arrange
+        var stream = "test-metadata-1";
+        var options = new SqlServerEventStoreOptions
+        {
+            ConnectionString = _connectionString!,
+            IncludeMetadata = true
+        };
+        var storeWithMetadata = new SqlServerEventStore(options);
+
+        // Act
+        var userId = Guid.NewGuid();
+        await storeWithMetadata.AppendAsync(stream, new UserCreated(userId, "Alice", "alice@example.com"));
+
+        // Assert - Check metadata was stored in database
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT Metadata FROM BbQ_Events WHERE StreamName = @StreamName";
+        command.Parameters.AddWithValue("@StreamName", stream);
+
+        var metadata = await command.ExecuteScalarAsync();
+        Assert.That(metadata, Is.Not.Null);
+        Assert.That(metadata, Is.Not.EqualTo(DBNull.Value));
+
+        var metadataString = metadata.ToString();
+        Assert.That(metadataString, Does.Contain("timestamp"));
+        Assert.That(metadataString, Does.Contain("server"));
+    }
+
+    [Test]
+    public async Task IncludeMetadata_WhenDisabled_StoresNullMetadata()
+    {
+        // Arrange
+        var stream = "test-metadata-2";
+        // Default options have IncludeMetadata = false
+
+        // Act
+        var userId = Guid.NewGuid();
+        await _store!.AppendAsync(stream, new UserCreated(userId, "Bob", "bob@example.com"));
+
+        // Assert - Check metadata is null in database
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT Metadata FROM BbQ_Events WHERE StreamName = @StreamName";
+        command.Parameters.AddWithValue("@StreamName", stream);
+
+        var metadata = await command.ExecuteScalarAsync();
+        Assert.That(metadata, Is.EqualTo(DBNull.Value));
+    }
+
+    [Test]
+    public async Task CustomJsonOptions_WithPascalCase_SerializesCorrectly()
+    {
+        // Arrange
+        var stream = "test-json-1";
+        var customOptions = new System.Text.Json.JsonSerializerOptions
+        {
+            PropertyNamingPolicy = null // PascalCase (default)
+        };
+
+        var options = new SqlServerEventStoreOptions
+        {
+            ConnectionString = _connectionString!,
+            JsonSerializerOptions = customOptions
+        };
+        var storeWithCustomJson = new SqlServerEventStore(options);
+
+        // Act
+        var userId = Guid.NewGuid();
+        await storeWithCustomJson.AppendAsync(stream, new UserCreated(userId, "Charlie", "charlie@example.com"));
+
+        // Assert - Check JSON uses PascalCase
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT EventData FROM BbQ_Events WHERE StreamName = @StreamName";
+        command.Parameters.AddWithValue("@StreamName", stream);
+
+        var eventData = (await command.ExecuteScalarAsync())?.ToString();
+        Assert.That(eventData, Is.Not.Null);
+        Assert.That(eventData, Does.Contain("UserId")); // PascalCase
+        Assert.That(eventData, Does.Contain("Name"));
+        Assert.That(eventData, Does.Not.Contain("userId")); // Should not be camelCase
+    }
+
+    [Test]
+    public async Task CustomJsonOptions_RoundTrip_DeserializesCorrectly()
+    {
+        // Arrange
+        var stream = "test-json-2";
+        var customOptions = new System.Text.Json.JsonSerializerOptions
+        {
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower
+        };
+
+        var options = new SqlServerEventStoreOptions
+        {
+            ConnectionString = _connectionString!,
+            JsonSerializerOptions = customOptions
+        };
+        var storeWithCustomJson = new SqlServerEventStore(options);
+
+        // Act
+        var userId = Guid.NewGuid();
+        var originalEvent = new UserCreated(userId, "David", "david@example.com");
+        await storeWithCustomJson.AppendAsync(stream, originalEvent);
+
+        // Read back using the same store (with same JSON options)
+        var events = new List<UserCreated>();
+        await foreach (var storedEvent in storeWithCustomJson.ReadAsync<UserCreated>(stream))
+        {
+            events.Add(storedEvent.Event);
+        }
+
+        // Assert
+        Assert.That(events, Has.Count.EqualTo(1));
+        Assert.That(events[0].UserId, Is.EqualTo(originalEvent.UserId));
+        Assert.That(events[0].Name, Is.EqualTo(originalEvent.Name));
+        Assert.That(events[0].Email, Is.EqualTo(originalEvent.Email));
     }
 }

@@ -43,29 +43,11 @@ internal static class SqlHelpers
     }
 
     /// <summary>
-    /// Gets a string value from a SqlDataReader, handling null values.
-    /// </summary>
-    public static string? GetNullableString(this SqlDataReader reader, string columnName)
-    {
-        var ordinal = reader.GetOrdinal(columnName);
-        return reader.IsDBNull(ordinal) ? null : reader.GetString(ordinal);
-    }
-
-    /// <summary>
     /// Gets a long value from a SqlDataReader.
     /// </summary>
     public static long GetLong(this SqlDataReader reader, string columnName)
     {
         var ordinal = reader.GetOrdinal(columnName);
         return reader.GetInt64(ordinal);
-    }
-
-    /// <summary>
-    /// Gets a DateTime value from a SqlDataReader.
-    /// </summary>
-    public static DateTime GetDateTime(this SqlDataReader reader, string columnName)
-    {
-        var ordinal = reader.GetOrdinal(columnName);
-        return reader.GetDateTime(ordinal);
     }
 }

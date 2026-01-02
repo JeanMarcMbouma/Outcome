@@ -30,7 +30,11 @@ internal static class SqlConstants
 
     // SQL queries - Events
     public const string AppendEventSql = @"
-        -- Insert or update stream metadata
+        -- Declare variable for the new position
+        DECLARE @NewPosition BIGINT;
+        DECLARE @TempPosition TABLE (Position BIGINT);
+
+        -- Insert or update stream metadata and capture the new position atomically
         MERGE BbQ_Streams AS target
         USING (SELECT @StreamName AS StreamName) AS source
         ON target.StreamName = source.StreamName
@@ -41,11 +45,11 @@ internal static class SqlConstants
                 LastUpdatedUtc = SYSUTCDATETIME()
         WHEN NOT MATCHED THEN
             INSERT (StreamName, CurrentPosition, Version, CreatedUtc, LastUpdatedUtc)
-            VALUES (@StreamName, 0, 1, SYSUTCDATETIME(), SYSUTCDATETIME());
+            VALUES (@StreamName, 0, 1, SYSUTCDATETIME(), SYSUTCDATETIME())
+        OUTPUT INSERTED.CurrentPosition INTO @TempPosition;
 
-        -- Get the new position
-        DECLARE @NewPosition BIGINT;
-        SELECT @NewPosition = CurrentPosition FROM BbQ_Streams WHERE StreamName = @StreamName;
+        -- Get the position from the OUTPUT table
+        SELECT @NewPosition = Position FROM @TempPosition;
 
         -- Insert the event
         INSERT INTO BbQ_Events (StreamName, Position, EventType, EventData, Metadata, CreatedUtc)
