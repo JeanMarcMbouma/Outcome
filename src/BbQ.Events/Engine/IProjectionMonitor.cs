@@ -1,4 +1,4 @@
-namespace BbQ.Events;
+namespace BbQ.Events.Engine;
 
 /// <summary>
 /// Interface for monitoring projection health and performance.

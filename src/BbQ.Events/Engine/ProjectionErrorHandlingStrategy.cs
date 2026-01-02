@@ -1,4 +1,4 @@
-namespace BbQ.Events;
+namespace BbQ.Events.Engine;
 
 /// <summary>
 /// Defines how projection errors should be handled during event processing.

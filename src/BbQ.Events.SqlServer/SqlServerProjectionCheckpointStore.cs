@@ -1,3 +1,4 @@
+using BbQ.Events.Checkpointing;
 using Microsoft.Data.SqlClient;
 
 namespace BbQ.Events.SqlServer;

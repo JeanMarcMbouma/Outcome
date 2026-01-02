@@ -1,4 +1,4 @@
-namespace BbQ.Events;
+namespace BbQ.Events.Engine;
 
 /// <summary>
 /// Service for rebuilding projections from scratch by resetting checkpoints.

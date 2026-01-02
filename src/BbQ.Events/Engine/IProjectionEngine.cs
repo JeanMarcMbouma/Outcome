@@ -1,4 +1,4 @@
-namespace BbQ.Events;
+namespace BbQ.Events.Engine;
 
 /// <summary>
 /// Orchestrates the execution of projection handlers by subscribing to event streams

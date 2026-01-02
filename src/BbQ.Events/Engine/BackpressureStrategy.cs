@@ -1,4 +1,4 @@
-namespace BbQ.Events;
+namespace BbQ.Events.Engine;
 
 /// <summary>
 /// Defines strategies for handling backpressure when event ingestion outpaces projection processing.

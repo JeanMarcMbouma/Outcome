@@ -1,10 +1,13 @@
+using BbQ.Events.Checkpointing;
+using BbQ.Events.Events;
+using BbQ.Events.Projections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Reflection;
 using System.Threading.Channels;
 
-namespace BbQ.Events;
+namespace BbQ.Events.Engine;
 
 /// <summary>
 /// Default implementation of the projection engine with partition support.

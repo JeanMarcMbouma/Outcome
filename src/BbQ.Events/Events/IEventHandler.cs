@@ -1,7 +1,7 @@
 // -------------------------------
 // Event/Pub-Sub contracts
 // -------------------------------
-namespace BbQ.Events;
+namespace BbQ.Events.Events;
 
 /// <summary>
 /// Handler interface for processing events one-by-one as they are published.

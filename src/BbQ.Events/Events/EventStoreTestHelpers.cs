@@ -1,4 +1,4 @@
-namespace BbQ.Events;
+namespace BbQ.Events.Events;
 
 /// <summary>
 /// Helper extensions for working with IEventStore in tests.

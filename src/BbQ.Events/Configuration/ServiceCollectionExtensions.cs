@@ -1,14 +1,17 @@
-using BbQ.Events;
+using BbQ.Events.Checkpointing;
+using BbQ.Events.Engine;
+using BbQ.Events.Events;
+using BbQ.Events.Projections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace BbQ.Events.DependencyInjection;
+namespace BbQ.Events.Configuration;
 
 /// <summary>
 /// Extension methods for registering event bus and projection components in the dependency injection container.
 /// </summary>
 /// <remarks>
-/// This static class uses C# 14 extension types to add event bus and projection registration methods
+/// This static class uses extension types to add event bus and projection registration methods
 /// to IServiceCollection.
 /// </remarks>
 public static class ServiceCollectionExtensions

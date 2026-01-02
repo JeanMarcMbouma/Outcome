@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 
-namespace BbQ.Events;
+namespace BbQ.Events.Engine;
 
 /// <summary>
 /// Registry for tracking registered projection handlers.

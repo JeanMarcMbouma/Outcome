@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 
-namespace BbQ.Events;
+namespace BbQ.Events.Checkpointing;
 
 /// <summary>
 /// In-memory implementation of projection checkpoint storage.
