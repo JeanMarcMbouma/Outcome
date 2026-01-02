@@ -44,10 +44,10 @@ public class PostgreSqlProjectionCheckpointStoreTests
             command.CommandText = @"
                 CREATE TABLE IF NOT EXISTS bbq_projection_checkpoints (
                     projection_name TEXT NOT NULL,
-                    partition_key TEXT NULL,
+                    partition_key TEXT NULL DEFAULT NULL,
                     position BIGINT NOT NULL,
                     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                    PRIMARY KEY (projection_name, partition_key)
+                    CONSTRAINT pk_bbq_projection_checkpoints PRIMARY KEY (projection_name, partition_key) NULLS NOT DISTINCT
                 );";
             
             await command.ExecuteNonQueryAsync();
