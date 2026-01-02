@@ -33,17 +33,17 @@ internal static class PostgreSqlConstants
     public const string AppendEventSqlSimplified = @"
         WITH updated_stream AS (
             INSERT INTO bbq_streams (stream_name, current_position, version, created_utc, last_updated_utc)
-            VALUES (@stream_name, 0, 1, NOW(), NOW())
+            VALUES (@stream_name, 0, 1, (NOW() AT TIME ZONE 'UTC'), (NOW() AT TIME ZONE 'UTC'))
             ON CONFLICT (stream_name)
             DO UPDATE SET 
                 current_position = bbq_streams.current_position + 1,
                 version = bbq_streams.version + 1,
-                last_updated_utc = NOW()
+                last_updated_utc = (NOW() AT TIME ZONE 'UTC')
             RETURNING current_position
         ),
         inserted_event AS (
             INSERT INTO bbq_events (stream_name, position, event_type, event_data, metadata, created_utc)
-            SELECT @stream_name, current_position, @event_type, @event_data, @metadata, NOW()
+            SELECT @stream_name, current_position, @event_type, @event_data, @metadata, (NOW() AT TIME ZONE 'UTC')
             FROM updated_stream
             RETURNING position
         )
