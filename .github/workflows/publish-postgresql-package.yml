@@ -1,0 +1,39 @@
+name: Publish BbQ.Events.PostgreSql to NuGet
+
+on:
+  push:
+    tags:
+      - 'postgresql-v*'  # Triggers on tags like postgresql-v0.1.0, postgresql-v1.0.0
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore src/BbQ.Events.PostgreSql/BbQ.Events.PostgreSql.csproj
+
+    - name: Build
+      run: dotnet build src/BbQ.Events.PostgreSql/BbQ.Events.PostgreSql.csproj --configuration Release --no-restore
+
+    - name: Test
+      run: dotnet test tests/BbQ.Events.PostgreSql.Tests/BbQ.Events.PostgreSql.Tests.csproj --configuration Release --verbosity normal
+      # Tests use Testcontainers which requires Docker
+
+    - name: Pack
+      run: dotnet pack src/BbQ.Events.PostgreSql/BbQ.Events.PostgreSql.csproj --configuration Release --no-build --output ./artifacts
+
+    - name: Push to NuGet
+      run: dotnet nuget push ./artifacts/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+      env:
+        NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
