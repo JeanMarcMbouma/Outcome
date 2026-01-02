@@ -58,7 +58,10 @@ public class PostgreSqlEventStoreTests
                 if (exists == null && !string.IsNullOrEmpty(testDatabase))
                 {
                     // PostgreSQL doesn't support parameters for CREATE DATABASE, so we need to validate the name
-                    // Database names can only contain alphanumeric characters and underscores
+                    // For safety we restrict the database name to alphanumeric characters and underscores before
+                    // interpolating it into SQL. PostgreSQL unquoted identifiers allow a broader set (letters,
+                    // digits, underscores, and dollar signs, starting with a letter or underscore), but we use a
+                    // stricter validation here as a security precaution.
                     if (!System.Text.RegularExpressions.Regex.IsMatch(testDatabase, @"^[a-zA-Z0-9_]+$"))
                     {
                         throw new InvalidOperationException($"Invalid database name: {testDatabase}");
