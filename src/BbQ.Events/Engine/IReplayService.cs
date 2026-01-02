@@ -76,20 +76,22 @@ public interface IReplayService
     /// <remarks>
     /// This method:
     /// - Validates replay options
-    /// - Resolves projection metadata
+    /// - Resolves projection metadata  
     /// - Determines replay boundaries
     /// - Optionally resets checkpoints
-    /// - Processes events according to configuration
+    /// - Streams events from IEventStore (if registered)
+    /// - Processes events through projection handlers
     /// - Writes checkpoints based on CheckpointMode
-    /// - Provides progress tracking (future: emit events)
+    /// - Provides progress tracking via logging
     /// 
     /// The method blocks until replay completes or is cancelled.
     /// For long-running replays, monitor progress through logging.
     /// 
-    /// Note: This is a simplified initial implementation. Event streaming
-    /// is not yet implemented - this will be added when event store integration
-    /// is available. Currently, this validates the replay configuration and
-    /// manages checkpoint state.
+    /// Error Handling: By default, projection errors are logged and replay continues.
+    /// This behavior ensures replay can complete even if some events fail processing.
+    /// 
+    /// Stream Naming: Events are read from a stream named after the projection.
+    /// Ensure events for the projection are appended to a stream with this name.
     /// </remarks>
     Task ReplayAsync(
         string projectionName,

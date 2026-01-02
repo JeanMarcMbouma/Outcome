@@ -799,17 +799,31 @@ if (args[0] == "replay")
 
 #### Event Store Integration
 
-**Note:** This initial implementation validates replay configuration and manages checkpoint state. Full event streaming replay will be available when event store integration is implemented. For now, use `ProjectionStartupMode.Replay` to replay from checkpoints when restarting the projection engine.
+Event streaming replay is fully implemented and works with any `IEventStore` implementation (InMemoryEventStore, SqlServerEventStore). 
+
+**Important:** The replay service reads events from a stream named after the projection. Ensure your events are appended to streams using the projection name as the stream identifier.
 
 ```csharp
-// Current approach: Use StartupMode.Replay
+// Example: Appending events to the correct stream for replay
+var eventStore = serviceProvider.GetRequiredService<IEventStore>();
+var projectionName = "UserProfileProjection";
+
+// Append events to stream named after projection
+await eventStore.AppendAsync(projectionName, new UserCreated(...));
+await eventStore.AppendAsync(projectionName, new UserUpdated(...));
+
+// Now replay will work correctly
+var replayService = serviceProvider.GetRequiredService<IReplayService>();
+await replayService.ReplayAsync(projectionName, new ReplayOptions { FromPosition = 0 }, ct);
+```
+
+**Alternative:** Use `ProjectionStartupMode.Replay` to automatically replay from checkpoints when the projection engine starts:
+
+```csharp
 services.AddProjection<UserProfileProjection>(options =>
 {
     options.StartupMode = ProjectionStartupMode.Replay;
 });
-
-// Future: Direct event streaming replay
-// await replayService.ReplayAsync("UserProfileProjection", options, ct);
 ```
 
 ### Distributed Systems

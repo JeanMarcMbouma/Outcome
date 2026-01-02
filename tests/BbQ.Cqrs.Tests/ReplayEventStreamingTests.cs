@@ -12,7 +12,12 @@ namespace BbQ.Cqrs.Tests;
 /// <summary>
 /// Integration tests for replay service with event streaming.
 /// </summary>
+/// <remarks>
+/// These tests use a static list to track processed events.
+/// The NonParallelizable attribute ensures tests run sequentially to avoid race conditions.
+/// </remarks>
 [TestFixture]
+[NonParallelizable]
 public class ReplayEventStreamingTests
 {
     private ServiceProvider _serviceProvider = null!;

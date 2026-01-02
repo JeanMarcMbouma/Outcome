@@ -20,6 +20,20 @@ namespace BbQ.Events.Engine;
 /// 
 /// The replay service keeps the projection engine focused on event processing
 /// while handling replay-specific orchestration externally.
+/// 
+/// <b>Important Notes:</b>
+/// 
+/// <b>Stream Naming:</b> Events are read from a stream named after the projection.
+/// Ensure events for a projection are appended to a stream matching the projection name.
+/// 
+/// <b>Checkpoint Tracking:</b> When a projection handles multiple event types, all events
+/// are expected to be in the same stream with monotonically increasing positions.
+/// If event types are in separate streams with independent positions, checkpoint tracking
+/// may not work correctly for interrupted replays.
+/// 
+/// <b>Error Handling:</b> By default, errors during event processing are logged and replay
+/// continues. This ensures replay can complete even if some events fail. Consider this
+/// behavior when replaying critical projections.
 /// </remarks>
 internal class DefaultReplayService : IReplayService
 {
@@ -136,10 +150,14 @@ internal class DefaultReplayService : IReplayService
         }
 
         // Reset checkpoint if not resuming from checkpoint and not in dry run
+        // Note: This resets the checkpoint even if FromPosition is specified.
+        // If replay is interrupted, resuming requires specifying FromCheckpoint=true
+        // or providing FromPosition again, as the checkpoint will be null.
         if (!options.FromCheckpoint && !options.DryRun && options.CheckpointMode != CheckpointMode.None)
         {
             _logger.LogInformation(
-                "Resetting checkpoint for {CheckpointKey} before replay",
+                "Resetting checkpoint for {CheckpointKey} before replay. " +
+                "To resume interrupted replay, use FromCheckpoint=true or specify FromPosition again.",
                 checkpointKey);
             await _checkpointStore.ResetCheckpointAsync(checkpointKey, cancellationToken);
         }
@@ -261,25 +279,43 @@ internal class DefaultReplayService : IReplayService
                 eventType.Name,
                 projectionName);
 
-            // Use a generic helper method via reflection
-            var processMethod = typeof(DefaultReplayService)
-                .GetMethod(nameof(ProcessTypedEventStreamAsync), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
-                .MakeGenericMethod(eventType);
+            // Use a generic helper method via reflection for type-safe event streaming
+            var methodInfo = typeof(DefaultReplayService)
+                .GetMethod(nameof(ProcessTypedEventStreamAsync), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+            if (methodInfo is null)
+            {
+                _logger.LogError(
+                    "Could not find method '{MethodName}' on '{TypeName}'",
+                    nameof(ProcessTypedEventStreamAsync),
+                    nameof(DefaultReplayService));
+                continue;
+            }
+
+            var processMethod = methodInfo.MakeGenericMethod(eventType);
 
             var streamName = projectionName; // Use projection name as stream name
             
-            var task = (Task<(long, long)>)processMethod.Invoke(this, new object[] 
+            var invocationResult = processMethod.Invoke(this, new object[] 
             { 
                 streamName,
                 handlers, 
                 options, 
                 checkpointKey, 
                 eventsProcessed, 
-                currentPosition, 
+                startPosition,  // Use startPosition for reading, not currentPosition
                 batchSize, 
                 normalCheckpointing, 
                 cancellationToken 
-            })!;
+            });
+
+            if (invocationResult is not Task<(long, long)> task)
+            {
+                _logger.LogError(
+                    "Method '{MethodName}' did not return expected type Task<(long, long)>",
+                    nameof(ProcessTypedEventStreamAsync));
+                continue;
+            }
             
             var result = await task;
             eventsProcessed = result.Item1;
@@ -287,7 +323,10 @@ internal class DefaultReplayService : IReplayService
         }
 
         // Final checkpoint write (if needed)
-        if (shouldWriteCheckpoints && (options.CheckpointMode == CheckpointMode.FinalOnly || 
+        // Only write if: we should write checkpoints AND we actually processed events AND
+        // (it's FinalOnly mode OR we have unwritten events in Normal mode)
+        if (shouldWriteCheckpoints && eventsProcessed > 0 && 
+            (options.CheckpointMode == CheckpointMode.FinalOnly || 
             (normalCheckpointing && eventsProcessed % batchSize != 0)))
         {
             await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, cancellationToken);
@@ -312,13 +351,37 @@ internal class DefaultReplayService : IReplayService
         ReplayOptions options,
         string checkpointKey,
         long eventsProcessed,
-        long currentPosition,
+        long startPosition,
         int batchSize,
         bool normalCheckpointing,
         CancellationToken cancellationToken)
     {
-        // Read events from the event store
-        await foreach (var storedEvent in _eventStore!.ReadAsync<TEvent>(streamName, currentPosition, cancellationToken))
+        // Create partition handler once if partition filtering is needed (more efficient than per-event)
+        object? partitionHandler = null;
+        System.Reflection.MethodInfo? getPartitionKeyMethod = null;
+        
+        if (!string.IsNullOrEmpty(options.Partition))
+        {
+            foreach (var handlerType in handlers)
+            {
+                var partitionedInterface = handlerType.GetInterfaces()
+                    .FirstOrDefault(i => i.IsGenericType &&
+                        i.GetGenericTypeDefinition() == typeof(IPartitionedProjectionHandler<>));
+
+                if (partitionedInterface != null)
+                {
+                    using var scope = _serviceProvider.CreateScope();
+                    partitionHandler = scope.ServiceProvider.GetRequiredService(handlerType);
+                    getPartitionKeyMethod = partitionedInterface.GetMethod("GetPartitionKey");
+                    break;
+                }
+            }
+        }
+
+        long currentPosition = startPosition;
+        
+        // Read events from the event store starting from the specified position
+        await foreach (var storedEvent in _eventStore!.ReadAsync<TEvent>(streamName, startPosition, cancellationToken))
         {
             var position = storedEvent.Position;
             var @event = storedEvent.Event;
@@ -336,35 +399,12 @@ internal class DefaultReplayService : IReplayService
             }
 
             // Filter by partition if specified
-            if (!string.IsNullOrEmpty(options.Partition))
+            if (!string.IsNullOrEmpty(options.Partition) && getPartitionKeyMethod != null && partitionHandler != null)
             {
-                var shouldSkipEvent = false;
-                foreach (var handlerType in handlers)
+                var partitionKeyResult = getPartitionKeyMethod.Invoke(partitionHandler, new[] { (object)@event });
+                if (partitionKeyResult is string partitionKey && partitionKey != options.Partition)
                 {
-                    var partitionedInterface = handlerType.GetInterfaces()
-                        .FirstOrDefault(i => i.IsGenericType &&
-                            i.GetGenericTypeDefinition() == typeof(IPartitionedProjectionHandler<>));
-
-                    if (partitionedInterface != null)
-                    {
-                        using var scope = _serviceProvider.CreateScope();
-                        var handler = scope.ServiceProvider.GetRequiredService(handlerType);
-                        var getPartitionKeyMethod = partitionedInterface.GetMethod("GetPartitionKey");
-                        if (getPartitionKeyMethod != null)
-                        {
-                            var partitionKeyResult = getPartitionKeyMethod.Invoke(handler, new[] { (object)@event });
-                            if (partitionKeyResult is string partitionKey && partitionKey != options.Partition)
-                            {
-                                shouldSkipEvent = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-                
-                if (shouldSkipEvent)
-                {
-                    continue;
+                    continue; // Skip this event - wrong partition
                 }
             }
 
@@ -380,18 +420,29 @@ internal class DefaultReplayService : IReplayService
                     var projectMethod = handlerType.GetMethod("ProjectAsync");
                     if (projectMethod != null)
                     {
-                        var result = projectMethod.Invoke(handler, new object[] { @event!, cancellationToken });
-                        if (result is ValueTask projectTask)
+                        try
                         {
-                            await projectTask;
+                            var result = projectMethod.Invoke(handler, new object[] { @event, cancellationToken });
+                            if (result is ValueTask projectTask)
+                            {
+                                await projectTask;
+                            }
+                        }
+                        catch (System.Reflection.TargetInvocationException tie) when (tie.InnerException != null)
+                        {
+                            // Unwrap TargetInvocationException to get the actual exception
+                            throw tie.InnerException;
                         }
                     }
                 }
                 catch (Exception ex)
                 {
+                    // Log error and continue processing
+                    // This behavior allows replay to continue even if some events fail
+                    // Consider making this configurable in future versions
                     _logger.LogError(
                         ex,
-                        "Error processing event at position {Position} for {CheckpointKey}, handler {HandlerType}",
+                        "Error processing event at position {Position} for {CheckpointKey}, handler {HandlerType}. Continuing replay.",
                         position,
                         checkpointKey,
                         handlerType.Name);
