@@ -1,4 +1,8 @@
-using BbQ.Events;
+using BbQ.Events.Checkpointing;
+using BbQ.Events.Configuration;
+using BbQ.Events.Engine;
+using BbQ.Events.Events;
+using BbQ.Events.Projections;
 using NUnit.Framework;
 
 namespace BbQ.Cqrs.Tests;

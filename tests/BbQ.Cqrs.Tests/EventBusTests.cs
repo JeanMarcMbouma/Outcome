@@ -1,6 +1,10 @@
 using BbQ.Cqrs;
-using BbQ.Events;
-using BbQ.Events.DependencyInjection;
+using BbQ.Events.Checkpointing;
+using BbQ.Events.Configuration;
+using BbQ.Events.Engine;
+using BbQ.Events.Events;
+using BbQ.Events.Projections;
+
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
