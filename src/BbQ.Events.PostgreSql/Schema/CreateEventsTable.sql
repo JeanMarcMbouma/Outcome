@@ -20,6 +20,3 @@ CREATE TABLE bbq_events (
     -- This constraint also creates an index for efficient stream reads
     CONSTRAINT uq_bbq_events_stream_position UNIQUE (stream_name, position)
 );
-
--- Create index for efficient stream reads
-CREATE INDEX ix_bbq_events_stream_name_position ON bbq_events(stream_name, position);
