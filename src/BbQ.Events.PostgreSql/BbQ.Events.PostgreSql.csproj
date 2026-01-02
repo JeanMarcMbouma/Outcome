@@ -7,8 +7,8 @@
     <Version>0.1.0</Version>
     <Authors>Jean</Authors>
     <Company>JM Mbouma</Company>
-    <Description>PostgreSQL implementation for BbQ.Events, providing IProjectionCheckpointStore for projection checkpoints. Features durable checkpoint persistence with upsert semantics, atomic operations, and thread-safe parallel processing support.</Description>
-    <PackageTags>events postgresql projections checkpoint persistence bbq cqrs</PackageTags>
+    <Description>PostgreSQL implementation for BbQ.Events, providing both IEventStore for event sourcing and IProjectionCheckpointStore for projection checkpoints. Features durable event persistence with sequential positions, atomic operations, JSON serialization, and thread-safe parallel processing support.</Description>
+    <PackageTags>events postgresql event-sourcing projections checkpoint persistence event-store bbq cqrs</PackageTags>
     <RepositoryUrl>https://github.com/JeanMarcMbouma/Outcome</RepositoryUrl>
     <PackageProjectUrl>https://github.com/JeanMarcMbouma/Outcome</PackageProjectUrl>
     <RepositoryType>git</RepositoryType>
