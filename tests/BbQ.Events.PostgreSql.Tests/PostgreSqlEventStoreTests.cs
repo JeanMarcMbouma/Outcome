@@ -32,8 +32,8 @@ public class PostgreSqlEventStoreTests
 
         if (string.IsNullOrWhiteSpace(_connectionString))
         {
-            // Try default local PostgreSQL as fallback
-            _connectionString = "Host=localhost;Database=bbqeventstest;Username=postgres;Password=postgres";
+            // Try default local PostgreSQL as fallback (without password - relies on trust authentication or .pgpass)
+            _connectionString = "Host=localhost;Database=bbqeventstest;Username=postgres";
         }
 
         try
