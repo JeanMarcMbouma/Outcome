@@ -4,11 +4,11 @@
     <TargetFramework>net8.0</TargetFramework>
 
     <PackageId>BbQ.Events.SqlServer</PackageId>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <Authors>Jean</Authors>
     <Company>JM Mbouma</Company>
-    <Description>SQL Server implementation of IProjectionCheckpointStore for BbQ.Events projections. Provides durable, production-ready checkpoint persistence with atomic upserts and parallel processing support.</Description>
-    <PackageTags>events sqlserver projections checkpoint persistence bbq</PackageTags>
+    <Description>SQL Server implementation for BbQ.Events, providing both IEventStore for event sourcing and IProjectionCheckpointStore for projection checkpoints. Features durable event persistence with sequential positions, atomic operations, JSON serialization, and thread-safe parallel processing support.</Description>
+    <PackageTags>events sqlserver event-sourcing projections checkpoint persistence event-store bbq cqrs</PackageTags>
     <RepositoryUrl>https://github.com/JeanMarcMbouma/Outcome</RepositoryUrl>
     <PackageProjectUrl>https://github.com/JeanMarcMbouma/Outcome</PackageProjectUrl>
     <RepositoryType>git</RepositoryType>

@@ -1,3 +1,4 @@
+using BbQ.Events.SqlServer.Checkpointing;
 using Microsoft.Data.SqlClient;
 using NUnit.Framework;
 
