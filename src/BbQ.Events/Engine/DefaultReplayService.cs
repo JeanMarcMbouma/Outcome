@@ -261,156 +261,29 @@ internal class DefaultReplayService : IReplayService
                 eventType.Name,
                 projectionName);
 
-            // Use reflection to call ReadAsync<TEvent> generically
-            var readMethod = typeof(IEventStore).GetMethod(nameof(IEventStore.ReadAsync))!
+            // Use a generic helper method via reflection
+            var processMethod = typeof(DefaultReplayService)
+                .GetMethod(nameof(ProcessTypedEventStreamAsync), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
                 .MakeGenericMethod(eventType);
 
             var streamName = projectionName; // Use projection name as stream name
-            var eventStream = readMethod.Invoke(_eventStore, new object[] { streamName, startPosition, cancellationToken });
-
-            if (eventStream == null)
-            {
-                _logger.LogWarning("Event stream is null for event type {EventType}", eventType.Name);
-                continue;
-            }
-
-            // Get the async enumerator
-            var getEnumeratorMethod = eventStream.GetType().GetMethod("GetAsyncEnumerator");
-            if (getEnumeratorMethod == null)
-            {
-                _logger.LogWarning("Could not get async enumerator for event type {EventType}", eventType.Name);
-                continue;
-            }
-
-            var enumerator = getEnumeratorMethod.Invoke(eventStream, new object[] { cancellationToken });
-            if (enumerator == null)
-            {
-                _logger.LogWarning("Enumerator is null for event type {EventType}", eventType.Name);
-                continue;
-            }
-
-            var enumeratorType = enumerator.GetType();
-            var moveNextMethod = enumeratorType.GetMethod("MoveNextAsync");
-            var currentProperty = enumeratorType.GetProperty("Current");
-
-            if (moveNextMethod == null || currentProperty == null)
-            {
-                _logger.LogWarning("Could not find MoveNextAsync or Current for event type {EventType}", eventType.Name);
-                continue;
-            }
-
-            // Process events from the stream
-            while (true)
-            {
-                var moveNextResult = moveNextMethod.Invoke(enumerator, Array.Empty<object>());
-                if (moveNextResult == null) break;
-
-                var moveNextTask = (ValueTask<bool>)moveNextResult;
-                if (!await moveNextTask) break;
-
-                var storedEvent = currentProperty.GetValue(enumerator);
-                if (storedEvent == null) continue;
-
-                // Extract position and event from StoredEvent<TEvent>
-                var positionProp = storedEvent.GetType().GetProperty("Position");
-                var eventProp = storedEvent.GetType().GetProperty("Event");
-
-                if (positionProp == null || eventProp == null) continue;
-
-                var position = (long)positionProp.GetValue(storedEvent)!;
-                var @event = eventProp.GetValue(storedEvent);
-
-                if (@event == null) continue;
-
-                // Check if we've exceeded ToPosition
-                if (options.ToPosition.HasValue && position > options.ToPosition.Value)
-                {
-                    _logger.LogInformation(
-                        "Reached ToPosition {ToPosition} for {CheckpointKey}",
-                        options.ToPosition.Value,
-                        checkpointKey);
-                    break;
-                }
-
-                // Filter by partition if specified
-                if (!string.IsNullOrEmpty(options.Partition))
-                {
-                    // Check if handler is partitioned and get partition key
-                    var shouldSkipEvent = false;
-                    foreach (var handlerType in handlers)
-                    {
-                        var partitionedInterface = handlerType.GetInterfaces()
-                            .FirstOrDefault(i => i.IsGenericType &&
-                                i.GetGenericTypeDefinition() == typeof(IPartitionedProjectionHandler<>));
-
-                        if (partitionedInterface != null)
-                        {
-                            using var scope = _serviceProvider.CreateScope();
-                            var handler = scope.ServiceProvider.GetRequiredService(handlerType);
-                            var getPartitionKeyMethod = partitionedInterface.GetMethod("GetPartitionKey");
-                            if (getPartitionKeyMethod != null)
-                            {
-                                var partitionKey = getPartitionKeyMethod.Invoke(handler, new[] { @event }) as string;
-                                if (partitionKey != options.Partition)
-                                {
-                                    // Skip this event - wrong partition
-                                    shouldSkipEvent = true;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    
-                    if (shouldSkipEvent)
-                    {
-                        continue;
-                    }
-                }
-
-                // Process event through all handlers
-                foreach (var handlerType in handlers)
-                {
-                    try
-                    {
-                        using var scope = _serviceProvider.CreateScope();
-                        var handler = scope.ServiceProvider.GetRequiredService(handlerType);
-
-                        // Determine which ProjectAsync method to call
-                        var projectMethod = handlerType.GetMethod("ProjectAsync");
-                        if (projectMethod != null)
-                        {
-                            var projectTask = (ValueTask)projectMethod.Invoke(handler, new[] { @event, cancellationToken })!;
-                            await projectTask;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(
-                            ex,
-                            "Error processing event at position {Position} for projection {ProjectionName}, handler {HandlerType}",
-                            position,
-                            projectionName,
-                            handlerType.Name);
-
-                        // For replay, we continue processing even on errors (can be made configurable)
-                        // The assumption is that replay is often used for recovery/testing
-                    }
-                }
-
-                eventsProcessed++;
-                currentPosition = position;
-
-                // Checkpoint if needed (normal mode with batch size reached)
-                if (normalCheckpointing && eventsProcessed % batchSize == 0)
-                {
-                    await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, cancellationToken);
-                    _logger.LogDebug(
-                        "Checkpoint saved for {CheckpointKey} at position {Position} ({EventsProcessed} events processed)",
-                        checkpointKey,
-                        currentPosition,
-                        eventsProcessed);
-                }
-            }
+            
+            var task = (Task<(long, long)>)processMethod.Invoke(this, new object[] 
+            { 
+                streamName,
+                handlers, 
+                options, 
+                checkpointKey, 
+                eventsProcessed, 
+                currentPosition, 
+                batchSize, 
+                normalCheckpointing, 
+                cancellationToken 
+            })!;
+            
+            var result = await task;
+            eventsProcessed = result.Item1;
+            currentPosition = result.Item2;
         }
 
         // Final checkpoint write (if needed)
@@ -428,5 +301,115 @@ internal class DefaultReplayService : IReplayService
             "Replay processed {EventsProcessed} event(s) for {CheckpointKey}",
             eventsProcessed,
             checkpointKey);
+    }
+
+    /// <summary>
+    /// Processes events from a stream for a specific event type.
+    /// </summary>
+    private async Task<(long, long)> ProcessTypedEventStreamAsync<TEvent>(
+        string streamName,
+        List<Type> handlers,
+        ReplayOptions options,
+        string checkpointKey,
+        long eventsProcessed,
+        long currentPosition,
+        int batchSize,
+        bool normalCheckpointing,
+        CancellationToken cancellationToken)
+    {
+        // Read events from the event store
+        await foreach (var storedEvent in _eventStore!.ReadAsync<TEvent>(streamName, currentPosition, cancellationToken))
+        {
+            var position = storedEvent.Position;
+            var @event = storedEvent.Event;
+
+            if (@event == null) continue;
+
+            // Check if we've exceeded ToPosition
+            if (options.ToPosition.HasValue && position > options.ToPosition.Value)
+            {
+                _logger.LogInformation(
+                    "Reached ToPosition {ToPosition} for {CheckpointKey}",
+                    options.ToPosition.Value,
+                    checkpointKey);
+                break;
+            }
+
+            // Filter by partition if specified
+            if (!string.IsNullOrEmpty(options.Partition))
+            {
+                var shouldSkipEvent = false;
+                foreach (var handlerType in handlers)
+                {
+                    var partitionedInterface = handlerType.GetInterfaces()
+                        .FirstOrDefault(i => i.IsGenericType &&
+                            i.GetGenericTypeDefinition() == typeof(IPartitionedProjectionHandler<>));
+
+                    if (partitionedInterface != null)
+                    {
+                        using var scope = _serviceProvider.CreateScope();
+                        var handler = scope.ServiceProvider.GetRequiredService(handlerType);
+                        var getPartitionKeyMethod = partitionedInterface.GetMethod("GetPartitionKey");
+                        if (getPartitionKeyMethod != null)
+                        {
+                            var partitionKey = getPartitionKeyMethod.Invoke(handler, new[] { (object)@event }) as string;
+                            if (partitionKey != options.Partition)
+                            {
+                                shouldSkipEvent = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                if (shouldSkipEvent)
+                {
+                    continue;
+                }
+            }
+
+            // Process event through all handlers
+            foreach (var handlerType in handlers)
+            {
+                try
+                {
+                    using var scope = _serviceProvider.CreateScope();
+                    var handler = scope.ServiceProvider.GetRequiredService(handlerType);
+
+                    // Find and invoke ProjectAsync method
+                    var projectMethod = handlerType.GetMethod("ProjectAsync");
+                    if (projectMethod != null)
+                    {
+                        var projectTask = (ValueTask)projectMethod.Invoke(handler, new object[] { @event!, cancellationToken })!;
+                        await projectTask;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(
+                        ex,
+                        "Error processing event at position {Position} for {CheckpointKey}, handler {HandlerType}",
+                        position,
+                        checkpointKey,
+                        handlerType.Name);
+                }
+            }
+
+            eventsProcessed++;
+            currentPosition = position;
+
+            // Checkpoint if needed (normal mode with batch size reached)
+            if (normalCheckpointing && eventsProcessed % batchSize == 0)
+            {
+                await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, cancellationToken);
+                _logger.LogDebug(
+                    "Checkpoint saved for {CheckpointKey} at position {Position} ({EventsProcessed} events processed)",
+                    checkpointKey,
+                    currentPosition,
+                    eventsProcessed);
+            }
+        }
+        
+        return (eventsProcessed, currentPosition);
     }
 }
