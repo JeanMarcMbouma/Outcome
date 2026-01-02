@@ -9,7 +9,9 @@
     <Project Path="src/BbQ.Events/BbQ.Events.csproj" />
     <Project Path="src/BbQ.Events.SourceGenerators/BbQ.Events.SourceGenerators.csproj" />
     <Project Path="src/BbQ.Events.SqlServer/BbQ.Events.SqlServer.csproj" />
+    <Project Path="src/BbQ.Events.PostgreSql/BbQ.Events.PostgreSql.csproj" />
     <Project Path="tests/BbQ.Events.SqlServer.Tests/BbQ.Events.SqlServer.Tests.csproj" />
+    <Project Path="tests/BbQ.Events.PostgreSql.Tests/BbQ.Events.PostgreSql.Tests.csproj" />
   </Folder>
   <Project Path="src/Outcome.SourceGenerators/Outcome.SourceGenerators.csproj" />
   <Project Path="tests/Outcome.Tests/Outcome.Tests.csproj" />
