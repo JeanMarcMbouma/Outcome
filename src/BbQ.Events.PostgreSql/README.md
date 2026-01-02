@@ -9,7 +9,7 @@ This package provides a production-ready, durable implementation for:
 
 - ✅ **Durable Checkpoint Store**: Persistent projection checkpoints
 - ✅ **Atomic Operations**: INSERT ... ON CONFLICT upserts prevent race conditions
-- ✅ **Thread-Safe**: Safe for parallel processing and multiple instances
+- ✅ **Thread-safe**: Safe for parallel processing and multiple instances
 - ✅ **Minimal Dependencies**: Uses Npgsql (PostgreSQL ADO.NET provider) for performance
 - ✅ **Partitioned Projections**: Support for partition-based checkpointing (schema-ready)
 - ✅ **Feature-Based Architecture**: Organized by capability (Checkpointing, Configuration, Schema)
