@@ -10,27 +10,27 @@ namespace BbQ.Events.SqlServer.Configuration;
 internal class SqlServerSchemaInitializerHostedService : IHostedService
 {
     private readonly ISchemaInitializer _schemaInitializer;
-    private readonly ILogger<SqlServerSchemaInitializerHostedService>? _logger;
+    private readonly ILogger<SqlServerSchemaInitializerHostedService> _logger;
 
     public SqlServerSchemaInitializerHostedService(
         ISchemaInitializer schemaInitializer,
-        ILogger<SqlServerSchemaInitializerHostedService>? logger = null)
+        ILogger<SqlServerSchemaInitializerHostedService> logger)
     {
         _schemaInitializer = schemaInitializer ?? throw new ArgumentNullException(nameof(schemaInitializer));
-        _logger = logger;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         try
         {
-            _logger?.LogInformation("Ensuring SQL Server event store schema exists...");
+            _logger.LogInformation("Ensuring SQL Server event store schema exists...");
             await _schemaInitializer.EnsureSchemaAsync(cancellationToken);
-            _logger?.LogInformation("SQL Server event store schema initialized successfully");
+            _logger.LogInformation("SQL Server event store schema initialized successfully");
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Failed to initialize SQL Server event store schema");
+            _logger.LogError(ex, "Failed to initialize SQL Server event store schema");
             throw;
         }
     }
