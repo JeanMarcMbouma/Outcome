@@ -33,6 +33,11 @@ public class SqlServerEventStore : IEventStore
     private readonly JsonSerializerOptions _jsonOptions;
 
     /// <summary>
+    /// Gets the connection string used by this event store.
+    /// </summary>
+    internal string ConnectionString => _options.ConnectionString;
+
+    /// <summary>
     /// Creates a new SQL Server event store.
     /// </summary>
     /// <param name="options">Configuration options</param>

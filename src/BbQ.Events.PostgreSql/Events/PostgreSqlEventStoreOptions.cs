@@ -28,4 +28,14 @@ public class PostgreSqlEventStoreOptions
     /// Default is false.
     /// </remarks>
     public bool IncludeMetadata { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets whether to automatically create the database schema if it doesn't exist.
+    /// </summary>
+    /// <remarks>
+    /// When enabled, the event store will check for and create the required tables
+    /// (bbq_events, bbq_streams, bbq_projection_checkpoints) on first use.
+    /// Default is false for safety in production environments.
+    /// </remarks>
+    public bool AutoCreateSchema { get; set; } = false;
 }
