@@ -201,4 +201,24 @@ public class ServiceCollectionExtensionsTests
         // Assert
         Assert.That(result, Is.SameAs(services));
     }
+
+    [Test]
+    public void UseSqlServerEventStore_WithAutoCreateSchemaTrue_ConfiguresOptionsCorrectly()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+
+        // Act
+        services.UseSqlServerEventStore(options =>
+        {
+            options.ConnectionString = "Server=localhost;Database=Test;";
+            options.AutoCreateSchema = true;
+        });
+        var provider = services.BuildServiceProvider();
+
+        // Assert
+        var store = provider.GetService<IEventStore>();
+        Assert.That(store, Is.Not.Null);
+        Assert.That(store, Is.InstanceOf<SqlServerEventStore>());
+    }
 }

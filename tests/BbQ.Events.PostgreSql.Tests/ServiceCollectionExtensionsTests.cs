@@ -193,4 +193,24 @@ public class ServiceCollectionExtensionsTests
         // Assert
         Assert.That(result, Is.SameAs(services));
     }
+
+    [Test]
+    public void UsePostgreSqlEventStore_WithAutoCreateSchemaTrue_ConfiguresOptionsCorrectly()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+
+        // Act
+        services.UsePostgreSqlEventStore(options =>
+        {
+            options.ConnectionString = "Host=localhost;Database=test;Username=test;Password=test";
+            options.AutoCreateSchema = true;
+        });
+        var provider = services.BuildServiceProvider();
+
+        // Assert
+        var store = provider.GetService<IEventStore>();
+        Assert.That(store, Is.Not.Null);
+        Assert.That(store, Is.InstanceOf<PostgreSqlEventStore>());
+    }
 }
