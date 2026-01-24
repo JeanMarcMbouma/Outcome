@@ -24,7 +24,31 @@ dotnet add package BbQ.Events.SqlServer
 
 ## Database Schema
 
-The package includes SQL schema files in the `Schema/` folder. Run these scripts to set up your database:
+The package includes SQL schema files in the `Schema/` folder. 
+
+### Automatic Schema Creation (Recommended)
+
+The simplest way to set up the database schema is to enable automatic schema creation:
+
+```csharp
+services.UseSqlServerEventStore(options =>
+{
+    options.ConnectionString = "Server=localhost;Database=MyApp;Integrated Security=true";
+    options.AutoCreateSchema = true;  // Automatically create tables if they don't exist
+});
+```
+
+When `AutoCreateSchema` is enabled:
+- ✅ Tables are created automatically on application startup if they don't exist
+- ✅ The schema creation is idempotent (safe to run multiple times)
+- ✅ Existing tables are not modified
+- ✅ Uses the embedded SQL scripts to ensure consistency
+
+**Note**: For production environments, you may prefer to run the SQL scripts manually for more control. Set `AutoCreateSchema = false` (the default) and execute the scripts during deployment.
+
+### Manual Schema Creation
+
+Alternatively, you can manually run the schema scripts:
 
 ### 1. Events Table (for Event Store)
 
@@ -70,6 +94,22 @@ CREATE TABLE BbQ_ProjectionCheckpoints (
 
 **Note**: The `PartitionKey` column is nullable and defaults to `NULL` for non-partitioned projections. SQL Server allows nullable columns in composite primary keys. Due to how NULL values work in unique constraints, only one row with a NULL `PartitionKey` can exist per `ProjectionName`, which is the desired behavior for non-partitioned projections.
 
+### Explicit Schema Initialization
+
+You can also manually trigger schema initialization at any time:
+
+```csharp
+var eventStore = provider.GetRequiredService<IEventStore>();
+
+// Ensure the schema exists (creates tables if they don't exist)
+await eventStore.EnsureSchemaAsync();
+```
+
+This is useful for:
+- Testing environments where you want to set up the database on-demand
+- Initialization logic in application startup
+- Migration scenarios where you're adding the event store to an existing application
+
 ## Usage
 
 ### Event Store
@@ -112,6 +152,7 @@ services.UseSqlServerEventStore(options =>
 {
     options.ConnectionString = "Server=localhost;Database=MyApp;Integrated Security=true";
     options.IncludeMetadata = true;        // Include metadata (timestamp, server, etc.)
+    options.AutoCreateSchema = true;       // Automatically create schema if missing
     options.JsonSerializerOptions = new JsonSerializerOptions
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase

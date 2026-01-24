@@ -1,18 +1,22 @@
 # BbQ.Events.PostgreSql
 
-PostgreSQL implementation for BbQ.Events, providing checkpoint persistence for projections.
+PostgreSQL implementation for BbQ.Events, providing both event store and checkpoint persistence.
 
-This package provides a production-ready, durable implementation for:
+This package provides production-ready, durable implementations for:
+- **Event Store**: Full event sourcing with IEventStore for PostgreSQL
 - **Checkpoint Store**: Projection checkpoint persistence with IProjectionCheckpointStore
 
 ## Features
 
+- ✅ **Durable Event Store**: Sequential event persistence with stream isolation
 - ✅ **Durable Checkpoint Store**: Persistent projection checkpoints
 - ✅ **Atomic Operations**: INSERT ... ON CONFLICT upserts prevent race conditions
 - ✅ **Thread-safe**: Safe for parallel processing and multiple instances
+- ✅ **Automatic Schema Creation**: Optional schema initialization on startup
 - ✅ **Minimal Dependencies**: Uses Npgsql (PostgreSQL ADO.NET provider) for performance
+- ✅ **JSON Serialization**: Flexible event data serialization
 - ✅ **Partitioned Projections**: Support for partition-based checkpointing (schema-ready)
-- ✅ **Feature-Based Architecture**: Organized by capability (Checkpointing, Configuration, Schema)
+- ✅ **Feature-Based Architecture**: Organized by capability (Events, Checkpointing, Schema, Configuration)
 
 ## Installation
 
@@ -22,7 +26,60 @@ dotnet add package BbQ.Events.PostgreSql
 
 ## Database Schema
 
-The package includes SQL schema files in the `Schema/` folder. Run these scripts to set up your database:
+The package includes SQL schema files in the `Schema/` folder.
+
+### Automatic Schema Creation (Recommended)
+
+The simplest way to set up the database schema is to enable automatic schema creation:
+
+```csharp
+services.UsePostgreSqlEventStore(options =>
+{
+    options.ConnectionString = "Host=localhost;Database=myapp;Username=myuser;Password=mypass";
+    options.AutoCreateSchema = true;  // Automatically create tables if they don't exist
+});
+```
+
+When `AutoCreateSchema` is enabled:
+- ✅ Tables are created automatically on application startup if they don't exist
+- ✅ The schema creation is idempotent (safe to run multiple times)
+- ✅ Existing tables are not modified
+- ✅ Uses the embedded SQL scripts to ensure consistency
+
+**Note**: For production environments, you may prefer to run the SQL scripts manually for more control. Set `AutoCreateSchema = false` (the default) and execute the scripts during deployment.
+
+### Manual Schema Creation
+
+Alternatively, you can manually run the schema scripts:
+
+### Events Table (for Event Store)
+
+```sql
+-- See Schema/CreateEventsTable.sql for full script
+CREATE TABLE bbq_events (
+    event_id BIGSERIAL PRIMARY KEY,
+    stream_name VARCHAR(200) NOT NULL,
+    position BIGINT NOT NULL,
+    event_type VARCHAR(500) NOT NULL,
+    event_data TEXT NOT NULL,
+    metadata TEXT NULL,
+    created_utc TIMESTAMP NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC'),
+    CONSTRAINT uq_bbq_events_stream_position UNIQUE (stream_name, position)
+);
+```
+
+### Streams Table (for Event Store)
+
+```sql
+-- See Schema/CreateStreamsTable.sql for full script
+CREATE TABLE bbq_streams (
+    stream_name VARCHAR(200) PRIMARY KEY,
+    current_position BIGINT NOT NULL DEFAULT -1,
+    version INT NOT NULL DEFAULT 0,
+    created_utc TIMESTAMP NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC'),
+    last_updated_utc TIMESTAMP NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC')
+);
+```
 
 ### Checkpoints Table (for Projection Checkpoints)
 
@@ -39,7 +96,71 @@ CREATE TABLE bbq_projection_checkpoints (
 
 **Note**: The `partition_key` column is nullable and defaults to `NULL` for non-partitioned projections. PostgreSQL allows nullable columns in composite primary keys with the `NULLS NOT DISTINCT` clause (PostgreSQL 15+). This ensures only one row with a NULL `partition_key` can exist per `projection_name`, which is the desired behavior for non-partitioned projections.
 
+### Explicit Schema Initialization
+
+You can also manually trigger schema initialization at any time:
+
+```csharp
+var eventStore = provider.GetRequiredService<IEventStore>();
+
+// Ensure the schema exists (creates tables if they don't exist)
+await eventStore.EnsureSchemaAsync();
+```
+
+This is useful for:
+- Testing environments where you want to set up the database on-demand
+- Initialization logic in application startup
+- Migration scenarios where you're adding the event store to an existing application
+
 ## Usage
+
+### Event Store
+
+Use the PostgreSQL event store for durable event persistence:
+
+```csharp
+using BbQ.Events.PostgreSql.Configuration;
+
+var services = new ServiceCollection();
+
+// Register PostgreSQL event store
+services.UsePostgreSqlEventStore("Host=localhost;Database=myapp;Username=myuser;Password=mypass");
+
+var provider = services.BuildServiceProvider();
+var eventStore = provider.GetRequiredService<IEventStore>();
+
+// Append events to a stream
+var userId = Guid.NewGuid();
+await eventStore.AppendAsync("users", new UserCreated(userId, "Alice", "alice@example.com"));
+await eventStore.AppendAsync("users", new UserUpdated(userId, "Alice Smith"));
+
+// Read events from a stream
+await foreach (var storedEvent in eventStore.ReadAsync<UserCreated>("users"))
+{
+    Console.WriteLine($"Position {storedEvent.Position}: {storedEvent.Event.Name}");
+}
+
+// Get current stream position
+var position = await eventStore.GetStreamPositionAsync("users");
+Console.WriteLine($"Stream at position: {position}");
+```
+
+### Event Store with Options
+
+Configure advanced options:
+
+```csharp
+services.UsePostgreSqlEventStore(options =>
+{
+    options.ConnectionString = "Host=localhost;Database=myapp;Username=myuser;Password=mypass";
+    options.IncludeMetadata = true;        // Include metadata (timestamp, server, etc.)
+    options.AutoCreateSchema = true;       // Automatically create schema if missing
+    options.JsonSerializerOptions = new JsonSerializerOptions
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+});
+```
 
 ### Checkpoint Store (for Projections)
 
@@ -79,7 +200,14 @@ using BbQ.Events.PostgreSql.Configuration;
 
 var services = new ServiceCollection();
 
-// Register event store (in-memory or other provider)
+// Register PostgreSQL event store for event sourcing
+services.UsePostgreSqlEventStore(options =>
+{
+    options.ConnectionString = "Host=localhost;Database=myapp;Username=myuser;Password=mypass";
+    options.AutoCreateSchema = true;  // Automatically create schema
+});
+
+// Register event bus for pub/sub
 services.AddInMemoryEventBus();
 
 // Register projections
