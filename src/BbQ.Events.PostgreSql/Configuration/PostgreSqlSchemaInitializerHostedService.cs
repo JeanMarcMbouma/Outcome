@@ -10,27 +10,27 @@ namespace BbQ.Events.PostgreSql.Configuration;
 internal class PostgreSqlSchemaInitializerHostedService : IHostedService
 {
     private readonly ISchemaInitializer _schemaInitializer;
-    private readonly ILogger<PostgreSqlSchemaInitializerHostedService>? _logger;
+    private readonly ILogger<PostgreSqlSchemaInitializerHostedService> _logger;
 
     public PostgreSqlSchemaInitializerHostedService(
         ISchemaInitializer schemaInitializer,
-        ILogger<PostgreSqlSchemaInitializerHostedService>? logger = null)
+        ILogger<PostgreSqlSchemaInitializerHostedService> logger)
     {
         _schemaInitializer = schemaInitializer ?? throw new ArgumentNullException(nameof(schemaInitializer));
-        _logger = logger;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         try
         {
-            _logger?.LogInformation("Ensuring PostgreSQL event store schema exists...");
+            _logger.LogInformation("Ensuring PostgreSQL event store schema exists...");
             await _schemaInitializer.EnsureSchemaAsync(cancellationToken);
-            _logger?.LogInformation("PostgreSQL event store schema initialized successfully");
+            _logger.LogInformation("PostgreSQL event store schema initialized successfully");
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Failed to initialize PostgreSQL event store schema");
+            _logger.LogError(ex, "Failed to initialize PostgreSQL event store schema");
             throw;
         }
     }

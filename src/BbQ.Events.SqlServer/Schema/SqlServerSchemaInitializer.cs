@@ -56,7 +56,7 @@ public class SqlServerSchemaInitializer : ISchemaInitializer
         await using var checkCommand = new SqlCommand(checkSql, connection);
         checkCommand.Parameters.AddWithValue("@TableName", tableName);
 
-        var exists = (int)(await checkCommand.ExecuteScalarAsync(cancellationToken))! > 0;
+        var exists = (int)(await checkCommand.ExecuteScalarAsync(cancellationToken)) > 0;
 
         if (exists)
         {
