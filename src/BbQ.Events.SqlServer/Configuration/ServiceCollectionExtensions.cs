@@ -2,8 +2,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using BbQ.Events.Checkpointing;
 using BbQ.Events.Events;
+using BbQ.Events.Schema;
 using BbQ.Events.SqlServer.Checkpointing;
 using BbQ.Events.SqlServer.Events;
+using BbQ.Events.SqlServer.Schema;
 
 namespace BbQ.Events.SqlServer.Configuration;
 
@@ -126,6 +128,17 @@ public static class ServiceCollectionExtensions
         // Replace any existing IEventStore registration
         services.Replace(ServiceDescriptor.Singleton<IEventStore>(
             _ => new SqlServerEventStore(options)));
+
+        // Register schema initializer
+        services.Replace(ServiceDescriptor.Singleton<ISchemaInitializer>(
+            _ => new SqlServerSchemaInitializer(options.ConnectionString)));
+
+        // If AutoCreateSchema is enabled, ensure schema on first use
+        if (options.AutoCreateSchema)
+        {
+            // Use a hosted service or similar pattern to ensure schema is created early
+            services.AddHostedService<SqlServerSchemaInitializerHostedService>();
+        }
 
         return services;
     }

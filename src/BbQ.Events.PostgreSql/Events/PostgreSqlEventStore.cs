@@ -34,6 +34,11 @@ public class PostgreSqlEventStore : IEventStore
     private static readonly string MachineName = Environment.MachineName;
 
     /// <summary>
+    /// Gets the connection string used by this event store.
+    /// </summary>
+    internal string ConnectionString => _options.ConnectionString;
+
+    /// <summary>
     /// Creates a new PostgreSQL event store.
     /// </summary>
     /// <param name="options">Configuration options</param>
