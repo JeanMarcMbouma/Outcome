@@ -4,13 +4,14 @@ on:
   push:
     tags:
       - 'sqlserver-v*'  # Triggers on tags like sqlserver-v0.1.0, sqlserver-v1.0.0
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
   build-and-publish:
     runs-on: windows-latest
     environment: production
-    permissions:
-      contents: read
     
     steps:
     - name: Checkout code
