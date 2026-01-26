@@ -4,7 +4,7 @@
 
 CREATE TABLE BbQ_ProjectionCheckpoints (
     ProjectionName NVARCHAR(200) NOT NULL,
-    PartitionKey NVARCHAR(200) NULL,
+    PartitionKey NVARCHAR(200) NOT NULL,
     Position BIGINT NOT NULL,
     LastUpdatedUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
     PRIMARY KEY (ProjectionName, PartitionKey)
