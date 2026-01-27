@@ -4,7 +4,7 @@
     <TargetFramework>net8.0</TargetFramework>
 
     <PackageId>BbQ.Events.SqlServer</PackageId>
-    <Version>0.2.0</Version>
+    <Version>0.2.1</Version>
     <Authors>Jean</Authors>
     <Company>JM Mbouma</Company>
     <Description>SQL Server implementation for BbQ.Events, providing both IEventStore for event sourcing and IProjectionCheckpointStore for projection checkpoints. Features durable event persistence with sequential positions, atomic operations, JSON serialization, and thread-safe parallel processing support.</Description>

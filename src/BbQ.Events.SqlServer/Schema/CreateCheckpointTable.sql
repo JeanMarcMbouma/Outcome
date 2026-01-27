@@ -4,10 +4,9 @@
 
 CREATE TABLE BbQ_ProjectionCheckpoints (
     ProjectionName NVARCHAR(200) NOT NULL,
-    PartitionKey NVARCHAR(200) NOT NULL,
+    PartitionKey NVARCHAR(200) NULL,
     Position BIGINT NOT NULL,
-    LastUpdatedUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-    PRIMARY KEY (ProjectionName, PartitionKey)
+    LastUpdatedUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
 );
 
 -- Index for time-based queries (projection health monitoring)
@@ -17,3 +16,9 @@ ON BbQ_ProjectionCheckpoints(LastUpdatedUtc);
 -- Index for querying all checkpoints of a projection
 CREATE INDEX IX_BbQ_ProjectionCheckpoints_ProjectionName 
 ON BbQ_ProjectionCheckpoints(ProjectionName);
+
+CREATE UNIQUE CLUSTERED INDEX [UQ_BbQ_ProjectionCheckpoints_ProjectionPartition] ON BbQ_ProjectionCheckpoints
+(
+	[ProjectionName] ASC,
+	[PartitionKey] ASC
+)
