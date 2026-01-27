@@ -168,9 +168,11 @@ internal class DefaultProjectionEngine : IProjectionEngine
 
             // Get MoveNextAsync and Current from the enumerator (these are instance-specific)
             var enumeratorType = enumerator.GetType();
-            var moveNextMethod = enumeratorType.GetMethod("MoveNextAsync");
-            var currentProperty = enumeratorType.GetProperty("Current");
-            
+
+            MethodInfo? moveNextMethod = GetMoveNextAsync(enumeratorType);
+            var currentProperty = GetCurrentAsync(enumeratorType);
+
+
             if (moveNextMethod == null || currentProperty == null)
             {
                 _logger.LogError("Could not find MoveNextAsync or Current on enumerator for event type {EventType}", eventType.Name);
@@ -179,7 +181,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
 
             while (true)
             {
-                var moveNextResult = moveNextMethod.Invoke(enumerator, Array.Empty<object>());
+                var moveNextResult = moveNextMethod!.Invoke(enumerator, Array.Empty<object>());
                 if (moveNextResult == null)
                 {
                     _logger.LogError("MoveNextAsync returned null for event type {EventType}", eventType.Name);
@@ -208,6 +210,78 @@ internal class DefaultProjectionEngine : IProjectionEngine
             _logger.LogError(ex, "Error processing event stream for {EventType}", eventType.Name);
             throw;
         }
+    }
+
+    private static MethodInfo? GetMoveNextAsync(Type? type)
+    {
+        // Look for method named "MoveNextAsync"
+        var method = type?.GetMethod("MoveNextAsync", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        if (method != null)
+        {
+            return method;
+        }
+        else
+        {
+
+            // Check interfaces for explicit implementation
+            foreach (var iface in type.GetInterfaces())
+            {
+                var map = type.GetInterfaceMap(iface);
+                for (int i = 0; i < map.InterfaceMethods.Length; i++)
+                {
+                    if (map.InterfaceMethods[i].Name == "MoveNextAsync")
+                    {
+                        return map.TargetMethods[i];
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static PropertyInfo? GetCurrentAsync(Type? type)
+    {
+        // Look for method named "MoveNextAsync"
+        var method = type?.GetProperty("Current", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        if (method != null)
+        {
+            return method;
+        }
+        else
+        {
+
+            // Check interfaces for explicit implementation
+            foreach (var iface in type.GetInterfaces())
+            {
+                var map = type.GetInterfaceMap(iface);
+                for (int i = 0; i < map.InterfaceMethods.Length; i++)
+                {
+                    if (map.InterfaceMethods[i].Name == "get_Current")
+                    {
+                        // The target method is the getter; get its associated property
+                        var getter = map.TargetMethods[i];
+
+                        // Find the property that uses this getter
+                        var props = type.GetProperties(
+                            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+                        );
+
+                        foreach (var p in props)
+                        {
+                            if (p.GetMethod == getter)
+                                return p;
+                        }
+
+                        // If no property wrapper exists, return a synthetic PropertyInfo? (rare)
+                        return null;
+                    }
+
+                }
+            }
+        }
+
+        return null;
     }
 
     private async Task DispatchEventToHandlersAsync(
@@ -291,7 +365,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
     /// <summary>
     /// Gets projection options for a handler, checking registry first, then attribute, then defaults.
     /// </summary>
-    private ProjectionOptions GetProjectionOptions(Type concreteType)
+    private static ProjectionOptions GetProjectionOptions(Type concreteType)
     {
         // Check if options were registered programmatically
         var registeredOptions = ProjectionHandlerRegistry.GetProjectionOptions(concreteType.Name);
@@ -393,7 +467,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
     /// <summary>
     /// Creates a channel with the configured backpressure strategy.
     /// </summary>
-    private Channel<T> CreateChannelWithBackpressure<T>(ProjectionOptions options)
+    private static Channel<T> CreateChannelWithBackpressure<T>(ProjectionOptions options)
     {
         return options.BackpressureStrategy switch
         {
