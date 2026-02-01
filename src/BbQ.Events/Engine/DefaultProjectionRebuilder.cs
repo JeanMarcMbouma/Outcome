@@ -134,7 +134,9 @@ internal class DefaultProjectionRebuilder : IProjectionRebuilder
                 var registration = ProjectionHandlerRegistry.GetHandlerRegistration(eventType, handlerType);
                 if (registration != null)
                 {
-                    projectionNames.Add(registration.ConcreteType.Name);
+                    var projectionOptions = ProjectionHandlerRegistry.GetProjectionOptions(registration.ConcreteType.Name);
+                    var resolvedName = ProjectionNameResolver.Resolve(registration.ConcreteType, projectionOptions);
+                    projectionNames.Add(resolvedName);
                 }
             }
         }
