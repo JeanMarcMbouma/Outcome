@@ -102,7 +102,9 @@ internal class DefaultReplayService : IReplayService
                 var registration = ProjectionHandlerRegistry.GetHandlerRegistration(eventType, handlerType);
                 if (registration != null)
                 {
-                    registeredProjections.Add(registration.ConcreteType.Name);
+                    var projectionOptions = ProjectionHandlerRegistry.GetProjectionOptions(registration.ConcreteType.Name);
+                    var resolvedName = ProjectionNameResolver.Resolve(registration.ConcreteType, projectionOptions);
+                    registeredProjections.Add(resolvedName);
                 }
             }
         }
@@ -241,13 +243,18 @@ internal class DefaultReplayService : IReplayService
             foreach (var handlerType in handlers)
             {
                 var registration = ProjectionHandlerRegistry.GetHandlerRegistration(eventType, handlerType);
-                if (registration != null && registration.ConcreteType.Name == projectionName)
+                if (registration != null)
                 {
-                    if (!projectionHandlers.ContainsKey(eventType))
+                    var projectionOptions = ProjectionHandlerRegistry.GetProjectionOptions(registration.ConcreteType.Name);
+                    var resolvedName = ProjectionNameResolver.Resolve(registration.ConcreteType, projectionOptions);
+                    if (resolvedName == projectionName)
                     {
-                        projectionHandlers[eventType] = new List<Type>();
+                        if (!projectionHandlers.ContainsKey(eventType))
+                        {
+                            projectionHandlers[eventType] = new List<Type>();
+                        }
+                        projectionHandlers[eventType].Add(handlerType);
                     }
-                    projectionHandlers[eventType].Add(handlerType);
                 }
             }
         }

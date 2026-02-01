@@ -377,9 +377,8 @@ internal class DefaultProjectionEngine : IProjectionEngine
         // Fall back to reading from attribute
         var attribute = concreteType.GetCustomAttribute<ProjectionAttribute>();
         
-        return new ProjectionOptions
+        var options = new ProjectionOptions
         {
-            ProjectionName = concreteType.Name,
             MaxDegreeOfParallelism = attribute?.MaxDegreeOfParallelism ?? 1,
             CheckpointBatchSize = attribute?.CheckpointBatchSize ?? 100,
             StartupMode = attribute?.StartupMode ?? ProjectionStartupMode.Resume,
@@ -387,6 +386,11 @@ internal class DefaultProjectionEngine : IProjectionEngine
             BackpressureStrategy = attribute?.BackpressureStrategy ?? BackpressureStrategy.Block,
             // ErrorHandling is already initialized by property initializer to default values
         };
+        
+        // Use ProjectionNameResolver for consistent name resolution
+        options.ProjectionName = ProjectionNameResolver.Resolve(concreteType, registeredOptions);
+        
+        return options;
     }
 
     /// <summary>
