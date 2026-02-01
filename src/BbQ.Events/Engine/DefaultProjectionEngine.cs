@@ -388,9 +388,8 @@ internal class DefaultProjectionEngine : IProjectionEngine
         };
         
         // Use ProjectionNameResolver for consistent name resolution
-        // Since we don't have registered options (they would have been returned above),
-        // pass null to get the type name
-        options.ProjectionName = ProjectionNameResolver.Resolve(concreteType, null);
+        // Since ProjectionName is not explicitly set in options, the resolver will use the type name
+        options.ProjectionName = ProjectionNameResolver.Resolve(concreteType, options);
         
         return options;
     }
