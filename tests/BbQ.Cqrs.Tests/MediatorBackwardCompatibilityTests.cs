@@ -1,6 +1,4 @@
-using BbQ.Cqrs;
 using BbQ.Cqrs.DependencyInjection;
-using BbQ.Outcome;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 
@@ -21,7 +19,7 @@ public class MediatorBackwardCompatibilityTests
     public void Setup()
     {
         var services = new ServiceCollection();
-        services.AddBbQMediator(typeof(DirectRequest).Assembly);
+        services.AddBbQMediator([typeof(DirectRequest).Assembly]);
         services.AddTransient<IRequestHandler<DirectRequest, string>, DirectRequestHandler>();
         
         _serviceProvider = services.BuildServiceProvider();
@@ -52,7 +50,7 @@ public class MediatorBackwardCompatibilityTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddBbQMediator(typeof(DirectRequest).Assembly);
+        services.AddBbQMediator([typeof(DirectRequest).Assembly]);
         services.AddTransient<IRequestHandler<DirectRequest, string>, DirectRequestHandler>();
         services.AddTransient<IPipelineBehavior<DirectRequest, string>, DirectRequestBehavior>();
 

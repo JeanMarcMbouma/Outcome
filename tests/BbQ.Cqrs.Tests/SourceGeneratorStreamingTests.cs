@@ -1,4 +1,3 @@
-using BbQ.Cqrs;
 using BbQ.Cqrs.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;

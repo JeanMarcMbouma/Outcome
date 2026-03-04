@@ -1,4 +1,3 @@
-using BbQ.Cqrs;
 using BbQ.Cqrs.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
@@ -22,7 +21,7 @@ public class StreamingQueryTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddBbQMediator(typeof(StreamNumbersQuery).Assembly);
+        services.AddBbQMediator([typeof(StreamNumbersQuery).Assembly]);
         services.AddTransient<IStreamHandler<StreamNumbersQuery, int>, StreamNumbersQueryHandler>();
 
         using var sp = services.BuildServiceProvider();
@@ -47,7 +46,7 @@ public class StreamingQueryTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddBbQMediator(typeof(StreamNumbersQuery).Assembly);
+        services.AddBbQMediator([typeof(StreamNumbersQuery).Assembly]);
         services.AddTransient<IStreamHandler<StreamNumbersQuery, int>, StreamNumbersQueryHandler>();
 
         using var sp = services.BuildServiceProvider();
@@ -72,7 +71,7 @@ public class StreamingQueryTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddBbQMediator(typeof(StreamNumbersQuery).Assembly);
+        services.AddBbQMediator([typeof(StreamNumbersQuery).Assembly]);
         services.AddTransient<IStreamHandler<StreamNumbersQuery, int>, StreamNumbersQueryHandler>();
         
         // Use a behavior instance to track count
@@ -101,7 +100,7 @@ public class StreamingQueryTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddBbQMediator(typeof(StreamNumbersQuery).Assembly);
+        services.AddBbQMediator([typeof(StreamNumbersQuery).Assembly]);
         services.AddTransient<IStreamHandler<StreamNumbersQuery, int>, StreamNumbersQueryHandler>();
         services.AddTransient<IStreamPipelineBehavior<StreamNumbersQuery, int>, StreamFilterEvenBehavior>();
 
@@ -126,7 +125,7 @@ public class StreamingQueryTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddBbQMediator(typeof(StreamNumbersQuery).Assembly);
+        services.AddBbQMediator([typeof(StreamNumbersQuery).Assembly]);
         services.AddTransient<IStreamHandler<StreamNumbersQuery, int>, StreamNumbersQueryHandler>();
         services.AddTransient<IStreamPipelineBehavior<StreamNumbersQuery, int>, StreamMultiplyBehavior>();
         services.AddTransient<IStreamPipelineBehavior<StreamNumbersQuery, int>, StreamAddBehavior>();
@@ -153,7 +152,7 @@ public class StreamingQueryTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddBbQMediator(typeof(StreamNumbersQuery).Assembly);
+        services.AddBbQMediator([typeof(StreamNumbersQuery).Assembly]);
         services.AddTransient<IStreamHandler<StreamNumbersQuery, int>, StreamNumbersQueryHandler>();
 
         using var sp = services.BuildServiceProvider();
@@ -190,7 +189,7 @@ public class StreamingQueryTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddBbQMediator(typeof(StreamNumbersQuery).Assembly);
+        services.AddBbQMediator([typeof(StreamNumbersQuery).Assembly]);
         services.AddTransient<IStreamHandler<StreamNumbersQuery, int>, StreamNumbersQueryHandler>();
 
         using var sp = services.BuildServiceProvider();
@@ -214,7 +213,7 @@ public class StreamingQueryTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddBbQMediator(typeof(StreamUsersQuery).Assembly);
+        services.AddBbQMediator([typeof(StreamUsersQuery).Assembly]);
         services.AddTransient<IStreamHandler<StreamUsersQuery, User>, StreamUsersQueryHandler>();
 
         using var sp = services.BuildServiceProvider();

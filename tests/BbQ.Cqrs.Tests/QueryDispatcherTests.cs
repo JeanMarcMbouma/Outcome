@@ -1,4 +1,3 @@
-using BbQ.Cqrs;
 using BbQ.Cqrs.DependencyInjection;
 using BbQ.Outcome;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,7 +22,7 @@ public class QueryDispatcherTests
     public void Setup()
     {
         var services = new ServiceCollection();
-        services.AddBbQMediator(typeof(TestQuery).Assembly);
+        services.AddBbQMediator([typeof(TestQuery).Assembly]);
         services.AddTransient<IRequestHandler<TestQuery, Outcome<string>>, TestQueryHandler>();
         
         _serviceProvider = services.BuildServiceProvider();
@@ -55,7 +54,7 @@ public class QueryDispatcherTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddBbQMediator(typeof(TestQuery).Assembly);
+        services.AddBbQMediator([typeof(TestQuery).Assembly]);
         services.AddTransient<IRequestHandler<TestQuery, Outcome<string>>, TestQueryHandler>();
         services.AddTransient<IPipelineBehavior<TestQuery, Outcome<string>>, QueryTestBehavior1>();
         services.AddTransient<IPipelineBehavior<TestQuery, Outcome<string>>, QueryTestBehavior2>();
@@ -82,7 +81,7 @@ public class QueryDispatcherTests
         CountingQueryHandler.Reset(); // Reset static counter to ensure test isolation
         
         var services = new ServiceCollection();
-        services.AddBbQMediator(typeof(TestQuery).Assembly);
+        services.AddBbQMediator([typeof(TestQuery).Assembly]);
         services.AddTransient<IRequestHandler<TestQuery, Outcome<string>>, CountingQueryHandler>();
         services.AddSingleton<CachingBehavior>();
         services.AddTransient<IPipelineBehavior<TestQuery, Outcome<string>>>(sp => sp.GetRequiredService<CachingBehavior>());

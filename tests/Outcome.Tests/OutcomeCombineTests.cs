@@ -2,7 +2,6 @@
 // These test aggregating multiple outcomes.
 
 using NUnit.Framework;
-using BbQ.Outcome;
 
 namespace BbQ.Outcome.Tests
 {

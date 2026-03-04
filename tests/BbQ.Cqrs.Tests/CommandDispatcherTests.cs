@@ -1,4 +1,3 @@
-using BbQ.Cqrs;
 using BbQ.Cqrs.DependencyInjection;
 using BbQ.Outcome;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,7 +22,7 @@ public class CommandDispatcherTests
     public void Setup()
     {
         var services = new ServiceCollection();
-        services.AddBbQMediator(typeof(TestCommand).Assembly);
+        services.AddBbQMediator([typeof(TestCommand).Assembly]);
         services.AddTransient<IRequestHandler<TestCommand, Outcome<string>>, TestCommandHandler>();
         services.AddTransient<IRequestHandler<TestCommandWithoutResult, Unit>, TestCommandWithoutResultHandler>();
         
@@ -56,7 +55,7 @@ public class CommandDispatcherTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddBbQMediator(typeof(TestCommand).Assembly);
+        services.AddBbQMediator([typeof(TestCommand).Assembly]);
         services.AddTransient<IRequestHandler<TestCommand, Outcome<string>>, TestCommandHandler>();
         services.AddTransient<IPipelineBehavior<TestCommand, Outcome<string>>, TestBehavior1>();
         services.AddTransient<IPipelineBehavior<TestCommand, Outcome<string>>, TestBehavior2>();

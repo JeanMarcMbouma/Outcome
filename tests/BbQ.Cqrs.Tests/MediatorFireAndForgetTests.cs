@@ -1,4 +1,3 @@
-using BbQ.Cqrs;
 using BbQ.Cqrs.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
@@ -22,7 +21,7 @@ public class MediatorFireAndForgetTests
     public void Setup()
     {
         var services = new ServiceCollection();
-        services.AddBbQMediator(typeof(FireAndForgetCommand).Assembly);
+        services.AddBbQMediator([typeof(FireAndForgetCommand).Assembly]);
         services.AddTransient<IRequestHandler<FireAndForgetCommand>, FireAndForgetCommandHandler>();
         services.AddSingleton<TrackingService>();
         
@@ -66,7 +65,7 @@ public class MediatorFireAndForgetTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddBbQMediator(typeof(FireAndForgetCommand).Assembly);
+        services.AddBbQMediator([typeof(FireAndForgetCommand).Assembly]);
         services.AddTransient<IRequestHandler<FireAndForgetCommand>, FireAndForgetCommandHandler>();
         services.AddSingleton<TrackingService>();
         services.AddTransient<IPipelineBehavior<FireAndForgetCommand, Unit>, FireAndForgetBehavior1>();
@@ -122,7 +121,7 @@ public class MediatorFireAndForgetTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddBbQMediator(typeof(CancellableFireAndForgetCommand).Assembly);
+        services.AddBbQMediator([typeof(CancellableFireAndForgetCommand).Assembly]);
         services.AddTransient<IRequestHandler<CancellableFireAndForgetCommand>, CancellableFireAndForgetHandler>();
         services.AddSingleton<CancellationTracker>();
 

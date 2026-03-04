@@ -1,5 +1,4 @@
 using BbQ.Cqrs;
-using BbQ.Outcome;
 
 namespace BbQ.CQRS.Samples;
 

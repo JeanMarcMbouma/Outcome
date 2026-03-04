@@ -21,7 +21,7 @@ namespace BbQ.Cqrs.SourceGenerators
         private static readonly LocalizableString Description = "The [Behavior] attribute can only be used on classes with exactly 2 type parameters that implement IPipelineBehavior<TRequest, TResponse>. Classes with additional type parameters cannot be automatically registered and must be registered manually.";
         private const string Category = "Usage";
 
-        private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(
+        private static readonly DiagnosticDescriptor Rule = new(
             DiagnosticId,
             Title,
             MessageFormat,

@@ -2,7 +2,6 @@
 // This demonstrates how to use IProjectionRebuilder in a CLI application
 // to reset and rebuild projections.
 
-using System;
 using BbQ.Events.Configuration;
 using BbQ.Events.Engine;
 using BbQ.Events.Projections;

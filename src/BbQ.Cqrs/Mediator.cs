@@ -1,5 +1,4 @@
 ﻿// The core mediator implementation that coordinates the CQRS pipeline
-using BbQ.Cqrs;
 using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Concurrent;
 

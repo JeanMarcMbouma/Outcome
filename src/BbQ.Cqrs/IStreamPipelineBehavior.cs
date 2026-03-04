@@ -113,6 +113,6 @@ public interface IStreamPipelineBehavior<TRequest, TItem>
     /// </remarks>
     IAsyncEnumerable<TItem> Handle(
         TRequest request,
-        [EnumeratorCancellation] CancellationToken ct,
+        CancellationToken ct,
         Func<TRequest, CancellationToken, IAsyncEnumerable<TItem>> next);
 }

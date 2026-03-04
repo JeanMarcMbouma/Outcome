@@ -55,8 +55,8 @@ namespace BbQ.Outcome.Tests
             // Arrange
             var errors = new List<Error<string>>
             {
-                new Error<string>("CODE1", "Description1"),
-                new Error<string>("CODE2", "Description2")
+                new("CODE1", "Description1"),
+                new("CODE2", "Description2")
             };
 
             // Act

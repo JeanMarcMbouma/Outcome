@@ -1,5 +1,3 @@
-using System.Runtime.CompilerServices;
-
 namespace BbQ.Events.Events;
 
 /// <summary>

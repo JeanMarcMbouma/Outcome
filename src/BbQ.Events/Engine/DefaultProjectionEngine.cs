@@ -214,8 +214,10 @@ internal class DefaultProjectionEngine : IProjectionEngine
 
     private static MethodInfo? GetMoveNextAsync(Type? type)
     {
+        if (type == null)
+            return null;
         // Look for method named "MoveNextAsync"
-        var method = type?.GetMethod("MoveNextAsync", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        var method = type.GetMethod("MoveNextAsync", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         if (method != null)
         {
             return method;
@@ -242,8 +244,10 @@ internal class DefaultProjectionEngine : IProjectionEngine
 
     private static PropertyInfo? GetCurrentAsync(Type? type)
     {
+        if (type == null) 
+            return null;
         // Look for method named "MoveNextAsync"
-        var method = type?.GetProperty("Current", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        var method = type.GetProperty("Current", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         if (method != null)
         {
             return method;

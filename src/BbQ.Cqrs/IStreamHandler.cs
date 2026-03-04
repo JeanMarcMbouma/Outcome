@@ -82,7 +82,6 @@ public interface IStreamHandler<TRequest, TItem>
     /// - Use 'yield return' to produce items incrementally
     /// - Check cancellation token periodically
     /// - Handle errors appropriately (exceptions will terminate the stream)
-    /// - Use [EnumeratorCancellation] on the CancellationToken parameter
     /// </remarks>
-    IAsyncEnumerable<TItem> Handle(TRequest request, [EnumeratorCancellation] CancellationToken ct);
+    IAsyncEnumerable<TItem> Handle(TRequest request, CancellationToken ct);
 }

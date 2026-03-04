@@ -2,7 +2,6 @@
 // These test MapAsync, BindAsync, and CombineAsync.
 
 using NUnit.Framework;
-using BbQ.Outcome;
 
 namespace BbQ.Outcome.Tests
 {

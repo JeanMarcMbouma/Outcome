@@ -5,7 +5,6 @@ using BbQ.Events.Events;
 using BbQ.Events.Projections;
 
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using System.Collections.Concurrent;
 

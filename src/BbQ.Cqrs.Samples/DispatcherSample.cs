@@ -21,7 +21,7 @@ public static class DispatcherSample
 
         // Setup dependency injection
         var services = new ServiceCollection();
-        services.AddBbQMediator(typeof(DispatcherSample).Assembly);
+        services.AddBbQMediator([typeof(DispatcherSample).Assembly]);
         
         // Register handlers
         services.AddTransient<IRequestHandler<CreateUserCommand, Outcome<User>>, CreateUserCommandHandler>();

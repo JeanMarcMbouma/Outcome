@@ -1,5 +1,4 @@
 using BbQ.Events.Events;
-using BbQ.Events.Schema;
 using BbQ.Events.PostgreSql.Schema;
 
 namespace BbQ.Events.PostgreSql.Events;
