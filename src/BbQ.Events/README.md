@@ -453,7 +453,7 @@ services.AddSingleton<IProjectionMonitor, PrometheusProjectionMonitor>();
 services.AddProjectionEngine();
 ```
 
-### Projection Replay API
+### Projection Rebuilder (IProjectionRebuilder)
 
 The projection rebuilder provides APIs to reset projection checkpoints and rebuild projections from scratch. This is useful for:
 - Rebuilding projections after schema changes
@@ -581,7 +581,7 @@ else
 
 **Note:** After resetting checkpoints, you must restart the projection engine (or projections) for the changes to take effect. The rebuilder only manages checkpoints - it does not modify projection state or read models directly.
 
-### Projection Replay API (NEW)
+### Advanced Replay Service (IReplayService)
 
 The replay service provides comprehensive control over replaying projections from historical events. Unlike simple checkpoint resets, replay offers fine-grained control over replay boundaries, batch processing, and checkpoint strategies.
 

@@ -10,78 +10,12 @@ A lightweight, extensible CQRS (Command Query Responsibility Segregation) implem
 - **Specialized dispatchers** (`ICommandDispatcher`, `IQueryDispatcher`) for explicit command/query separation
 - **Extensible behavior pipeline** with customizable middleware support and automatic ordering
 - **Source generators** for automatic handler registration, behavior registration with ordering
-- **Event-driven architecture** with built-in pub/sub support (`IEventPublisher`, `IEventHandler`, `IEventSubscriber`)
-- **In-memory event bus** for real-time event processing within a single application
 - **Test utilities** with `TestMediator` and `StubHandler` for isolated testing
 - **Comprehensive documentation** on all interfaces and classes with XML comments
 - **Seamless integration** with `Outcome<T>` for advanced error management
 - **Fire-and-forget commands** with `IRequest` (non-generic) for operations without return values
 
-## 📡 Pub/Sub Support
-
-BbQ.Cqrs includes first-class support for event-driven architecture with a strongly typed pub/sub system. Events can be published from command handlers and consumed by multiple handlers or subscribers.
-
-### Key Interfaces
-
-- **`IEventPublisher`** - Publish events from command handlers
-- **`IEventHandler<TEvent>`** - Handle events one-by-one as they're published
-- **`IEventSubscriber<TEvent>`** - Subscribe to event streams for reactive processing
-- **`IEventBus`** - Core event bus combining publishing and subscribing
-
-### Quick Start
-
-```csharp
-// 1. Register the in-memory event bus
-services.AddInMemoryEventBus();
-
-// 2. Register handlers (auto-discovered by source generator)
-services.AddYourAssemblyNameHandlers();
-
-// 3. Publish events from command handlers
-public class CreateUserHandler : IRequestHandler<CreateUser, Outcome<User>>
-{
-    private readonly IEventPublisher _publisher;
-
-    public async Task<Outcome<User>> Handle(CreateUser command, CancellationToken ct)
-    {
-        var user = new User(command.Id, command.Name);
-        
-        // Publish event after state change
-        await _publisher.Publish(new UserCreated(user.Id, user.Name), ct);
-        
-        return Outcome<User>.From(user);
-    }
-}
-
-// 4. Handle events one-by-one
-public class SendWelcomeEmailHandler : IEventHandler<UserCreated>
-{
-    public Task Handle(UserCreated evt, CancellationToken ct)
-    {
-        // Send welcome email
-        return Task.CompletedTask;
-    }
-}
-
-// 5. Subscribe to event streams
-public class UserAnalyticsSubscriber : IEventSubscriber<UserCreated>
-{
-    private readonly IEventBus _eventBus;
-
-    public IAsyncEnumerable<UserCreated> Subscribe(CancellationToken ct)
-        => _eventBus.Subscribe<UserCreated>(ct);
-}
-```
-
-### Features
-
-- **Optional handlers/subscribers** - Events can be published without any consumers
-- **Multiple handlers** - Multiple `IEventHandler<TEvent>` instances can handle the same event
-- **Thread-safe** - Built on `System.Threading.Channels` for safe concurrent access
-- **Storage-agnostic** - In-memory by default, easily extensible for distributed scenarios
-- **Source generator support** - Event handlers and subscribers are auto-discovered and registered
-
-For distributed systems, implement a custom `IEventBus` using message brokers like RabbitMQ, Azure Service Bus, or Kafka.
+> **Looking for event-driven pub/sub?** See [BbQ.Events](../BbQ.Events/README.md) for `IEventPublisher`, `IEventHandler<TEvent>`, `IEventSubscriber<TEvent>`, and `IEventBus`. BbQ.Events works standalone or integrates with BbQ.Cqrs.
 
 ## 🔧 Source Generators
 
@@ -496,43 +430,7 @@ public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, Outco
 
 ## 🔥 Fire-and-Forget Commands
 
-For operations that don't return a meaningful value (notifications, events, background tasks), use the fire-and-forget pattern with `IRequest` and `IRequestHandler<TRequest>`.
-
-### Define a Fire-and-Forget Command
-
-```csharp
-public class SendUserNotificationCommand : IRequest
-{
-    public string UserId { get; set; }
-    public string Message { get; set; }
-
-    public SendUserNotificationCommand(string userId, string message)
-    {
-        UserId = userId;
-        Message = message;
-    }
-}
-```
-
-### Implement a Fire-and-Forget Handler
-
-```csharp
-public class SendUserNotificationHandler : IRequestHandler<SendUserNotificationCommand>
-{
-    private readonly INotificationService _notificationService;
-
-    public SendUserNotificationHandler(INotificationService notificationService)
-    {
-        _notificationService = notificationService;
-    }
-
-    public async Task Handle(SendUserNotificationCommand request, CancellationToken ct)
-    {
-        await _notificationService.SendAsync(request.UserId, request.Message, ct);
-        // No return value needed - just perform the side effect
-    }
-}
-```
+For operations that don't return a meaningful value (notifications, background tasks), use the fire-and-forget pattern with `IRequest` and `IRequestHandler<TRequest>` (see [Core Components](#irequest-fire-and-forget) for interface definitions).
 
 ### Use Fire-and-Forget Commands
 
@@ -571,17 +469,6 @@ public class NotificationsController : ControllerBase
 - **Composable**: Works seamlessly with pipeline behaviors
 - **Testable**: Can be tested with `TestMediator`
 
-### Behaviors with Fire-and-Forget
-
-Fire-and-forget commands work with all behaviors, just like regular commands:
-
-```csharp
-// Register the mediator and handlers
-services.AddBbQMediator(typeof(Program).Assembly);
-
-// Register behaviors for both fire-and-forget and regular requests
-services.AddScoped(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
-services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 ## 📈 Performance Benchmarks
 
 Benchmark suite for core mediator/dispatcher paths is available in:
@@ -592,7 +479,6 @@ Run from repository root:
 
 ```bash
 dotnet run -c Release --project tests/BbQ.Cqrs.Benchmarks/BbQ.Cqrs.Benchmarks.csproj -- --filter * --join
-```
 ```
 
 ---
