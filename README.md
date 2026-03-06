@@ -38,15 +38,16 @@ dotnet add package BbQ.Cqrs
 [📖 Full Documentation 📖](./src/BbQ.Cqrs/README.md)
 
 ### [BbQ.Events](./src/BbQ.Events/README.md)
-Event-driven architecture support with strongly-typed pub/sub patterns.
+Event-driven architecture support with strongly-typed pub/sub and projections.
 
 - **Type-safe event publishing** with `IEventPublisher`
 - **Event handlers** (`IEventHandler<TEvent>`) for processing events one-by-one
 - **Event subscribers** (`IEventSubscriber<TEvent>`) for consuming event streams
+- **Projection support** for building read models and materialized views
 - **In-memory event bus** for single-process applications
 - **Thread-safe** implementation using `System.Threading.Channels`
 - **Storage-agnostic** design - extend for distributed scenarios
-- **Source generator support** - automatic handler/subscriber discovery
+- **Source generator support** - automatic handler/subscriber/projection discovery
 - **Fully independent** - works standalone or with BbQ.Cqrs
 
 ```csharp
@@ -185,6 +186,7 @@ public class GetUserQueryHandler : IRequestHandler<GetUserQuery, Outcome<User>>
 | Event publishing | - | - | ✅ |
 | Event handlers | - | - | ✅ |
 | Event subscribers | - | - | ✅ |
+| Projections & replay | - | - | ✅ |
 | Thread-safe in-memory bus | - | - | ✅ |
 | Storage-agnostic design | - | - | ✅ |
 | Fully independent | ✅ | ✅ | ✅ |
