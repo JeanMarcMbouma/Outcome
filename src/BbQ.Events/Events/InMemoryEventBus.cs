@@ -62,7 +62,7 @@ internal sealed class InMemoryEventBus : IEventBus
     /// <param name="event">The event instance to publish</param>
     /// <param name="ct">Cancellation token for async operations</param>
     /// <returns>A task that completes when the event has been published to all channels</returns>
-    public async Task Publish<TEvent>(TEvent @event, CancellationToken ct = default)
+    public Task Publish<TEvent>(TEvent @event, CancellationToken ct = default)
     {
         if (@event == null)
             throw new ArgumentNullException(nameof(@event));
@@ -72,88 +72,214 @@ internal sealed class InMemoryEventBus : IEventBus
         _logger.LogDebug("Publishing event of type {EventType}", eventType.Name);
 
         // Execute all registered event handlers
-        await ExecuteHandlers(@event, ct);
+        var handlersTask = ExecuteHandlers(@event, ct);
+        if (!handlersTask.IsCompletedSuccessfully)
+        {
+            return PublishAfterHandlersAsync(handlersTask, @event, ct);
+        }
 
         // Publish to all active subscribers
+        return PublishToSubscribers(@event, ct);
+    }
+
+    private async Task PublishAfterHandlersAsync<TEvent>(Task handlersTask, TEvent @event, CancellationToken ct)
+    {
+        await handlersTask;
         await PublishToSubscribers(@event, ct);
     }
 
     /// <summary>
     /// Executes all registered IEventHandler&lt;TEvent&gt; instances for the given event.
     /// </summary>
-    private async Task ExecuteHandlers<TEvent>(TEvent @event, CancellationToken ct)
+    private Task ExecuteHandlers<TEvent>(TEvent @event, CancellationToken ct)
     {
-        var handlers = _serviceProvider.GetServices<IEventHandler<TEvent>>().ToList();
+        Task? singleTask = null;
+        List<Task>? tasks = null;
+        var handlerCount = 0;
 
-        if (handlers.Count == 0)
+        foreach (var handler in _serviceProvider.GetServices<IEventHandler<TEvent>>())
+        {
+            handlerCount++;
+
+            var task = ExecuteHandlerSafely(handler, @event, ct);
+            if (task.IsCompletedSuccessfully)
+            {
+                continue;
+            }
+
+            if (singleTask == null)
+            {
+                singleTask = task;
+                continue;
+            }
+
+            tasks ??= new List<Task> { singleTask };
+            tasks.Add(task);
+        }
+
+        if (handlerCount == 0)
         {
             _logger.LogDebug("No handlers registered for event type {EventType}", typeof(TEvent).Name);
-            return;
+            return Task.CompletedTask;
         }
 
         _logger.LogDebug("Executing {HandlerCount} handler(s) for event type {EventType}", 
-            handlers.Count, typeof(TEvent).Name);
+            handlerCount, typeof(TEvent).Name);
 
-        // Execute all handlers concurrently and await their completion
-        var tasks = handlers.Select(async handler =>
+        if (singleTask == null)
         {
-            try
-            {
-                await handler.Handle(@event, ct);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, 
-                    "Error executing event handler {HandlerType} for event type {EventType}", 
-                    handler.GetType().Name, typeof(TEvent).Name);
-            }
-        });
+            return Task.CompletedTask;
+        }
 
-        await Task.WhenAll(tasks);
+        if (tasks == null)
+        {
+            return singleTask;
+        }
+
+        return Task.WhenAll(tasks);
+    }
+
+    private Task ExecuteHandlerSafely<TEvent>(IEventHandler<TEvent> handler, TEvent @event, CancellationToken ct)
+    {
+        try
+        {
+            var task = handler.Handle(@event, ct);
+            if (task.IsCompletedSuccessfully)
+            {
+                return Task.CompletedTask;
+            }
+
+            return AwaitHandler(task, handler.GetType().Name, typeof(TEvent).Name);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Error executing event handler {HandlerType} for event type {EventType}",
+                handler.GetType().Name, typeof(TEvent).Name);
+            return Task.CompletedTask;
+        }
+    }
+
+    private async Task AwaitHandler(Task handlerTask, string handlerTypeName, string eventTypeName)
+    {
+        try
+        {
+            await handlerTask;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Error executing event handler {HandlerType} for event type {EventType}",
+                handlerTypeName,
+                eventTypeName);
+        }
     }
 
     /// <summary>
     /// Publishes the event to all active subscriber channels.
     /// </summary>
-    private async Task PublishToSubscribers<TEvent>(TEvent @event, CancellationToken ct)
+    private Task PublishToSubscribers<TEvent>(TEvent @event, CancellationToken ct)
     {
         var eventType = typeof(TEvent);
-        
-        List<Channel<TEvent>> activeChannels;
+        object[] activeChannels;
+
         lock (_subscriptionLock)
         {
             if (!_subscriptions.TryGetValue(eventType, out var channels) || channels.Count == 0)
             {
                 _logger.LogDebug("No subscribers for event type {EventType}", eventType.Name);
-                return;
+                return Task.CompletedTask;
             }
-            
-            // Get a snapshot of active channels (cast from object)
-            activeChannels = channels.Cast<Channel<TEvent>>().ToList();
+
+            // Get a snapshot of active channels
+            activeChannels = channels.ToArray();
         }
 
         _logger.LogDebug("Publishing to {SubscriberCount} subscriber(s) for event type {EventType}", 
-            activeChannels.Count, eventType.Name);
+            activeChannels.Length, eventType.Name);
 
-        // Write to all channels concurrently
-        var tasks = activeChannels.Select(async channel =>
+        Task? singleTask = null;
+        List<Task>? tasks = null;
+        foreach (var channelObj in activeChannels)
         {
-            try
+            if (channelObj is not Channel<TEvent> channel)
             {
-                await channel.Writer.WriteAsync(@event, ct);
+                continue;
             }
-            catch (ChannelClosedException)
-            {
-                // Channel was closed, will be cleaned up on next subscription check
-                _logger.LogDebug("Attempted to write to closed channel for event type {EventType}", eventType.Name);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error writing to channel for event type {EventType}", eventType.Name);
-            }
-        });
 
-        await Task.WhenAll(tasks);
+            var task = PublishToChannelSafely(channel, @event, ct);
+            if (task.IsCompletedSuccessfully)
+            {
+                continue;
+            }
+
+            if (singleTask == null)
+            {
+                singleTask = task;
+                continue;
+            }
+
+            tasks ??= new List<Task>(activeChannels.Length) { singleTask };
+            tasks.Add(task);
+        }
+
+        if (singleTask == null)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (tasks == null)
+        {
+            return singleTask;
+        }
+
+        return Task.WhenAll(tasks);
+    }
+
+    private Task PublishToChannelSafely<TEvent>(Channel<TEvent> channel, TEvent @event, CancellationToken ct)
+    {
+        try
+        {
+            if (channel.Writer.TryWrite(@event))
+            {
+                return Task.CompletedTask;
+            }
+
+            var writeTask = channel.Writer.WriteAsync(@event, ct);
+            if (writeTask.IsCompletedSuccessfully)
+            {
+                return Task.CompletedTask;
+            }
+
+            return AwaitChannelWrite(writeTask.AsTask(), typeof(TEvent).Name);
+        }
+        catch (ChannelClosedException)
+        {
+            _logger.LogDebug("Attempted to write to closed channel for event type {EventType}", typeof(TEvent).Name);
+            return Task.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error writing to channel for event type {EventType}", typeof(TEvent).Name);
+            return Task.CompletedTask;
+        }
+    }
+
+    private async Task AwaitChannelWrite(Task writeTask, string eventTypeName)
+    {
+        try
+        {
+            await writeTask;
+        }
+        catch (ChannelClosedException)
+        {
+            // Channel was closed, will be cleaned up on next subscription check
+            _logger.LogDebug("Attempted to write to closed channel for event type {EventType}", eventTypeName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error writing to channel for event type {EventType}", eventTypeName);
+        }
     }
 
     /// <summary>

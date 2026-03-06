@@ -82,7 +82,7 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator
     /// Handles requests that implement IRequest&lt;TResponse&gt; directly without implementing ICommand or IQuery.
     /// This provides backward compatibility for direct IRequest implementations.
     /// </summary>
-    private async Task<TResponse> HandleGenericRequest<TResponse>(IRequest<TResponse> request, CancellationToken ct)
+    private Task<TResponse> HandleGenericRequest<TResponse>(IRequest<TResponse> request, CancellationToken ct)
     {
         var key = (request.GetType(), typeof(TResponse));
 
@@ -122,7 +122,7 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator
             return pipeline;
         });
 
-        return await (Task<TResponse>)dispatcher(request, ct);
+        return (Task<TResponse>)dispatcher(request, ct);
     }
 
     /// <summary>

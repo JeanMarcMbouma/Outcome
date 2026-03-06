@@ -72,15 +72,18 @@ public class InMemoryEventStore : IEventStore
             yield break; // Stream doesn't exist, return empty
         }
 
-        var events = streamData.GetEvents<TEvent>(fromPosition);
-        
-        foreach (var storedEvent in events)
+        var snapshot = streamData.GetSnapshot(fromPosition);
+
+        for (var i = 0; i < snapshot.Length; i++)
         {
             ct.ThrowIfCancellationRequested();
-            yield return storedEvent;
+
+            var entry = snapshot[i];
+            if (entry.Event is TEvent typedEvent)
+            {
+                yield return new StoredEvent<TEvent>(entry.Position, typedEvent);
+            }
         }
-        
-        await Task.CompletedTask;
     }
 
     /// <summary>
@@ -113,7 +116,14 @@ public class InMemoryEventStore : IEventStore
     /// </summary>
     public int GetTotalEventCount()
     {
-        return _streams.Values.Sum(s => s.GetEventCount());
+        var totalCount = 0;
+
+        foreach (var streamData in _streams.Values)
+        {
+            totalCount += streamData.GetEventCount();
+        }
+
+        return totalCount;
     }
 
     /// <summary>
@@ -148,14 +158,40 @@ public class InMemoryEventStore : IEventStore
             }
         }
 
-        public List<StoredEvent<TEvent>> GetEvents<TEvent>(long fromPosition)
+        internal StoredEventData[] GetSnapshot(long fromPosition)
         {
             lock (_lock)
             {
-                return _events
-                    .Where(e => e.Position >= fromPosition && e.Event is TEvent)
-                    .Select(e => new StoredEvent<TEvent>(e.Position, (TEvent)e.Event))
-                    .ToList();
+                if (_events.Count == 0)
+                {
+                    return Array.Empty<StoredEventData>();
+                }
+
+                if (fromPosition <= 0)
+                {
+                    return _events.ToArray();
+                }
+
+                var startIndex = 0;
+                while (startIndex < _events.Count && _events[startIndex].Position < fromPosition)
+                {
+                    startIndex++;
+                }
+
+                if (startIndex >= _events.Count)
+                {
+                    return Array.Empty<StoredEventData>();
+                }
+
+                var length = _events.Count - startIndex;
+                var result = new StoredEventData[length];
+
+                for (var i = 0; i < length; i++)
+                {
+                    result[i] = _events[startIndex + i];
+                }
+
+                return result;
             }
         }
 
@@ -175,6 +211,6 @@ public class InMemoryEventStore : IEventStore
             }
         }
 
-        private record StoredEventData(long Position, object Event);
+        internal readonly record struct StoredEventData(long Position, object Event);
     }
 }

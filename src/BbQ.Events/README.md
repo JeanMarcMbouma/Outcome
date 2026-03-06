@@ -24,6 +24,18 @@ Event-driven architecture support with strongly-typed pub/sub and projections fo
 dotnet add package BbQ.Events
 ```
 
+## 📈 Performance Benchmarks
+
+Benchmark suite for core event bus/event store paths is available in:
+
+- [tests/BbQ.Events.Benchmarks](../../tests/BbQ.Events.Benchmarks/README.md)
+
+Run from repository root:
+
+```bash
+dotnet run -c Release --project tests/BbQ.Events.Benchmarks/BbQ.Events.Benchmarks.csproj -- --filter * --join
+```
+
 ## 🚀 Quick Start
 
 ### 1. Register the Event Bus

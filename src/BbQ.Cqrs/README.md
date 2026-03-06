@@ -582,6 +582,17 @@ services.AddBbQMediator(typeof(Program).Assembly);
 // Register behaviors for both fire-and-forget and regular requests
 services.AddScoped(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
 services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+## 📈 Performance Benchmarks
+
+Benchmark suite for core mediator/dispatcher paths is available in:
+
+- [tests/BbQ.Cqrs.Benchmarks](../../tests/BbQ.Cqrs.Benchmarks/README.md)
+
+Run from repository root:
+
+```bash
+dotnet run -c Release --project tests/BbQ.Cqrs.Benchmarks/BbQ.Cqrs.Benchmarks.csproj -- --filter * --join
+```
 ```
 
 ---

@@ -1,6 +1,7 @@
 // The command dispatcher implementation that coordinates the CQRS pipeline for commands
 using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Concurrent;
+using System.Reflection;
 
 namespace BbQ.Cqrs;
 
@@ -63,7 +64,7 @@ internal sealed class CommandDispatcher(IServiceProvider sp) : ICommandDispatche
     /// If no handler is registered, GetRequiredService() throws InvalidOperationException.
     /// If no behaviors are registered, the command goes directly to the handler.
     /// </remarks>
-    public async Task<TResponse> Dispatch<TResponse>(ICommand<TResponse> command, CancellationToken ct = default)
+    public Task<TResponse> Dispatch<TResponse>(ICommand<TResponse> command, CancellationToken ct = default)
     {
         // Resolve strongly-typed handler - throws if not registered
         var key = (command.GetType(), typeof(TResponse));
@@ -72,39 +73,38 @@ internal sealed class CommandDispatcher(IServiceProvider sp) : ICommandDispatche
         {
             var (cmdType, resType) = k;
 
-            // Resolve handler
-            var handlerType = typeof(IRequestHandler<,>).MakeGenericType(cmdType, resType);
-            var handleMethod = handlerType.GetMethod("Handle")!;
+            var factoryMethod = typeof(CommandDispatcher)
+                .GetMethod(nameof(CreateDispatcherCore), BindingFlags.Instance | BindingFlags.NonPublic)!
+                .MakeGenericMethod(cmdType, resType);
 
-            Task<TResponse> terminal(object cmd, CancellationToken token)
-            {
-                var handler = _sp.GetRequiredService(handlerType);
-                return (Task<TResponse>)handleMethod.Invoke(handler, [cmd, token])!;
-            }
-
-            // Resolve behaviors in registration order (first registered becomes outermost)
-            // This creates FIFO order before handler, LIFO order after handler
-            var behaviorType = typeof(IPipelineBehavior<,>).MakeGenericType(cmdType, resType);
-            var behaviors = _sp.GetServices(behaviorType).Reverse().ToArray();
-
-            Func<object, CancellationToken, Task<TResponse>> pipeline = terminal;
-            foreach (var b in behaviors)
-            {
-                var method = behaviorType.GetMethod("Handle")!;
-                var next = pipeline;
-                pipeline = (cmd, token) =>
-                    (Task<TResponse>)method.Invoke(b,
-                    [
-                            cmd,
-                            token,
-                            new Func<object, CancellationToken, Task<TResponse>>(next)
-                    ])!;
-            }
-
-            return pipeline;
+            return (Func<object, CancellationToken, Task>)factoryMethod.Invoke(this, null)!;
         });
 
-        return await (Task<TResponse>)dispatcher(command, ct);
+        return (Task<TResponse>)dispatcher(command, ct);
+    }
+
+    private Func<object, CancellationToken, Task> CreateDispatcherCore<TCommand, TResponse>()
+        where TCommand : ICommand<TResponse>
+    {
+        Task<TResponse> Terminal(TCommand cmd, CancellationToken token)
+        {
+            var handler = _sp.GetRequiredService<IRequestHandler<TCommand, TResponse>>();
+            return handler.Handle(cmd, token);
+        }
+
+        var behaviors = _sp
+            .GetServices<IPipelineBehavior<TCommand, TResponse>>()
+            .Reverse()
+            .ToArray();
+
+        Func<TCommand, CancellationToken, Task<TResponse>> pipeline = Terminal;
+        foreach (var behavior in behaviors)
+        {
+            var next = pipeline;
+            pipeline = (cmd, token) => behavior.Handle(cmd, token, next);
+        }
+
+        return (cmd, token) => pipeline((TCommand)cmd, token);
     }
 
     /// <summary>

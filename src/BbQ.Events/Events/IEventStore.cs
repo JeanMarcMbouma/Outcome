@@ -45,4 +45,4 @@ public interface IEventStore
 /// Represents an event stored in an event store with its position.
 /// </summary>
 /// <typeparam name="TEvent">The type of event</typeparam>
-public record StoredEvent<TEvent>(long Position, TEvent Event);
+public readonly record struct StoredEvent<TEvent>(long Position, TEvent Event);

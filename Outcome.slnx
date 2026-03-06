@@ -4,6 +4,7 @@
     <Project Path="src/BbQ.Cqrs.SourceGenerators/BbQ.Cqrs.SourceGenerators.csproj" />
     <Project Path="src/BbQ.Cqrs.Samples/BbQ.Cqrs.Samples.csproj" />
     <Project Path="tests/BbQ.Cqrs.Tests/BbQ.Cqrs.Tests.csproj" />
+    <Project Path="tests/BbQ.Cqrs.Benchmarks/BbQ.Cqrs.Benchmarks.csproj" />
   </Folder>
   <Folder Name="/Events/">
     <Project Path="src/BbQ.Events/BbQ.Events.csproj" />
@@ -12,6 +13,7 @@
     <Project Path="src/BbQ.Events.PostgreSql/BbQ.Events.PostgreSql.csproj" />
     <Project Path="tests/BbQ.Events.SqlServer.Tests/BbQ.Events.SqlServer.Tests.csproj" />
     <Project Path="tests/BbQ.Events.PostgreSql.Tests/BbQ.Events.PostgreSql.Tests.csproj" />
+    <Project Path="tests/BbQ.Events.Benchmarks/BbQ.Events.Benchmarks.csproj" />
   </Folder>
   <Folder Name="/Samples/">
     <Project Path="samples/BbQ.Events.Samples/BbQ.Events.Samples.csproj" Id="f2343415-bdae-4ab0-be93-2159e9840f4b" />

@@ -1,6 +1,7 @@
 // The query dispatcher implementation that coordinates the CQRS pipeline for queries
 using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Concurrent;
+using System.Reflection;
 
 namespace BbQ.Cqrs;
 
@@ -46,7 +47,7 @@ internal sealed class QueryDispatcher(IServiceProvider sp) : IQueryDispatcher
         Func<object, CancellationToken, Task>> _dispatchCache = new();
 
     private readonly ConcurrentDictionary<(Type Qry, Type Item),
-        Func<object, CancellationToken, IAsyncEnumerable<object>>> _streamCache = new();
+        object> _streamCache = new();
 
     /// <summary>
     /// Dispatches a query through the CQRS pipeline and returns a response.
@@ -66,7 +67,7 @@ internal sealed class QueryDispatcher(IServiceProvider sp) : IQueryDispatcher
     /// If no handler is registered, GetRequiredService() throws InvalidOperationException.
     /// If no behaviors are registered, the query goes directly to the handler.
     /// </remarks>
-    public async Task<TResponse> Dispatch<TResponse>(IQuery<TResponse> query, CancellationToken ct = default)
+    public Task<TResponse> Dispatch<TResponse>(IQuery<TResponse> query, CancellationToken ct = default)
     {
         // Resolve strongly-typed handler - throws if not registered
         var key = (query.GetType(), typeof(TResponse));
@@ -75,39 +76,38 @@ internal sealed class QueryDispatcher(IServiceProvider sp) : IQueryDispatcher
         {
             var (qryType, resType) = k;
 
-            // Resolve handler
-            var handlerType = typeof(IRequestHandler<,>).MakeGenericType(qryType, resType);
-            var handleMethod = handlerType.GetMethod("Handle")!;
+            var factoryMethod = typeof(QueryDispatcher)
+                .GetMethod(nameof(CreateDispatcherCore), BindingFlags.Instance | BindingFlags.NonPublic)!
+                .MakeGenericMethod(qryType, resType);
 
-            Task<TResponse> terminal(object qry, CancellationToken token)
-            {
-                var handler = _sp.GetRequiredService(handlerType);
-                return (Task<TResponse>)handleMethod.Invoke(handler, [qry, token])!;
-            }
-
-            // Resolve behaviors in registration order (first registered becomes outermost)
-            // This creates FIFO order before handler, LIFO order after handler
-            var behaviorType = typeof(IPipelineBehavior<,>).MakeGenericType(qryType, resType);
-            var behaviors = _sp.GetServices(behaviorType).Reverse().ToArray();
-
-            Func<object, CancellationToken, Task<TResponse>> pipeline = terminal;
-            foreach (var b in behaviors)
-            {
-                var method = behaviorType.GetMethod("Handle")!;
-                var next = pipeline;
-                pipeline = (qry, token) =>
-                    (Task<TResponse>)method.Invoke(b,
-                    [
-                            qry,
-                            token,
-                            new Func<object, CancellationToken, Task<TResponse>>(next)
-                    ])!;
-            }
-
-            return pipeline;
+            return (Func<object, CancellationToken, Task>)factoryMethod.Invoke(this, null)!;
         });
 
-        return await (Task<TResponse>)dispatcher(query, ct);
+        return (Task<TResponse>)dispatcher(query, ct);
+    }
+
+    private Func<object, CancellationToken, Task> CreateDispatcherCore<TQuery, TResponse>()
+        where TQuery : IQuery<TResponse>
+    {
+        Task<TResponse> Terminal(TQuery qry, CancellationToken token)
+        {
+            var handler = _sp.GetRequiredService<IRequestHandler<TQuery, TResponse>>();
+            return handler.Handle(qry, token);
+        }
+
+        var behaviors = _sp
+            .GetServices<IPipelineBehavior<TQuery, TResponse>>()
+            .Reverse()
+            .ToArray();
+
+        Func<TQuery, CancellationToken, Task<TResponse>> pipeline = Terminal;
+        foreach (var behavior in behaviors)
+        {
+            var next = pipeline;
+            pipeline = (qry, token) => behavior.Handle(qry, token, next);
+        }
+
+        return (qry, token) => pipeline((TQuery)qry, token);
     }
 
     /// <summary>
@@ -130,75 +130,47 @@ internal sealed class QueryDispatcher(IServiceProvider sp) : IQueryDispatcher
     /// 
     /// The pipeline construction is cached per query/item type pair to avoid repeated reflection overhead.
     /// </remarks>
-    public async IAsyncEnumerable<TItem> Stream<TItem>(
-        IStreamQuery<TItem> query, 
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    public IAsyncEnumerable<TItem> Stream<TItem>(
+        IStreamQuery<TItem> query,
+        CancellationToken ct = default)
     {
         var key = (query.GetType(), typeof(TItem));
 
-        var dispatcher = _streamCache.GetOrAdd(key, k =>
+        var dispatcher = (Func<object, CancellationToken, IAsyncEnumerable<TItem>>)_streamCache.GetOrAdd(key, k =>
         {
             var (qryType, itemType) = k;
 
-            // Resolve handler metadata (type and method). Handler instances are resolved per-call in the terminal.
-            var handlerType = typeof(IStreamHandler<,>).MakeGenericType(qryType, itemType);
-            var handleMethod = handlerType.GetMethod("Handle")!;
+            var factoryMethod = typeof(QueryDispatcher)
+                .GetMethod(nameof(CreateStreamDispatcherCore), BindingFlags.Instance | BindingFlags.NonPublic)!
+                .MakeGenericMethod(qryType, itemType);
 
-            async IAsyncEnumerable<object> terminal(object qry, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken token)
-            {
-                var handler = _sp.GetRequiredService(handlerType);
-                var stream = (IAsyncEnumerable<TItem>)handleMethod.Invoke(handler, [qry, token])!;
-                await foreach (var item in stream.ConfigureAwait(false))
-                {
-                    yield return item!;
-                }
-            }
-
-            // Resolve behaviors in registration order (first registered becomes outermost)
-            var behaviorType = typeof(IStreamPipelineBehavior<,>).MakeGenericType(qryType, itemType);
-            var behaviors = _sp.GetServices(behaviorType).Reverse().ToArray();
-
-            Func<object, CancellationToken, IAsyncEnumerable<object>> pipeline = terminal;
-            foreach (var b in behaviors)
-            {
-                var method = behaviorType.GetMethod("Handle")!;
-                var next = pipeline;
-                pipeline = (qry, token) =>
-                {
-                    var typedNext = CreateTypedNextFunc<TItem>(next);
-                    var result = method.Invoke(b, [qry, token, typedNext]);
-                    return ConvertToObjectStream((IAsyncEnumerable<TItem>)result!);
-                };
-            }
-
-            return pipeline;
+            return factoryMethod.Invoke(this, null)!;
         });
 
-        await foreach (var item in dispatcher(query, ct).ConfigureAwait(false))
-        {
-            yield return (TItem)item;
-        }
+        return dispatcher(query, ct);
     }
 
-    private static Func<object, CancellationToken, IAsyncEnumerable<TItem>> CreateTypedNextFunc<TItem>(
-        Func<object, CancellationToken, IAsyncEnumerable<object>> next)
+    private Func<object, CancellationToken, IAsyncEnumerable<TItem>> CreateStreamDispatcherCore<TQuery, TItem>()
+        where TQuery : IStreamQuery<TItem>
     {
-        return (qry, token) => ConvertFromObjectStream<TItem>(next(qry, token));
-    }
-
-    private static async IAsyncEnumerable<object> ConvertToObjectStream<TItem>(IAsyncEnumerable<TItem> source)
-    {
-        await foreach (var item in source.ConfigureAwait(false))
+        IAsyncEnumerable<TItem> Terminal(TQuery qry, CancellationToken token)
         {
-            yield return item!;
+            var handler = _sp.GetRequiredService<IStreamHandler<TQuery, TItem>>();
+            return handler.Handle(qry, token);
         }
-    }
 
-    private static async IAsyncEnumerable<TItem> ConvertFromObjectStream<TItem>(IAsyncEnumerable<object> source)
-    {
-        await foreach (var item in source.ConfigureAwait(false))
+        var behaviors = _sp
+            .GetServices<IStreamPipelineBehavior<TQuery, TItem>>()
+            .Reverse()
+            .ToArray();
+
+        Func<TQuery, CancellationToken, IAsyncEnumerable<TItem>> pipeline = Terminal;
+        foreach (var behavior in behaviors)
         {
-            yield return (TItem)item;
+            var next = pipeline;
+            pipeline = (qry, token) => behavior.Handle(qry, token, next);
         }
+
+        return (qry, token) => pipeline((TQuery)qry, token);
     }
 }
