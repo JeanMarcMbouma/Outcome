@@ -59,7 +59,7 @@
         /// <summary>
         /// Private constructor for creating a success outcome with a value.
         /// </summary>
-        private Outcome(T value) => (_value, IsSuccess, _errors) = (value, true, []);
+        private Outcome(T value) => (_value, IsSuccess, _errors) = (value, true, Array.Empty<object?>());
 
         /// <summary>
         /// Private constructor for creating a failure outcome with errors.
@@ -78,7 +78,7 @@
         /// </summary>
         /// <param name="errors">A list of errors that occurred during the operation.</param>
         /// <returns>An outcome representing failure with the given errors.</returns>
-        public static Outcome<T> FromErrors(IReadOnlyList<object> errors) => new(errors);
+        public static Outcome<T> FromErrors(IReadOnlyList<object?> errors) => new(errors);
 
         /// <summary>
         /// Implicitly converts a value of type <typeparam name="T"/> to an <see cref="Outcome{T}"/> success.
@@ -106,9 +106,20 @@
         public IEnumerable<Error<TCode>> GetErrors<TCode>()
         {
             if (IsSuccess)
-                return [];
+                return Array.Empty<Error<TCode>>();
 
-            return Errors.OfType<Error<TCode>>();
+            return EnumerateTypedErrors<TCode>(_errors);
+        }
+
+        private static IEnumerable<Error<TCode>> EnumerateTypedErrors<TCode>(IReadOnlyList<object?> errors)
+        {
+            for (var i = 0; i < errors.Count; i++)
+            {
+                if (errors[i] is Error<TCode> typedError)
+                {
+                    yield return typedError;
+                }
+            }
         }
 
         /// <summary>
@@ -130,7 +141,20 @@
         /// </example>
         public Error<TCode>? GetError<TCode>()
         {
-            return GetErrors<TCode>().FirstOrDefault();
+            if (IsSuccess)
+            {
+                return null;
+            }
+
+            for (var i = 0; i < _errors.Count; i++)
+            {
+                if (_errors[i] is Error<TCode> typedError)
+                {
+                    return typedError;
+                }
+            }
+
+            return null;
         }
 
         /// <summary>
@@ -151,7 +175,20 @@
         /// </example>
         public bool HasErrors<TCode>()
         {
-            return GetErrors<TCode>().Any();
+            if (IsSuccess)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < _errors.Count; i++)
+            {
+                if (_errors[i] is Error<TCode>)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -173,7 +210,23 @@
         public IEnumerable<Error<TCode>> GetErrors<TCode>(
             Func<Error<TCode>, bool> predicate)
         {
-            return GetErrors<TCode>().Where(predicate);
+            if (IsSuccess)
+                return Array.Empty<Error<TCode>>();
+
+            return EnumerateTypedErrors(_errors, predicate);
+
+            static IEnumerable<Error<TCode>> EnumerateTypedErrors(
+                IReadOnlyList<object?> errors,
+                Func<Error<TCode>, bool> filter)
+            {
+                for (var i = 0; i < errors.Count; i++)
+                {
+                    if (errors[i] is Error<TCode> typedError && filter(typedError))
+                    {
+                        yield return typedError;
+                    }
+                }
+            }
         }
         /// <summary>
         /// Returns a human-readable string representation of the outcome.

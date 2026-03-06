@@ -20,5 +20,6 @@
   </Folder>
   <Project Path="src/Outcome.SourceGenerators/Outcome.SourceGenerators.csproj" />
   <Project Path="tests/Outcome.Tests/Outcome.Tests.csproj" />
+  <Project Path="tests/Outcome.Benchmarks/Outcome.Benchmarks.csproj" />
   <Project Path="src/Outcome/Outcome.csproj" />
 </Solution>

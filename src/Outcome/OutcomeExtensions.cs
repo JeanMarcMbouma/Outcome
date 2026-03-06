@@ -135,15 +135,34 @@ namespace BbQ.Outcome
             /// // If any fail: Failure with aggregated errors
             /// </code>
             /// </example>
-            public static Outcome<IEnumerable<T>> Combine(params IEnumerable<Outcome<T>> outcomes)
+            public static Outcome<IEnumerable<T>> Combine(params Outcome<T>[] outcomes)
             {
-                // Collect errors from all provided outcomes.
-                var errors = outcomes
-                    .Where(o => o.IsError)
-                    .SelectMany(o => o.Errors);
-                return errors.Any()
-                    ? Outcome<IEnumerable<T>>.FromErrors(errors.ToList()!)
-                    : Outcome<IEnumerable<T>>.From(outcomes.Select(r => r.Value));
+                List<object?>? errors = null;
+                List<T>? values = null;
+
+                foreach (var item in outcomes)
+                {
+                    if (item.IsSuccess)
+                    {
+                        values ??= [];
+                        values.Add(item.Value);
+                    }
+                    else
+                    {
+                        errors ??= [];
+                        for (var i = 0; i < item.Errors.Count; i++)
+                        {
+                            errors.Add(item.Errors[i]);
+                        }
+                    }
+                }
+
+                if (errors is { Count: > 0 })
+                {
+                    return Outcome<IEnumerable<T>>.FromErrors(errors);
+                }
+
+                return Outcome<IEnumerable<T>>.From(values ?? (IEnumerable<T>)Array.Empty<T>());
             }
 
             // ============ Async composition methods ============
@@ -164,8 +183,20 @@ namespace BbQ.Outcome
             ///     .MapAsync(x => FetchDataAsync(x));
             /// </code>
             /// </example>
-            public async Task<Outcome<TResult>> MapAsync<TResult>(Func<T, Task<TResult>> mapper) =>
-                outcome.IsSuccess ? Outcome<TResult>.From(await mapper(outcome.Value)) : Outcome<TResult>.FromErrors(outcome.Errors!);
+            public Task<Outcome<TResult>> MapAsync<TResult>(Func<T, Task<TResult>> mapper)
+            {
+                if (!outcome.IsSuccess)
+                {
+                    return Task.FromResult(Outcome<TResult>.FromErrors(outcome.Errors!));
+                }
+
+                return AwaitMapAsync(outcome.Value, mapper);
+
+                static async Task<Outcome<TResult>> AwaitMapAsync(T value, Func<T, Task<TResult>> map)
+                {
+                    return Outcome<TResult>.From(await map(value).ConfigureAwait(false));
+                }
+            }
 
             /// <summary>
             /// Asynchronously binds (flatMaps) the successful value using an async binder that returns an Outcome.
@@ -183,8 +214,20 @@ namespace BbQ.Outcome
             ///     .BindAsync(x => ValidateAndFetchAsync(x));
             /// </code>
             /// </example>
-            public async Task<Outcome<TResult>> BindAsync<TResult>(Func<T, Task<Outcome<TResult>>> binder) =>
-                outcome.IsSuccess ? await binder(outcome.Value) : Outcome<TResult>.FromErrors(outcome.Errors!);
+            public Task<Outcome<TResult>> BindAsync<TResult>(Func<T, Task<Outcome<TResult>>> binder)
+            {
+                if (!outcome.IsSuccess)
+                {
+                    return Task.FromResult(Outcome<TResult>.FromErrors(outcome.Errors!));
+                }
+
+                return AwaitBindAsync(outcome.Value, binder);
+
+                static async Task<Outcome<TResult>> AwaitBindAsync(T value, Func<T, Task<Outcome<TResult>>> bind)
+                {
+                    return await bind(value).ConfigureAwait(false);
+                }
+            }
 
             /// <summary>
             /// Awaits multiple outcome-producing tasks and combines their results.
@@ -208,12 +251,35 @@ namespace BbQ.Outcome
             /// </example>
             public static async Task<Outcome<IEnumerable<T>>> CombineAsync(params Task<Outcome<T>>[] tasks)
             {
-                var results = await Task.WhenAll(tasks);
-                var errors = results.Where(r => r.IsError).SelectMany(r => r.Errors).ToList();
-                if (errors.Count != 0)
-                    return Outcome<IEnumerable<T>>.FromErrors(errors!);
+                var results = await Task.WhenAll(tasks).ConfigureAwait(false);
 
-                var values = results.Select(r => r.Value).ToList();
+                List<object?>? errors = null;
+                var values = new T[results.Length];
+                var valueCount = 0;
+
+                for (var i = 0; i < results.Length; i++)
+                {
+                    var result = results[i];
+
+                    if (result.IsSuccess)
+                    {
+                        values[valueCount++] = result.Value;
+                    }
+                    else
+                    {
+                        errors ??= [];
+                        for (var j = 0; j < result.Errors.Count; j++)
+                        {
+                            errors.Add(result.Errors[j]);
+                        }
+                    }
+                }
+
+                if (errors is { Count: > 0 })
+                {
+                    return Outcome<IEnumerable<T>>.FromErrors(errors);
+                }
+
                 return Outcome<IEnumerable<T>>.From(values);
             }
         }
