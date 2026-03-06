@@ -20,7 +20,7 @@ dotnet add package BbQ.Outcome
 [📖 Full Documentation 📖](./src/Outcome/README.md)
 
 ### [BbQ.Cqrs](./src/BbQ.Cqrs/README.md)
-A lightweight, extensible CQRS implementation that integrates seamlessly with Outcome.
+A lightweight, extensible CQRS implementation that integrates seamlessly with BbQ.Outcome.
 
 - **Type-safe mediator** for commands and queries
 - **Unified pipeline behaviors** for both regular and streaming requests
@@ -57,7 +57,7 @@ dotnet add package BbQ.Events
 
 ## 🚀 Quick Start
 
-### Using Outcome
+### Using BbQ.Outcome
 ```csharp
 var result = await GetUserAsync(userId);
 
@@ -67,7 +67,7 @@ return result.Match(
 );
 ```
 
-### Using Outcome + CQRS
+### Using BbQ.Outcome + CQRS
 ```csharp
 // Define error codes
 [QbqOutcome]
@@ -192,10 +192,10 @@ public class GetUserQueryHandler : IRequestHandler<GetUserQuery, Outcome<User>>
 
 ## 📚 Documentation
 
-- **[BbQ.Outcome Documentation](./src/Outcome/README.md)** - Complete guide to using Outcome for functional error handling
+- **[BbQ.Outcome Documentation](./src/Outcome/README.md)** - Complete guide to using BbQ.Outcome for functional error handling
 - **[BbQ.Cqrs Documentation](./src/BbQ.Cqrs/README.md)** - Complete guide to CQRS pattern implementation
 - **[BbQ.Events Documentation](./src/BbQ.Events/README.md)** - Complete guide to event-driven architecture
-- **[Strongly Typed Errors Guide](./STRONGLY_TYPED_ERRORS.md)** - Best practices for error handling patterns
+- **[Outcome Error Helper Properties](./src/Outcome/README.md)** - Strongly typed error patterns with source generators
 
 ## 🤝 Contributing
 

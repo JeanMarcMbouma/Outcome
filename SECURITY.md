@@ -10,7 +10,7 @@ The following table lists which versions of this project are currently supported
 
 ## Reporting a Vulnerability
 
-To report a security vulnerability, please use the [GitHub Security Advisories](https://github.com/<OWNER>/<REPO>/security/advisories/new) feature for this repository. Alternatively, you may email us at security@example.com.
+To report a security vulnerability, please use the [GitHub Security Advisories](https://github.com/JeanMarcMbouma/Outcome/security/advisories/new) feature for this repository.
 
 We will acknowledge receipt of your report within 2 business days. You can expect regular updates at least every 7 days while we investigate and address the issue.
 

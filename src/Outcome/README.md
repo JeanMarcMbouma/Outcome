@@ -1,12 +1,12 @@
-﻿# Outcome
+﻿# BbQ.Outcome
 
 A modern C# functional result type inspired by [ErrorOr](https://github.com/amantinband/error-or).  
 It builds on the excellent foundation of ErrorOr by adding **async workflows, LINQ query syntax, deconstruction, Source Link, and multi-targeting** — making error-aware programming feel like a first-class citizen in modern .NET.
 
-## ❓ Why Outcome?
+## ❓ Why BbQ.Outcome?
 
 ErrorOr pioneered the idea of replacing exceptions with a discriminated union of either a value or errors.  
-Outcome takes this idea further:
+BbQ.Outcome takes this idea further:
 
 - **Structured errors**: Rich `Error` record with `Code`, `Description`, and `Severity`.
 - **Async composition**: `BindAsync`, `MapAsync`, `CombineAsync` for natural async pipelines.
@@ -307,5 +307,5 @@ public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, Outco
 
 ## 📚 Learn More
 
-- [Strongly Typed Errors Guide](../../STRONGLY_TYPED_ERRORS.md) - Best practices for error handling
+- [Outcome Error Helper Properties](./README.md) - Strongly typed error patterns with source generators
 - [BbQ.Cqrs Documentation](../BbQ.Cqrs/README.md) - Using Outcome with CQRS

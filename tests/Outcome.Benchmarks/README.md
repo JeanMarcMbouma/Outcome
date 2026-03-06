@@ -1,4 +1,4 @@
-# Outcome Benchmarks
+# BbQ.Outcome Benchmarks
 
 BenchmarkDotNet suite for core `BbQ.Outcome` composition paths.
 

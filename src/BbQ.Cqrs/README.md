@@ -1,6 +1,6 @@
 ﻿# BbQ.Cqrs
 
-A lightweight, extensible CQRS (Command Query Responsibility Segregation) implementation that integrates seamlessly with `Outcome` for comprehensive error handling.
+A lightweight, extensible CQRS (Command Query Responsibility Segregation) implementation that integrates seamlessly with `BbQ.Outcome` for comprehensive error handling.
 
 ## ✨ Features
 
@@ -451,7 +451,7 @@ public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
 
 ---
 
-## 🔁 Error Handling with Outcome
+## 🔁 Error Handling with BbQ.Outcome
 
 Define error codes with the source generator:
 
@@ -1351,7 +1351,7 @@ public class ValidationBehaviorTests
 
 ---
 
-## 🔗 Integration with Outcome
+## 🔗 Integration with BbQ.Outcome
 
 Commands and queries typically return `Outcome<T>` for comprehensive error handling:
 
@@ -1383,5 +1383,5 @@ public class GetUserByIdQueryHandler : IRequestHandler<GetUserByIdQuery, Outcome
 
 ## 📚 Learn More
 
-- [BbQ.Outcome Documentation](../Outcome/README.md) - Functional error handling
-- [Strongly Typed Errors Guide](../../STRONGLY_TYPED_ERRORS.md) - Best practices
+- [BbQ.Outcome Documentation](../Outcome/README.md) - BbQ.Outcome functional error handling
+- [Outcome Error Helper Properties](../Outcome/README.md) - Strongly typed error patterns with source generators

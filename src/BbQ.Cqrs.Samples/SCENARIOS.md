@@ -496,4 +496,4 @@ static async Task Main()
 
 - [BbQ.Outcome Documentation](../../src/Outcome/README.md)
 - [BbQ.Cqrs Documentation](../../src/BbQ.Cqrs/README.md)
-- [Strongly Typed Errors Guide](../../STRONGLY_TYPED_ERRORS.md)
+- [Outcome Error Helper Properties](../../src/Outcome/README.md)
