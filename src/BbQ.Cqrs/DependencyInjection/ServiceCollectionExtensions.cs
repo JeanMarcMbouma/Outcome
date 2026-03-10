@@ -23,9 +23,9 @@ public static class ServiceCollectionExtensions
         /// <returns>The service collection for chaining</returns>
         /// <remarks>
         /// This method:
-        /// 1. Registers IMediator as a singleton (single instance for the application)
-        /// 2. Registers ICommandDispatcher as a singleton
-        /// 3. Registers IQueryDispatcher as a singleton
+        /// 1. Registers IMediator as scoped (one per request scope, can resolve scoped handlers)
+        /// 2. Registers ICommandDispatcher as scoped
+        /// 3. Registers IQueryDispatcher as scoped
         /// 4. Scans the provided assemblies for all classes implementing IRequestHandler&lt;&gt;
         /// 5. Scans the provided assemblies for all classes implementing IRequestHandler&lt;,&gt;
         /// 6. Registers each handler with its implemented interfaces
@@ -52,10 +52,11 @@ public static class ServiceCollectionExtensions
         public IServiceCollection AddBbQMediator(ServiceLifetime handlersLifeTime,
             params System.Reflection.Assembly[] assemblies)
         {
-            // Register the mediator and dispatchers as singleton
-            services.AddSingleton<IMediator, Mediator>();
-            services.AddSingleton<ICommandDispatcher, CommandDispatcher>();
-            services.AddSingleton<IQueryDispatcher, QueryDispatcher>();
+            // Register the mediator and dispatchers as scoped so they receive
+            // the current scope's IServiceProvider and can resolve scoped handlers
+            services.AddScoped<IMediator, Mediator>();
+            services.AddScoped<ICommandDispatcher, CommandDispatcher>();
+            services.AddScoped<IQueryDispatcher, QueryDispatcher>();
 
             // Scan and register all request handlers from the provided assemblies
             services.Scan(s => s.FromAssemblies(assemblies)
@@ -79,9 +80,9 @@ public static class ServiceCollectionExtensions
         /// <returns>The service collection for chaining</returns>
         /// <remarks>
         /// This method:
-        /// 1. Registers IMediator as a singleton (single instance for the application)
-        /// 2. Registers ICommandDispatcher as a singleton
-        /// 3. Registers IQueryDispatcher as a singleton
+        /// 1. Registers IMediator as scoped (one per request scope, can resolve scoped handlers)
+        /// 2. Registers ICommandDispatcher as scoped
+        /// 3. Registers IQueryDispatcher as scoped
         /// 4. Scans the provided assemblies for all classes implementing IRequestHandler&lt;&gt;
         /// 5. Scans the provided assemblies for all classes implementing IRequestHandler&lt;,&gt;
         /// 6. Registers each handler with its implemented interfaces
