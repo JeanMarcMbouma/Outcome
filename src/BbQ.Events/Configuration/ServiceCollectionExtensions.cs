@@ -127,7 +127,8 @@ public static class ServiceCollectionExtensions
             var projectionInterfaces = projectionType.GetInterfaces()
                 .Where(iface => iface.IsGenericType &&
                     (iface.GetGenericTypeDefinition() == typeof(IProjectionHandler<>) ||
-                     iface.GetGenericTypeDefinition() == typeof(IPartitionedProjectionHandler<>)));
+                     iface.GetGenericTypeDefinition() == typeof(IPartitionedProjectionHandler<>) ||
+                     iface.GetGenericTypeDefinition() == typeof(IProjectionBatchHandler<>)));
 
             // Configure options
             ProjectionOptions? options = null;
@@ -235,7 +236,7 @@ public static class ServiceCollectionExtensions
                 // Register the projection type itself
                 services.Add(new ServiceDescriptor(projectionType, projectionType, lifetime));
 
-                // Register for each handler interface
+                // Register for each projection handler interface
                 var projectionInterfaces = projectionType.GetInterfaces()
                     .Where(iface => iface.IsGenericType &&
                         (iface.GetGenericTypeDefinition() == typeof(IProjectionHandler<>) ||
@@ -252,126 +253,6 @@ public static class ServiceCollectionExtensions
                     ProjectionHandlerRegistry.Register(eventType, iface, projectionType);
                 }
             }
-
-            return services;
-        }
-
-        /// <summary>
-        /// Registers a batch projection handler with the dependency injection container.
-        /// </summary>
-        /// <typeparam name="TProjection">The batch projection handler type</typeparam>
-        /// <param name="services">The service collection to register with</param>
-        /// <param name="lifetime">The lifetime to use for the projection handler (default: Scoped)</param>
-        /// <returns>The service collection for chaining</returns>
-        /// <remarks>
-        /// This method registers a batch projection handler that receives events in batches.
-        /// The projection must implement at least one IProjectionBatchHandler&lt;TEvent&gt; interface.
-        /// 
-        /// Example usage:
-        /// <code>
-        /// services.AddInMemoryEventBus();
-        /// services.AddBatchProjection&lt;UserProfileBatchProjection&gt;();
-        /// services.AddProjectionService();
-        /// </code>
-        /// </remarks>
-        public IServiceCollection AddBatchProjection<TProjection>(ServiceLifetime lifetime = ServiceLifetime.Scoped)
-            where TProjection : class
-        {
-            return services.AddBatchProjection<TProjection>(null, lifetime);
-        }
-
-        /// <summary>
-        /// Registers a batch projection handler with custom service options.
-        /// </summary>
-        /// <typeparam name="TProjection">The batch projection handler type</typeparam>
-        /// <param name="services">The service collection to register with</param>
-        /// <param name="configureOptions">Action to configure projection service options</param>
-        /// <param name="lifetime">The lifetime to use for the projection handler (default: Scoped)</param>
-        /// <returns>The service collection for chaining</returns>
-        /// <remarks>
-        /// This method registers a batch projection handler and allows configuration of
-        /// batch size, timeout, parallelism, and automatic checkpointing.
-        /// 
-        /// Example usage:
-        /// <code>
-        /// services.AddBatchProjection&lt;UserProfileBatchProjection&gt;(options =&gt;
-        /// {
-        ///     options.BatchSize = 50;
-        ///     options.BatchTimeout = TimeSpan.FromSeconds(5);
-        ///     options.MaxDegreeOfParallelism = 4;
-        ///     options.AutoCheckpoint = true;
-        /// });
-        /// </code>
-        /// </remarks>
-        public IServiceCollection AddBatchProjection<TProjection>(
-            Action<ProjectionServiceOptions>? configureOptions,
-            ServiceLifetime lifetime = ServiceLifetime.Scoped)
-            where TProjection : class
-        {
-            // Register the projection handler itself
-            services.Add(new ServiceDescriptor(typeof(TProjection), typeof(TProjection), lifetime));
-
-            var projectionType = typeof(TProjection);
-            var batchInterfaces = projectionType.GetInterfaces()
-                .Where(iface => iface.IsGenericType &&
-                    iface.GetGenericTypeDefinition() == typeof(IProjectionBatchHandler<>));
-
-            // Configure options
-            ProjectionServiceOptions? options = null;
-            if (configureOptions != null)
-            {
-                options = new ProjectionServiceOptions { ProjectionName = projectionType.Name };
-                configureOptions(options);
-            }
-
-            foreach (var iface in batchInterfaces)
-            {
-                // Register the interface to resolve to the projection instance
-                services.Add(new ServiceDescriptor(iface, sp => sp.GetRequiredService<TProjection>(), lifetime));
-
-                // Register in the projection handler registry
-                var eventType = iface.GenericTypeArguments[0];
-                ProjectionHandlerRegistry.RegisterBatch(eventType, iface, projectionType, options);
-            }
-
-            return services;
-        }
-
-        /// <summary>
-        /// Registers the projection service for batch processing with automatic checkpointing.
-        /// </summary>
-        /// <param name="services">The service collection to register with</param>
-        /// <returns>The service collection for chaining</returns>
-        /// <remarks>
-        /// This method registers:
-        /// 1. IProjectionCheckpointStore as a singleton (in-memory, if not already registered)
-        /// 2. IProjectionMonitor as a singleton (in-memory, if not already registered)
-        /// 3. IProjectionService as a singleton (DefaultProjectionService)
-        ///
-        /// The projection service must be run manually or as a hosted service:
-        /// <code>
-        /// services.AddInMemoryEventBus();
-        /// services.AddBatchProjection&lt;UserProfileBatchProjection&gt;(options =&gt;
-        /// {
-        ///     options.BatchSize = 50;
-        ///     options.BatchTimeout = TimeSpan.FromSeconds(5);
-        /// });
-        /// services.AddProjectionService();
-        /// 
-        /// var service = serviceProvider.GetRequiredService&lt;IProjectionService&gt;();
-        /// await service.RunAsync(cancellationToken);
-        /// </code>
-        /// </remarks>
-        public IServiceCollection AddProjectionService()
-        {
-            // Register checkpoint store if not already registered
-            services.TryAddSingleton<IProjectionCheckpointStore, InMemoryProjectionCheckpointStore>();
-
-            // Register projection monitor if not already registered
-            services.TryAddSingleton<IProjectionMonitor, InMemoryProjectionMonitor>();
-
-            // Register the projection service
-            services.TryAddSingleton<IProjectionService, DefaultProjectionService>();
 
             return services;
         }

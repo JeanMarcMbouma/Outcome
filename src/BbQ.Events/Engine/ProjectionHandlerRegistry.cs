@@ -10,37 +10,11 @@ public static class ProjectionHandlerRegistry
 {
     private static readonly ConcurrentDictionary<Type, ConcurrentBag<HandlerRegistration>> _handlers = new();
     private static readonly ConcurrentDictionary<string, ProjectionOptions> _projectionOptions = new();
-    private static readonly ConcurrentDictionary<string, ProjectionServiceOptions> _projectionServiceOptions = new();
 
     /// <summary>
     /// Registers a projection handler service type for a specific event type.
     /// </summary>
     public static void Register(Type eventType, Type handlerServiceType, Type concreteType, ProjectionOptions? options = null)
-    {
-        RegisterHandler(eventType, handlerServiceType, concreteType);
-        
-        // Store options if provided
-        if (options != null)
-        {
-            _projectionOptions[concreteType.Name] = options;
-        }
-    }
-    
-    /// <summary>
-    /// Registers a batch projection handler service type for a specific event type with service options.
-    /// </summary>
-    public static void RegisterBatch(Type eventType, Type handlerServiceType, Type concreteType, ProjectionServiceOptions? serviceOptions = null)
-    {
-        RegisterHandler(eventType, handlerServiceType, concreteType);
-        
-        // Store service options if provided
-        if (serviceOptions != null)
-        {
-            _projectionServiceOptions[concreteType.Name] = serviceOptions;
-        }
-    }
-
-    private static void RegisterHandler(Type eventType, Type handlerServiceType, Type concreteType)
     {
         _handlers.AddOrUpdate(
             eventType,
@@ -53,22 +27,20 @@ public static class ProjectionHandlerRegistry
                 }
                 return bag;
             });
+        
+        // Store options if provided
+        if (options != null)
+        {
+            _projectionOptions[concreteType.Name] = options;
+        }
     }
-
+    
     /// <summary>
     /// Gets projection options for a concrete type, returns null if not found.
     /// </summary>
     public static ProjectionOptions? GetProjectionOptions(string projectionName)
     {
         return _projectionOptions.TryGetValue(projectionName, out var options) ? options : null;
-    }
-
-    /// <summary>
-    /// Gets projection service options for a concrete type, returns null if not found.
-    /// </summary>
-    public static ProjectionServiceOptions? GetProjectionServiceOptions(string projectionName)
-    {
-        return _projectionServiceOptions.TryGetValue(projectionName, out var options) ? options : null;
     }
 
     /// <summary>
@@ -108,7 +80,6 @@ public static class ProjectionHandlerRegistry
     {
         _handlers.Clear();
         _projectionOptions.Clear();
-        _projectionServiceOptions.Clear();
     }
 
     /// <summary>

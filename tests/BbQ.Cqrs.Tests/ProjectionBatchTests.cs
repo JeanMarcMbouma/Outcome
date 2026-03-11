@@ -6,23 +6,16 @@ using BbQ.Events.Projections;
 
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
-using System.Collections.Concurrent;
 
 namespace BbQ.Cqrs.Tests;
 
 /// <summary>
-/// Tests for the projection service with batch processing, parallel processing,
-/// and automatic checkpointing.
+/// Tests for batch processing, parallel processing, and automatic checkpointing
+/// integrated directly into the DefaultProjectionEngine.
 /// </summary>
 [TestFixture]
-public class ProjectionServiceTests
+public class ProjectionBatchTests
 {
-    /// <summary>Time to wait for the service to process dispatched events.</summary>
-    private const int ProcessingDelayMs = 1000;
-    
-    /// <summary>Time to wait for the batch timeout to trigger partial batch dispatch.</summary>
-    private const int BatchTimeoutWaitMs = 500;
-
     [TearDown]
     public void TearDown()
     {
@@ -30,7 +23,7 @@ public class ProjectionServiceTests
     }
 
     [Test]
-    public void AddBatchProjection_RegistersBatchHandler()
+    public void AddProjection_RegistersBatchHandler()
     {
         // Arrange
         ProjectionHandlerRegistry.Clear();
@@ -39,7 +32,7 @@ public class ProjectionServiceTests
         services.AddInMemoryEventBus();
 
         // Act
-        services.AddBatchProjection<TestBatchProjection>();
+        services.AddProjection<TestBatchProjection>();
         var provider = services.BuildServiceProvider();
 
         // Assert
@@ -52,7 +45,7 @@ public class ProjectionServiceTests
     }
 
     [Test]
-    public void AddBatchProjection_WithOptions_ConfiguresOptions()
+    public void AddProjection_WithBatchOptions_ConfiguresOptions()
     {
         // Arrange
         ProjectionHandlerRegistry.Clear();
@@ -61,7 +54,7 @@ public class ProjectionServiceTests
         services.AddInMemoryEventBus();
 
         // Act
-        services.AddBatchProjection<TestBatchProjection>(options =>
+        services.AddProjection<TestBatchProjection>(options =>
         {
             options.BatchSize = 50;
             options.BatchTimeout = TimeSpan.FromSeconds(10);
@@ -70,7 +63,7 @@ public class ProjectionServiceTests
         });
 
         // Assert
-        var options = ProjectionHandlerRegistry.GetProjectionServiceOptions(nameof(TestBatchProjection));
+        var options = ProjectionHandlerRegistry.GetProjectionOptions(nameof(TestBatchProjection));
         Assert.That(options, Is.Not.Null);
         Assert.That(options!.BatchSize, Is.EqualTo(50));
         Assert.That(options.BatchTimeout, Is.EqualTo(TimeSpan.FromSeconds(10)));
@@ -79,7 +72,7 @@ public class ProjectionServiceTests
     }
 
     [Test]
-    public void AddProjectionService_RegistersServiceAndCheckpointStore()
+    public void AddProjectionEngine_RegistersEngineAndCheckpointStore()
     {
         // Arrange
         ProjectionHandlerRegistry.Clear();
@@ -88,14 +81,14 @@ public class ProjectionServiceTests
         services.AddInMemoryEventBus();
 
         // Act
-        services.AddProjectionService();
+        services.AddProjectionEngine();
         var provider = services.BuildServiceProvider();
 
         // Assert
-        var service = provider.GetService<IProjectionService>();
+        var engine = provider.GetService<IProjectionEngine>();
         var checkpointStore = provider.GetService<IProjectionCheckpointStore>();
 
-        Assert.That(service, Is.Not.Null);
+        Assert.That(engine, Is.Not.Null);
         Assert.That(checkpointStore, Is.Not.Null);
         Assert.That(checkpointStore, Is.InstanceOf<InMemoryProjectionCheckpointStore>());
     }
@@ -108,7 +101,7 @@ public class ProjectionServiceTests
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddInMemoryEventBus();
-        services.AddBatchProjection<TestBatchProjection>();
+        services.AddProjection<TestBatchProjection>();
 
         var provider = services.BuildServiceProvider();
         var handler = provider.GetRequiredService<IProjectionBatchHandler<BatchTestEvent>>();
@@ -131,96 +124,56 @@ public class ProjectionServiceTests
     }
 
     [Test]
-    public async Task BatchHandler_ProcessesMultipleBatches()
-    {
-        // Arrange
-        ProjectionHandlerRegistry.Clear();
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddInMemoryEventBus();
-        services.AddBatchProjection<TestBatchProjection>();
-
-        var provider = services.BuildServiceProvider();
-        var handler = provider.GetRequiredService<IProjectionBatchHandler<BatchTestEvent>>();
-
-        // Act - Process two batches
-        await handler.ProjectBatchAsync(new List<BatchTestEvent>
-        {
-            new("1", "Alice"),
-            new("2", "Bob")
-        });
-
-        await handler.ProjectBatchAsync(new List<BatchTestEvent>
-        {
-            new("3", "Charlie"),
-            new("4", "Dave"),
-            new("5", "Eve")
-        });
-
-        // Assert
-        var projection = (TestBatchProjection)handler;
-        Assert.That(projection.ProcessedBatches.Count, Is.EqualTo(2));
-        Assert.That(projection.ProcessedBatches[0].Count, Is.EqualTo(2));
-        Assert.That(projection.ProcessedBatches[1].Count, Is.EqualTo(3));
-        Assert.That(projection.TotalEventsProcessed, Is.EqualTo(5));
-    }
-
-    [Test]
-    public void ProjectionServiceOptions_HasCorrectDefaults()
+    public void ProjectionOptions_BatchDefaults()
     {
         // Arrange & Act
-        var options = new ProjectionServiceOptions();
+        var options = new ProjectionOptions();
 
         // Assert
-        Assert.That(options.BatchSize, Is.EqualTo(100));
+        Assert.That(options.BatchSize, Is.EqualTo(0), "BatchSize defaults to 0 (disabled)");
         Assert.That(options.BatchTimeout, Is.EqualTo(TimeSpan.FromSeconds(5)));
-        Assert.That(options.MaxDegreeOfParallelism, Is.EqualTo(1));
         Assert.That(options.AutoCheckpoint, Is.True);
-        Assert.That(options.ChannelCapacity, Is.EqualTo(1000));
-        Assert.That(options.StartupMode, Is.EqualTo(ProjectionStartupMode.Resume));
-        Assert.That(options.ProjectionName, Is.EqualTo(string.Empty));
     }
 
     [Test]
-    public async Task ProjectionService_ProcessesBatchEvents_WithAutomaticCheckpointing()
+    public async Task Engine_ProcessesBatchEvents_WithAutomaticCheckpointing()
     {
         // Arrange
         ProjectionHandlerRegistry.Clear();
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddInMemoryEventBus();
-        services.AddBatchProjection<TestBatchProjection>(options =>
+        services.AddProjection<TestBatchProjection>(options =>
         {
             options.BatchSize = 3;
             options.BatchTimeout = TimeSpan.FromMilliseconds(200);
             options.AutoCheckpoint = true;
         });
-        services.AddProjectionService();
+        services.AddProjectionEngine();
 
         var provider = services.BuildServiceProvider();
         var eventBus = provider.GetRequiredService<IEventBus>();
-        var service = provider.GetRequiredService<IProjectionService>();
+        var engine = provider.GetRequiredService<IProjectionEngine>();
         var checkpointStore = provider.GetRequiredService<IProjectionCheckpointStore>();
 
-        // Act - Start service and publish events
+        // Act - Start engine and publish events
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-        var serviceTask = service.RunAsync(cts.Token);
+        var engineTask = engine.RunAsync(cts.Token);
 
-        // Publish events that will fill a batch
         for (int i = 0; i < 3; i++)
         {
             await eventBus.Publish(new BatchTestEvent(i.ToString(), $"User-{i}"), cts.Token);
         }
 
         // Wait for processing
-        await Task.Delay(ProcessingDelayMs, CancellationToken.None);
+        await Task.Delay(1000, CancellationToken.None);
 
         // Cancel and wait for graceful shutdown
         cts.Cancel();
 
         try
         {
-            await serviceTask;
+            await engineTask;
         }
         catch (OperationCanceledException)
         {
@@ -234,57 +187,54 @@ public class ProjectionServiceTests
     }
 
     [Test]
-    public async Task ProjectionService_FlushesRemainingEventsOnShutdown()
+    public async Task Engine_FlushesRemainingEventsOnShutdown()
     {
         // Arrange
         ProjectionHandlerRegistry.Clear();
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddInMemoryEventBus();
-        services.AddBatchProjection<TestBatchProjection>(options =>
+        services.AddProjection<TestBatchProjection>(options =>
         {
-            options.BatchSize = 100; // Large batch size - won't fill naturally
+            options.BatchSize = 100; // Large batch - won't fill naturally
             options.BatchTimeout = TimeSpan.FromMilliseconds(100); // Short timeout
             options.AutoCheckpoint = true;
         });
-        services.AddProjectionService();
+        services.AddProjectionEngine();
 
         var provider = services.BuildServiceProvider();
         var eventBus = provider.GetRequiredService<IEventBus>();
-        var service = provider.GetRequiredService<IProjectionService>();
+        var engine = provider.GetRequiredService<IProjectionEngine>();
 
-        // Act - Start service and publish a few events (less than batch size)
+        // Act
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-        var serviceTask = service.RunAsync(cts.Token);
+        var engineTask = engine.RunAsync(cts.Token);
 
-        // Publish events that won't fill a batch
         await eventBus.Publish(new BatchTestEvent("1", "Alice"), cts.Token);
         await eventBus.Publish(new BatchTestEvent("2", "Bob"), cts.Token);
 
-        // Wait for batch timeout to trigger
-        await Task.Delay(BatchTimeoutWaitMs, CancellationToken.None);
+        // Wait for batch timeout
+        await Task.Delay(500, CancellationToken.None);
 
-        // Cancel to trigger shutdown
         cts.Cancel();
 
         try
         {
-            await serviceTask;
+            await engineTask;
         }
         catch (OperationCanceledException)
         {
             // Expected
         }
 
-        // Assert - Verify remaining events were flushed
+        // Assert
         var checkpointStore = provider.GetRequiredService<IProjectionCheckpointStore>();
         var checkpoint = await checkpointStore.GetCheckpointAsync("TestBatchProjection:_default");
-        // Checkpoint should exist from timeout-triggered batch or shutdown flush
         Assert.That(checkpoint, Is.Not.Null, "Checkpoint should have been saved for flushed batch");
     }
 
     [Test]
-    public void AddBatchProjection_WithMultipleEventTypes_RegistersAllHandlers()
+    public void AddProjection_WithMultipleBatchEventTypes_RegistersAllHandlers()
     {
         // Arrange
         ProjectionHandlerRegistry.Clear();
@@ -293,7 +243,7 @@ public class ProjectionServiceTests
         services.AddInMemoryEventBus();
 
         // Act
-        services.AddBatchProjection<TestMultiEventBatchProjection>();
+        services.AddProjection<TestMultiEventBatchProjection>();
         var provider = services.BuildServiceProvider();
 
         // Assert
@@ -303,7 +253,6 @@ public class ProjectionServiceTests
         Assert.That(handler1, Is.Not.Null);
         Assert.That(handler2, Is.Not.Null);
 
-        // Both should resolve to the same projection instance
         using var scope = provider.CreateScope();
         var h1 = scope.ServiceProvider.GetRequiredService<IProjectionBatchHandler<BatchTestEvent>>();
         var h2 = scope.ServiceProvider.GetRequiredService<IProjectionBatchHandler<BatchTestEvent2>>();
@@ -311,21 +260,21 @@ public class ProjectionServiceTests
     }
 
     [Test]
-    public void ProjectionService_WithNoHandlers_ReturnsImmediately()
+    public void Engine_WithNoHandlers_ReturnsImmediately()
     {
         // Arrange
         ProjectionHandlerRegistry.Clear();
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddInMemoryEventBus();
-        services.AddProjectionService();
+        services.AddProjectionEngine();
 
         var provider = services.BuildServiceProvider();
-        var service = provider.GetRequiredService<IProjectionService>();
+        var engine = provider.GetRequiredService<IProjectionEngine>();
 
-        // Act & Assert - Should complete quickly without handlers
-        var task = service.RunAsync(CancellationToken.None);
-        Assert.That(task.Wait(TimeSpan.FromSeconds(2)), Is.True, "Service should complete when no handlers are registered");
+        // Act & Assert
+        var task = engine.RunAsync(CancellationToken.None);
+        Assert.That(task.Wait(TimeSpan.FromSeconds(2)), Is.True, "Engine should complete when no handlers are registered");
     }
 
     [Test]
@@ -338,10 +287,10 @@ public class ProjectionServiceTests
         services.AddInMemoryEventBus();
 
         // Act
-        services.AddProjectionsFromAssembly(typeof(ProjectionServiceTests).Assembly);
+        services.AddProjectionsFromAssembly(typeof(ProjectionBatchTests).Assembly);
         var provider = services.BuildServiceProvider();
 
-        // Assert - TestDiscoverableBatchProjection has [Projection] attribute
+        // Assert
         var projection = provider.GetService<TestDiscoverableBatchProjection>();
         Assert.That(projection, Is.Not.Null);
 
@@ -350,27 +299,26 @@ public class ProjectionServiceTests
     }
 
     [Test]
-    public void ProjectionHandlerRegistry_Clear_ClearsServiceOptions()
+    public void ProjectionHandlerRegistry_Clear_ClearsOptions()
     {
         // Arrange
         ProjectionHandlerRegistry.Clear();
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddInMemoryEventBus();
-        services.AddBatchProjection<TestBatchProjection>(options =>
+        services.AddProjection<TestBatchProjection>(options =>
         {
             options.BatchSize = 50;
         });
 
-        // Verify options exist
-        var options = ProjectionHandlerRegistry.GetProjectionServiceOptions(nameof(TestBatchProjection));
+        var options = ProjectionHandlerRegistry.GetProjectionOptions(nameof(TestBatchProjection));
         Assert.That(options, Is.Not.Null);
 
         // Act
         ProjectionHandlerRegistry.Clear();
 
         // Assert
-        options = ProjectionHandlerRegistry.GetProjectionServiceOptions(nameof(TestBatchProjection));
+        options = ProjectionHandlerRegistry.GetProjectionOptions(nameof(TestBatchProjection));
         Assert.That(options, Is.Null);
     }
 

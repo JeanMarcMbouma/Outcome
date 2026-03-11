@@ -44,14 +44,15 @@ namespace BbQ.Events.Projections;
 /// }
 /// </code>
 /// 
-/// Registration:
+/// Registration (batch options are configured via <see cref="Engine.ProjectionOptions"/>):
 /// <code>
-/// services.AddBatchProjection&lt;UserProfileBatchProjection&gt;(options =&gt;
+/// services.AddProjection&lt;UserProfileBatchProjection&gt;(options =&gt;
 /// {
 ///     options.BatchSize = 50;
 ///     options.BatchTimeout = TimeSpan.FromSeconds(5);
+///     options.AutoCheckpoint = true;
 /// });
-/// services.AddProjectionService();
+/// services.AddProjectionEngine();
 /// </code>
 /// </remarks>
 public interface IProjectionBatchHandler<in TEvent>
@@ -63,10 +64,10 @@ public interface IProjectionBatchHandler<in TEvent>
     /// <param name="ct">Cancellation token for async operations</param>
     /// <returns>A task that completes when the batch has been projected</returns>
     /// <remarks>
-    /// This method is called by the projection service when a batch of events
+    /// This method is called by the projection engine when a batch of events
     /// of type TEvent has been collected. The batch size is controlled by
-    /// <see cref="Engine.ProjectionServiceOptions.BatchSize"/> and
-    /// <see cref="Engine.ProjectionServiceOptions.BatchTimeout"/>.
+    /// <see cref="Engine.ProjectionOptions.BatchSize"/> and
+    /// <see cref="Engine.ProjectionOptions.BatchTimeout"/>.
     /// 
     /// Guidelines:
     /// - Must be idempotent (safe to call multiple times with the same batch)
