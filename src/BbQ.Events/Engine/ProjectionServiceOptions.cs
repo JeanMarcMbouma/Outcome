@@ -55,7 +55,7 @@ public class ProjectionServiceOptions
     public TimeSpan BatchTimeout { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
-    /// Maximum number of partitions that can be processed in parallel.
+    /// Maximum number of concurrent batch processing operations.
     /// </summary>
     /// <remarks>
     /// Default: 1 (sequential processing)
@@ -63,7 +63,7 @@ public class ProjectionServiceOptions
     /// This value limits the number of concurrent batch processing operations:
     /// - 1: Sequential batch processing
     /// - N (&gt; 1): Up to N batches may be processed concurrently
-    /// - 0 or negative: Capped at 1000 concurrent operations
+    /// - 0 or negative: Capped at DefaultMaxConcurrentBatches (1000) concurrent operations
     /// 
     /// When used with partitioned batch handlers, each partition collects
     /// its own batch independently and processes in parallel up to this limit.

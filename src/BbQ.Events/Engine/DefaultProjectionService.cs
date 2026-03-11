@@ -30,6 +30,7 @@ namespace BbQ.Events.Engine;
 internal class DefaultProjectionService : IProjectionService
 {
     private const string DefaultPartitionKey = "_default";
+    private const int MaxConcurrentBatches = 1000;
 
     private readonly IServiceProvider _serviceProvider;
     private readonly IEventBus _eventBus;
@@ -253,7 +254,7 @@ internal class DefaultProjectionService : IProjectionService
                         {
                             var maxCount = options.MaxDegreeOfParallelism > 0
                                 ? options.MaxDegreeOfParallelism
-                                : 1000;
+                                : MaxConcurrentBatches;
                             return new SemaphoreSlim(maxCount, maxCount);
                         });
 

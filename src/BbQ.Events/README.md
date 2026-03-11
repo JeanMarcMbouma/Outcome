@@ -9,6 +9,8 @@ Event-driven architecture support with strongly-typed pub/sub and projections fo
 - **Event subscribers** (`IEventSubscriber<TEvent>`) for consuming event streams
 - **Projection support** for building read models and materialized views
 - **Partitioned projections** for parallel event processing
+- **Batch projection processing** via `IProjectionBatchHandler<TEvent>` for high-throughput bulk operations (NEW)
+- **Projection service** (`IProjectionService`) with built-in batch processing, parallel processing, and automatic checkpointing (NEW)
 - **Backpressure & flow control** - bounded channels with configurable strategies (Block, DropNewest, DropOldest)
 - **Projection monitoring** via `IProjectionMonitor` for observability (events/sec, lag, worker count, checkpoints, queue depth)
 - **Projection replay API** via `IProjectionRebuilder` for resetting and rebuilding projections
@@ -333,6 +335,137 @@ Console.WriteLine($"Events Processed: {metrics.EventsProcessed}");
 
 📖 **See [PROJECTION_SAMPLE.md](PROJECTION_SAMPLE.md) for complete examples and best practices.**
 
+### Batch Processing with IProjectionService (NEW)
+
+For high-throughput scenarios, the projection service provides built-in batch processing, parallel processing, and automatic checkpointing:
+
+#### Define a Batch Projection
+
+```csharp
+public class UserProfileBatchProjection : IProjectionBatchHandler<UserCreated>
+{
+    private readonly IUserRepository _repository;
+    
+    public UserProfileBatchProjection(IUserRepository repository)
+    {
+        _repository = repository;
+    }
+    
+    public async ValueTask ProjectBatchAsync(IReadOnlyList<UserCreated> events, CancellationToken ct)
+    {
+        // Process all events in a single batch operation
+        var profiles = events.Select(e => new UserProfile(e.UserId, e.Name, e.Email));
+        await _repository.BulkUpsertAsync(profiles, ct);
+    }
+}
+```
+
+#### Register and Run the Projection Service
+
+```csharp
+// Register event bus and batch projections
+services.AddInMemoryEventBus();
+services.AddBatchProjection<UserProfileBatchProjection>(options =>
+{
+    options.BatchSize = 50;                              // Events per batch
+    options.BatchTimeout = TimeSpan.FromSeconds(5);      // Max wait for full batch
+    options.MaxDegreeOfParallelism = 4;                  // Parallel processing
+    options.AutoCheckpoint = true;                       // Checkpoint after each batch
+});
+services.AddProjectionService();
+
+// Run the service (as hosted service or manually)
+var service = serviceProvider.GetRequiredService<IProjectionService>();
+await service.RunAsync(cancellationToken);
+```
+
+#### Configuration Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `BatchSize` | 100 | Maximum events collected before dispatching a batch |
+| `BatchTimeout` | 5 seconds | Maximum time to wait for a full batch |
+| `MaxDegreeOfParallelism` | 1 | Concurrent batch processing operations |
+| `AutoCheckpoint` | true | Automatically save checkpoints after each batch |
+| `ChannelCapacity` | 1000 | Maximum events queued before backpressure |
+| `StartupMode` | Resume | How the projection starts (Resume, Replay, CatchUp, LiveOnly) |
+| `ErrorHandling` | Retry(3) | Error strategy with exponential backoff |
+
+**Key differences from IProjectionEngine:**
+
+- **Batch processing** - Events are collected into configurable batches before dispatching, enabling efficient bulk operations
+- **Automatic checkpointing** - Checkpoints are saved after each batch without manual intervention
+- **Batch timeout** - Partial batches are automatically flushed after a configurable timeout
+- **Graceful shutdown** - Remaining events are flushed and checkpointed on shutdown
+
+**Examples:**
+
+```csharp
+// High-throughput batch projection with parallelism
+services.AddBatchProjection<AnalyticsBatchProjection>(options =>
+{
+    options.BatchSize = 200;
+    options.BatchTimeout = TimeSpan.FromSeconds(2);
+    options.MaxDegreeOfParallelism = 8;
+    options.AutoCheckpoint = true;
+});
+
+// Small batches with fast flush for low-latency projections
+services.AddBatchProjection<DashboardBatchProjection>(options =>
+{
+    options.BatchSize = 10;
+    options.BatchTimeout = TimeSpan.FromMilliseconds(500);
+    options.AutoCheckpoint = true;
+});
+
+// Manual checkpoint control for critical projections
+services.AddBatchProjection<FinancialBatchProjection>(options =>
+{
+    options.BatchSize = 50;
+    options.AutoCheckpoint = false; // Manage checkpoints manually
+    options.ErrorHandling.Strategy = ProjectionErrorHandlingStrategy.Stop;
+});
+```
+
+**Hosted Service Pattern:**
+
+```csharp
+public class ProjectionServiceHost : BackgroundService
+{
+    private readonly IProjectionService _service;
+    
+    public ProjectionServiceHost(IProjectionService service)
+    {
+        _service = service;
+    }
+    
+    protected override Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        return _service.RunAsync(stoppingToken);
+    }
+}
+
+// Register in DI
+services.AddHostedService<ProjectionServiceHost>();
+```
+
+**Assembly scanning** also discovers batch projections marked with `[Projection]`:
+
+```csharp
+[Projection]
+public class AutoDiscoveredBatchProjection : IProjectionBatchHandler<OrderPlaced>
+{
+    public async ValueTask ProjectBatchAsync(IReadOnlyList<OrderPlaced> events, CancellationToken ct)
+    {
+        // Batch processing logic
+    }
+}
+
+// Auto-discovers batch projections alongside regular projections
+services.AddProjectionsFromAssembly(typeof(Program).Assembly);
+services.AddProjectionService();
+```
+
 ## 🔗 Automatic Handler Registration
 
 Event handlers, subscribers, and projections are automatically discovered by the BbQ.Events source generator:
@@ -386,6 +519,16 @@ The default projection engine:
 - Handles errors gracefully and continues processing
 - Can be extended for batch processing, parallel processing, and automatic checkpointing
 - **Tracks metrics and health via IProjectionMonitor** (events/sec, lag, worker count, checkpoints)
+
+### Projection Service (NEW)
+
+The default projection service (`IProjectionService` / `DefaultProjectionService`):
+- Provides batch processing via `IProjectionBatchHandler<TEvent>`
+- Collects events into configurable batches (by size and timeout)
+- Supports parallel batch processing with configurable concurrency
+- Automatic checkpoint persistence after each batch
+- Graceful shutdown with batch flushing and final checkpoint save
+- Configurable via `ProjectionServiceOptions` (BatchSize, BatchTimeout, MaxDegreeOfParallelism, AutoCheckpoint)
 
 ### Projection Monitoring
 

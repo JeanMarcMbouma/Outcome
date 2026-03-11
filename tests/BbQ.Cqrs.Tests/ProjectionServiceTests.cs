@@ -17,6 +17,12 @@ namespace BbQ.Cqrs.Tests;
 [TestFixture]
 public class ProjectionServiceTests
 {
+    /// <summary>Time to wait for the service to process dispatched events.</summary>
+    private const int ProcessingDelayMs = 1000;
+    
+    /// <summary>Time to wait for the batch timeout to trigger partial batch dispatch.</summary>
+    private const int BatchTimeoutWaitMs = 500;
+
     [TearDown]
     public void TearDown()
     {
@@ -207,7 +213,7 @@ public class ProjectionServiceTests
         }
 
         // Wait for processing
-        await Task.Delay(1000, CancellationToken.None);
+        await Task.Delay(ProcessingDelayMs, CancellationToken.None);
 
         // Cancel and wait for graceful shutdown
         cts.Cancel();
@@ -256,7 +262,7 @@ public class ProjectionServiceTests
         await eventBus.Publish(new BatchTestEvent("2", "Bob"), cts.Token);
 
         // Wait for batch timeout to trigger
-        await Task.Delay(500, CancellationToken.None);
+        await Task.Delay(BatchTimeoutWaitMs, CancellationToken.None);
 
         // Cancel to trigger shutdown
         cts.Cancel();
