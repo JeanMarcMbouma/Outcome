@@ -142,7 +142,8 @@ namespace BbQ.Events.SourceGenerators
                     eventTypes.Add(new EventTypeInfo
                     {
                         EventTypeName = eventType.ToDisplayString(),
-                        IsPartitioned = false
+                        IsPartitioned = false,
+                        IsBatch = false
                     });
                 }
                 // Check for IPartitionedProjectionHandler<TEvent>
@@ -152,7 +153,19 @@ namespace BbQ.Events.SourceGenerators
                     eventTypes.Add(new EventTypeInfo
                     {
                         EventTypeName = eventType.ToDisplayString(),
-                        IsPartitioned = true
+                        IsPartitioned = true,
+                        IsBatch = false
+                    });
+                }
+                // Check for IProjectionBatchHandler<TEvent>
+                else if (interfaceName.StartsWith("BbQ.Events.Projections.IProjectionBatchHandler<") && iface.TypeArguments.Length == 1)
+                {
+                    var eventType = iface.TypeArguments[0];
+                    eventTypes.Add(new EventTypeInfo
+                    {
+                        EventTypeName = eventType.ToDisplayString(),
+                        IsPartitioned = false,
+                        IsBatch = true
                     });
                 }
             }
@@ -192,6 +205,7 @@ namespace BbQ.Events.SourceGenerators
             sb.AppendLine("using Microsoft.Extensions.DependencyInjection;");
             sb.AppendLine("using Microsoft.Extensions.DependencyInjection.Extensions;");
             sb.AppendLine("using BbQ.Events.Events;");
+            sb.AppendLine("using BbQ.Events.Engine;");
             sb.AppendLine("using BbQ.Events.Projections;");
             sb.AppendLine();
             sb.AppendLine("namespace BbQ.Events.Configuration");
@@ -253,7 +267,12 @@ namespace BbQ.Events.SourceGenerators
                     // Register for each event type it handles
                     foreach (var eventType in projection.EventTypes)
                     {
-                        if (eventType.IsPartitioned)
+                        if (eventType.IsBatch)
+                        {
+                            sb.AppendLine($"            services.Add(new ServiceDescriptor(typeof(IProjectionBatchHandler<{eventType.EventTypeName}>), sp => sp.GetRequiredService<{projection.ProjectionTypeName}>(), handlersLifetime));");
+                            sb.AppendLine($"            ProjectionHandlerRegistry.Register(typeof({eventType.EventTypeName}), typeof(IProjectionBatchHandler<{eventType.EventTypeName}>), typeof({projection.ProjectionTypeName}));");
+                        }
+                        else if (eventType.IsPartitioned)
                         {
                             sb.AppendLine($"            services.Add(new ServiceDescriptor(typeof(IPartitionedProjectionHandler<{eventType.EventTypeName}>), sp => sp.GetRequiredService<{projection.ProjectionTypeName}>(), handlersLifetime));");
                             sb.AppendLine($"            ProjectionHandlerRegistry.Register(typeof({eventType.EventTypeName}), typeof(IPartitionedProjectionHandler<{eventType.EventTypeName}>), typeof({projection.ProjectionTypeName}));");
@@ -297,6 +316,7 @@ namespace BbQ.Events.SourceGenerators
         {
             public string EventTypeName { get; set; } = "";
             public bool IsPartitioned { get; set; }
+            public bool IsBatch { get; set; }
         }
     }
 }
