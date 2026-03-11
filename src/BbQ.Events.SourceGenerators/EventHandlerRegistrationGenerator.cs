@@ -205,7 +205,6 @@ namespace BbQ.Events.SourceGenerators
             sb.AppendLine("using Microsoft.Extensions.DependencyInjection;");
             sb.AppendLine("using Microsoft.Extensions.DependencyInjection.Extensions;");
             sb.AppendLine("using BbQ.Events.Events;");
-            sb.AppendLine("using BbQ.Events.Engine;");
             sb.AppendLine("using BbQ.Events.Projections;");
             sb.AppendLine();
             sb.AppendLine("namespace BbQ.Events.Configuration");
