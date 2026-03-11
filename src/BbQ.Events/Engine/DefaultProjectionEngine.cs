@@ -4,6 +4,7 @@ using BbQ.Events.Projections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Reflection;
 using System.Threading.Channels;
 
@@ -726,7 +727,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
         CancellationToken ct)
     {
         var batch = new List<WorkItem>(options.BatchSize);
-        var batchTimer = System.Diagnostics.Stopwatch.StartNew();
+        var batchTimer = Stopwatch.StartNew();
 
         _logger.LogInformation(
             "Batch partition worker started for {ProjectionName}:{PartitionKey} (BatchSize={BatchSize}, BatchTimeout={BatchTimeout}ms, AutoCheckpoint={AutoCheckpoint})",
@@ -832,7 +833,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
     private static async Task<bool> WaitToReadWithTimeoutAsync(
         ChannelReader<WorkItem> reader,
         TimeSpan batchTimeout,
-        System.Diagnostics.Stopwatch batchTimer,
+        Stopwatch batchTimer,
         CancellationToken ct)
     {
         var remaining = batchTimeout - batchTimer.Elapsed;
@@ -991,7 +992,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
         // Create typed IReadOnlyList<TEvent>
         var typedList = cache.CreateTypedBatchList(batch.Select(w => w.Event));
 
-        var projectTask = (ValueTask)cache.ProjectBatchMethod!.Invoke(handler, new[] { typedList, ct })!;
+        var projectTask = (ValueTask)cache.ProjectBatchMethod.Invoke(handler, new[] { typedList, ct })!;
         await projectTask;
     }
 
