@@ -112,18 +112,22 @@ namespace BbQ.Cqrs.SourceGenerators
                     bool isCommand = requestInterfaces.Any(i => i.ToDisplayString().StartsWith("BbQ.Cqrs.ICommand<"));
                     bool isQuery = requestInterfaces.Any(i => i.ToDisplayString().StartsWith("BbQ.Cqrs.IQuery<"));
                     
-                    if (isCommand || isQuery)
+                    // Skip handlers whose request type only implements IRequest<> directly
+                    // (not via ICommand<> or IQuery<>), to avoid generating registrations
+                    // for the IRequest abstraction itself or open generic type parameters.
+                    if (!isCommand && !isQuery)
+                        return null;
+                    
+                    return new HandlerInfo
                     {
-                        return new HandlerInfo
-                        {
-                            HandlerTypeName = classSymbol.ToDisplayString(),
-                            RequestTypeName = requestType.ToDisplayString(),
-                            ResponseTypeName = responseType.ToDisplayString(),
-                            IsCommand = isCommand,
-                            IsQuery = isQuery,
-                            Namespace = classSymbol.ContainingNamespace.ToDisplayString()
-                        };
-                    }
+                        HandlerTypeName = classSymbol.ToDisplayString(),
+                        RequestTypeName = requestType.ToDisplayString(),
+                        ResponseTypeName = responseType.ToDisplayString(),
+                        IsCommand = isCommand,
+                        IsQuery = isQuery,
+                        Namespace = classSymbol.ContainingNamespace.ToDisplayString()
+                    };
+                    
                 }
                 // Check for IRequestHandler<TRequest> (fire-and-forget)
                 else if (interfaceName.StartsWith("BbQ.Cqrs.IRequestHandler<") && iface.TypeArguments.Length == 1)

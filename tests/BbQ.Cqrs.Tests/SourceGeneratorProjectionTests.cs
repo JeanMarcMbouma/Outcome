@@ -39,4 +39,26 @@ public class SourceGeneratorProjectionTests
         Assert.That(createdHandler, Is.Not.Null, "IProjectionHandler should be registered");
         Assert.That(activityHandler, Is.Not.Null, "IPartitionedProjectionHandler should be registered");
     }
+
+    [Test]
+    public void AddProjectionsFromAssembly_RegistersBatchProjections_WhenAttributePresent()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddInMemoryEventBus();
+
+        // Act - Use AddProjectionsFromAssembly which scans for [Projection] attributes
+        services.AddProjectionsFromAssembly(typeof(ProjectionBatchTests).Assembly);
+        var provider = services.BuildServiceProvider();
+
+        // Assert - Check that the batch projection type is registered
+        var batchProjection = provider.GetService<ProjectionBatchTests.TestDiscoverableBatchProjection>();
+        Assert.That(batchProjection, Is.Not.Null, "TestDiscoverableBatchProjection should be registered");
+
+        // Verify the IProjectionBatchHandler<> interface is also registered
+        var batchHandler = provider.GetService<IProjectionBatchHandler<ProjectionBatchTests.BatchTestEvent>>();
+        Assert.That(batchHandler, Is.Not.Null, "IProjectionBatchHandler<BatchTestEvent> should be registered");
+        Assert.That(batchHandler, Is.InstanceOf<ProjectionBatchTests.TestDiscoverableBatchProjection>());
+    }
 }
