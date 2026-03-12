@@ -9,6 +9,7 @@ Event-driven architecture support with strongly-typed pub/sub and projections fo
 - **Event subscribers** (`IEventSubscriber<TEvent>`) for consuming event streams
 - **Projection support** for building read models and materialized views
 - **Partitioned projections** for parallel event processing
+- **Batch projection processing** via `IProjectionBatchHandler<TEvent>` for high-throughput bulk operations
 - **Backpressure & flow control** - bounded channels with configurable strategies (Block, DropNewest, DropOldest)
 - **Projection monitoring** via `IProjectionMonitor` for observability (events/sec, lag, worker count, checkpoints, queue depth)
 - **Projection replay API** via `IProjectionRebuilder` for resetting and rebuilding projections
@@ -333,6 +334,54 @@ Console.WriteLine($"Events Processed: {metrics.EventsProcessed}");
 
 📖 **See [PROJECTION_SAMPLE.md](PROJECTION_SAMPLE.md) for complete examples and best practices.**
 
+### Batch Processing (IProjectionBatchHandler)
+
+For high-throughput scenarios, implement `IProjectionBatchHandler<TEvent>` instead of `IProjectionHandler<TEvent>`.
+The engine collects events into configurable batches and dispatches them in bulk:
+
+```csharp
+public class UserProfileBatchProjection : IProjectionBatchHandler<UserCreated>
+{
+    private readonly IUserRepository _repository;
+    
+    public UserProfileBatchProjection(IUserRepository repository)
+    {
+        _repository = repository;
+    }
+    
+    public async ValueTask ProjectBatchAsync(IReadOnlyList<UserCreated> events, CancellationToken ct)
+    {
+        var profiles = events.Select(e => new UserProfile(e.UserId, e.Name, e.Email));
+        await _repository.BulkUpsertAsync(profiles, ct);
+    }
+}
+```
+
+Register batch projections using the same `AddProjection<T>` API, with batch options on `ProjectionOptions`:
+
+```csharp
+services.AddInMemoryEventBus();
+services.AddProjection<UserProfileBatchProjection>(options =>
+{
+    options.BatchSize = 50;                              // Events per batch
+    options.BatchTimeout = TimeSpan.FromSeconds(5);      // Max wait for full batch
+    options.AutoCheckpoint = true;                       // Checkpoint after each batch
+});
+services.AddProjectionEngine();
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `BatchSize` | 0 (disabled) | Events collected before dispatching a batch |
+| `BatchTimeout` | 5 seconds | Max time to wait for a full batch |
+| `AutoCheckpoint` | true | Save checkpoint after each batch |
+| `CheckpointBatchSize` | 100 | Checkpoint after N events (non-batch mode, or when AutoCheckpoint is off) |
+| `MaxDegreeOfParallelism` | 1 | Max concurrent partition workers (applies to partitioned projections with multiple partitions) |
+
+When `BatchSize` is 0 the engine processes events one-at-a-time (the default behaviour).
+When `BatchSize > 0` the engine collects events and dispatches them via `ProjectBatchAsync`.
+Partial batches are flushed automatically when `BatchTimeout` expires or the engine shuts down.
+
 ## 🔗 Automatic Handler Registration
 
 Event handlers, subscribers, and projections are automatically discovered by the BbQ.Events source generator:
@@ -384,7 +433,8 @@ The default projection engine:
 - Processes events sequentially as they arrive
 - Provides checkpoint storage infrastructure (IProjectionCheckpointStore)
 - Handles errors gracefully and continues processing
-- Can be extended for batch processing, parallel processing, and automatic checkpointing
+- **Supports batch processing** via `IProjectionBatchHandler<TEvent>` with configurable batch size, timeout, and automatic checkpointing
+- **Supports parallel processing** via `MaxDegreeOfParallelism` for concurrent batch or partitioned event processing
 - **Tracks metrics and health via IProjectionMonitor** (events/sec, lag, worker count, checkpoints)
 
 ### Projection Monitoring

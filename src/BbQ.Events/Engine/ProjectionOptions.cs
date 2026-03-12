@@ -127,4 +127,51 @@ public class ProjectionOptions
     /// Use with caution in production systems.
     /// </remarks>
     public BackpressureStrategy BackpressureStrategy { get; set; } = BackpressureStrategy.Block;
+
+    /// <summary>
+    /// Maximum number of events to collect before dispatching as a batch to
+    /// <see cref="BbQ.Events.Projections.IProjectionBatchHandler{TEvent}"/> handlers.
+    /// </summary>
+    /// <remarks>
+    /// Default: 0 (batch processing disabled; events dispatched one-at-a-time)
+    /// 
+    /// When greater than zero the engine collects events until either:
+    /// - This batch size is reached, or
+    /// - The <see cref="BatchTimeout"/> expires (whichever comes first)
+    /// 
+    /// This setting only affects handlers that implement
+    /// <see cref="BbQ.Events.Projections.IProjectionBatchHandler{TEvent}"/>.
+    /// Regular <see cref="BbQ.Events.Projections.IProjectionHandler{TEvent}"/>
+    /// and <see cref="BbQ.Events.Projections.IPartitionedProjectionHandler{TEvent}"/>
+    /// handlers are always invoked one event at a time regardless of this setting.
+    /// </remarks>
+    public int BatchSize { get; set; } = 0;
+
+    /// <summary>
+    /// Maximum time to wait for a full batch before dispatching a partial batch.
+    /// </summary>
+    /// <remarks>
+    /// Default: 5 seconds
+    /// 
+    /// When events arrive slowly, this timeout ensures partial batches are
+    /// dispatched within a bounded time. This prevents events from sitting
+    /// in the buffer indefinitely when the stream is idle.
+    /// 
+    /// Only used when <see cref="BatchSize"/> is greater than zero.
+    /// </remarks>
+    public TimeSpan BatchTimeout { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// Whether to automatically save a checkpoint after each batch is processed.
+    /// </summary>
+    /// <remarks>
+    /// Default: true
+    /// 
+    /// When enabled the engine persists a checkpoint after every successfully
+    /// processed batch. When disabled the normal <see cref="CheckpointBatchSize"/>
+    /// counting logic is used instead.
+    /// 
+    /// Only used when <see cref="BatchSize"/> is greater than zero.
+    /// </remarks>
+    public bool AutoCheckpoint { get; set; } = true;
 }

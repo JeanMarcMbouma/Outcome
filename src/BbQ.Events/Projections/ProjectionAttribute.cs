@@ -10,7 +10,7 @@ namespace BbQ.Events.Projections;
 /// The Projection attribute:
 /// - Enables automatic discovery of projection handlers
 /// - Works with source generators to generate registration code
-/// - Requires the class to implement at least one IProjectionHandler&lt;TEvent&gt; or IPartitionedProjectionHandler&lt;TEvent&gt;
+/// - Requires the class to implement at least one IProjectionHandler&lt;TEvent&gt;, IPartitionedProjectionHandler&lt;TEvent&gt;, or IProjectionBatchHandler&lt;TEvent&gt;
 /// - Optionally configures projection behavior via MaxDegreeOfParallelism, CheckpointBatchSize, and StartupMode
 /// 
 /// **IMPORTANT:** When manually registering projections (not using source generators), prefer configuring 
@@ -82,4 +82,11 @@ public sealed class ProjectionAttribute : Attribute
     /// Default: BackpressureStrategy.Block
     /// </summary>
     public BackpressureStrategy BackpressureStrategy { get; set; } = BackpressureStrategy.Block;
+
+    /// <summary>
+    /// Maximum number of events to collect before dispatching as a batch to
+    /// <see cref="IProjectionBatchHandler{TEvent}"/> handlers.
+    /// Default: 0 (batch processing disabled)
+    /// </summary>
+    public int BatchSize { get; set; } = 0;
 }

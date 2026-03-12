@@ -16,6 +16,17 @@ namespace BbQ.Events.Configuration;
 /// </remarks>
 public static class ServiceCollectionExtensions
 {
+    /// <summary>
+    /// Tests whether an interface type is one of the supported projection handler interfaces.
+    /// </summary>
+    private static bool IsProjectionHandlerInterface(Type iface)
+    {
+        return iface.IsGenericType &&
+            (iface.GetGenericTypeDefinition() == typeof(IProjectionHandler<>) ||
+             iface.GetGenericTypeDefinition() == typeof(IPartitionedProjectionHandler<>) ||
+             iface.GetGenericTypeDefinition() == typeof(IProjectionBatchHandler<>));
+    }
+
     extension(IServiceCollection services)
     {
 
@@ -125,9 +136,7 @@ public static class ServiceCollectionExtensions
             // Register for each IProjectionHandler<TEvent> interface it implements
             var projectionType = typeof(TProjection);
             var projectionInterfaces = projectionType.GetInterfaces()
-                .Where(iface => iface.IsGenericType &&
-                    (iface.GetGenericTypeDefinition() == typeof(IProjectionHandler<>) ||
-                     iface.GetGenericTypeDefinition() == typeof(IPartitionedProjectionHandler<>)));
+                .Where(IsProjectionHandlerInterface);
 
             // Configure options
             ProjectionOptions? options = null;
@@ -224,21 +233,16 @@ public static class ServiceCollectionExtensions
             var projectionTypes = assembly.GetTypes()
                 .Where(t => t.IsClass && !t.IsAbstract)
                 .Where(t => t.GetCustomAttributes(typeof(ProjectionAttribute), false).Any())
-                .Where(t => t.GetInterfaces().Any(i => 
-                    i.IsGenericType && 
-                    (i.GetGenericTypeDefinition() == typeof(IProjectionHandler<>) ||
-                     i.GetGenericTypeDefinition() == typeof(IPartitionedProjectionHandler<>))));
+                .Where(t => t.GetInterfaces().Any(IsProjectionHandlerInterface));
 
             foreach (var projectionType in projectionTypes)
             {
                 // Register the projection type itself
                 services.Add(new ServiceDescriptor(projectionType, projectionType, lifetime));
 
-                // Register for each IProjectionHandler<TEvent> or IPartitionedProjectionHandler<TEvent> interface
+                // Register for each projection handler interface
                 var projectionInterfaces = projectionType.GetInterfaces()
-                    .Where(iface => iface.IsGenericType &&
-                        (iface.GetGenericTypeDefinition() == typeof(IProjectionHandler<>) ||
-                         iface.GetGenericTypeDefinition() == typeof(IPartitionedProjectionHandler<>)));
+                    .Where(IsProjectionHandlerInterface);
 
                 foreach (var iface in projectionInterfaces)
                 {
