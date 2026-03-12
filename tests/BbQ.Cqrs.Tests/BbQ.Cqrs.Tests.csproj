@@ -22,7 +22,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\BbQ.Cqrs\BbQ.Cqrs.csproj" />
     <ProjectReference Include="..\..\src\BbQ.Events\BbQ.Events.csproj" />
-    <ProjectReference Include="..\..\src\Outcome\Outcome.csproj" />
+    <ProjectReference Include="..\..\src\BbQ.Outcome\BbQ.Outcome.csproj" />
   </ItemGroup>
 
 </Project>

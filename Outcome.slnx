@@ -18,8 +18,8 @@
   <Folder Name="/Samples/">
     <Project Path="samples/BbQ.Events.Samples/BbQ.Events.Samples.csproj" Id="f2343415-bdae-4ab0-be93-2159e9840f4b" />
   </Folder>
-  <Project Path="src/Outcome.SourceGenerators/Outcome.SourceGenerators.csproj" />
-  <Project Path="tests/Outcome.Tests/Outcome.Tests.csproj" />
-  <Project Path="tests/Outcome.Benchmarks/Outcome.Benchmarks.csproj" />
-  <Project Path="src/Outcome/Outcome.csproj" />
+  <Project Path="src/BbQ.Outcome.SourceGenerators/BbQ.Outcome.SourceGenerators.csproj" />
+  <Project Path="tests/BbQ.Outcome.Tests/BbQ.Outcome.Tests.csproj" />
+  <Project Path="tests/BbQ.Outcome.Benchmarks/BbQ.Outcome.Benchmarks.csproj" />
+  <Project Path="src/BbQ.Outcome/BbQ.Outcome.csproj" />
 </Solution>

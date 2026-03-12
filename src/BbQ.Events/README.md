@@ -110,7 +110,7 @@ await foreach (var evt in subscriber.Subscribe(cancellationToken))
 }
 ```
 
-## 🎯 Projections (NEW)
+## 🎯 Projections
 
 Projections transform events into queryable read models for event-sourced systems.
 
@@ -177,7 +177,7 @@ public class UserStatisticsProjection : IPartitionedProjectionHandler<UserActivi
 }
 ```
 
-### Error Handling & Retry Policies (NEW)
+### Error Handling & Retry Policies
 
 Configure how projections handle errors during event processing:
 
@@ -250,7 +250,7 @@ All error handling strategies provide structured logging with event details:
 //            Manual intervention required.
 ```
 
-### Backpressure & Flow Control (NEW)
+### Backpressure & Flow Control
 
 Prevent unbounded memory growth when event ingestion outpaces projection processing:
 
@@ -394,8 +394,8 @@ The projection monitoring system tracks:
 - **Per-partition lag** - how far behind the projection is
 - **Active worker count** - number of concurrent workers
 - **Checkpoint frequency** - how often checkpoints are written
-- **Queue depth** - number of events waiting to be processed (NEW)
-- **Events dropped** - total events dropped due to backpressure (NEW)
+- **Queue depth** - number of events waiting to be processed
+- **Events dropped** - total events dropped due to backpressure
 
 Example usage:
 ```csharp

@@ -4,7 +4,7 @@ A comprehensive suite of modern C# libraries for functional error handling, comm
 
 ## 📦 Packages
 
-### [BbQ.Outcome](./src/Outcome/README.md)
+### [BbQ.Outcome](./src/BbQ.Outcome/README.md)
 A modern C# functional result type for error-aware programming.
 
 - **Structured errors** with `Code`, `Description`, and `Severity`
@@ -17,7 +17,7 @@ A modern C# functional result type for error-aware programming.
 dotnet add package BbQ.Outcome
 ```
 
-[📖 Full Documentation 📖](./src/Outcome/README.md)
+[📖 Full Documentation 📖](./src/BbQ.Outcome/README.md)
 
 ### [BbQ.Cqrs](./src/BbQ.Cqrs/README.md)
 A lightweight, extensible CQRS implementation that integrates seamlessly with BbQ.Outcome.
@@ -194,10 +194,10 @@ public class GetUserQueryHandler : IRequestHandler<GetUserQuery, Outcome<User>>
 
 ## 📚 Documentation
 
-- **[BbQ.Outcome Documentation](./src/Outcome/README.md)** - Complete guide to using BbQ.Outcome for functional error handling
+- **[BbQ.Outcome Documentation](./src/BbQ.Outcome/README.md)** - Complete guide to using BbQ.Outcome for functional error handling
 - **[BbQ.Cqrs Documentation](./src/BbQ.Cqrs/README.md)** - Complete guide to CQRS pattern implementation
 - **[BbQ.Events Documentation](./src/BbQ.Events/README.md)** - Complete guide to event-driven architecture
-- **[Outcome Error Helper Properties](./src/Outcome/README.md)** - Strongly typed error patterns with source generators
+- **[Outcome Error Helper Properties](./src/BbQ.Outcome/README.md)** - Strongly typed error patterns with source generators
 
 ## 🤝 Contributing
 

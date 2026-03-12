@@ -17,9 +17,9 @@
     <ProjectReference Include="..\BbQ.Cqrs\BbQ.Cqrs.csproj" />
     <ProjectReference Include="..\BbQ.Events\BbQ.Events.csproj" />
     <ProjectReference Include="..\BbQ.Cqrs.SourceGenerators\BbQ.Cqrs.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
-    <ProjectReference Include="..\Outcome.SourceGenerators\Outcome.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
+    <ProjectReference Include="..\BbQ.Outcome.SourceGenerators\BbQ.Outcome.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
 
-    <ProjectReference Include="..\Outcome\Outcome.csproj" />
+    <ProjectReference Include="..\BbQ.Outcome\BbQ.Outcome.csproj" />
   </ItemGroup>
 
 </Project>

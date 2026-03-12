@@ -494,6 +494,6 @@ static async Task Main()
 
 ## Related Documentation
 
-- [BbQ.Outcome Documentation](../../src/Outcome/README.md)
+- [BbQ.Outcome Documentation](../../src/BbQ.Outcome/README.md)
 - [BbQ.Cqrs Documentation](../../src/BbQ.Cqrs/README.md)
-- [Outcome Error Helper Properties](../../src/Outcome/README.md)
+- [Outcome Error Helper Properties](../../src/BbQ.Outcome/README.md)

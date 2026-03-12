@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <!-- Multi-target frameworks -->
-    <TargetFrameworks>net8.0</TargetFrameworks>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
 
     <!-- Package metadata -->
     <PackageId>BbQ.Outcome</PackageId>
@@ -41,7 +41,7 @@
 
   <ItemGroup>
     <!-- Include source generator as an analyzer in the package -->
-    <ProjectReference Include="../Outcome.SourceGenerators/Outcome.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
+    <ProjectReference Include="../BbQ.Outcome.SourceGenerators/BbQ.Outcome.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
   </ItemGroup>
 
 </Project>

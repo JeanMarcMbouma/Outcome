@@ -54,7 +54,7 @@
 
   <!-- Ensure analyzer is included in the correct NuGet package structure -->
   <ItemGroup>
-    <None Include="$(OutputPath)Outcome.SourceGenerators.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <None Include="$(OutputPath)BbQ.Outcome.SourceGenerators.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
   </ItemGroup>
 
 </Project>

@@ -16,12 +16,15 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
       - name: Setup NuGet.exe for use with actions
         # You may pin to the exact commit or the version.
         # uses: NuGet/setup-nuget@a21f25cd3998bf370fde17e3f1b4c12c175172f9
@@ -41,10 +44,10 @@ jobs:
         run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
         
       - name: Pack NuGet Outcome
-        run: dotnet pack src/Outcome/Outcome.csproj --configuration Release --no-build -o ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
+        run: dotnet pack src/BbQ.Outcome/BbQ.Outcome.csproj --configuration Release --no-build -o ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
       
       - name: Pack NuGet Outcome SourceGenerators
-        run: dotnet pack src/Outcome.SourceGenerators/Outcome.SourceGenerators.csproj --configuration Release --no-build -o ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
+        run: dotnet pack src/BbQ.Outcome.SourceGenerators/BbQ.Outcome.SourceGenerators.csproj --configuration Release --no-build -o ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
       
       - name: Pack NuGet BbQ.Cqrs
         run: dotnet pack src/BbQ.Cqrs/BbQ.Cqrs.csproj --configuration Release --no-build -o ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}

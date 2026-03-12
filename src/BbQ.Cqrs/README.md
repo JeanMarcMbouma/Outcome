@@ -1269,5 +1269,5 @@ public class GetUserByIdQueryHandler : IRequestHandler<GetUserByIdQuery, Outcome
 
 ## 📚 Learn More
 
-- [BbQ.Outcome Documentation](../Outcome/README.md) - BbQ.Outcome functional error handling
-- [Outcome Error Helper Properties](../Outcome/README.md) - Strongly typed error patterns with source generators
+- [BbQ.Outcome Documentation](../BbQ.Outcome/README.md) - BbQ.Outcome functional error handling
+- [Outcome Error Helper Properties](../BbQ.Outcome/README.md) - Strongly typed error patterns with source generators
