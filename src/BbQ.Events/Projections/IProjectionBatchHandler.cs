@@ -44,7 +44,7 @@ namespace BbQ.Events.Projections;
 /// }
 /// </code>
 /// 
-/// Registration (batch options are configured via <see cref="Engine.ProjectionOptions"/>):
+/// Registration (batch options are configured via <see cref="BbQ.Events.Engine.ProjectionOptions"/>):
 /// <code>
 /// services.AddProjection&lt;UserProfileBatchProjection&gt;(options =&gt;
 /// {
@@ -66,8 +66,8 @@ public interface IProjectionBatchHandler<in TEvent>
     /// <remarks>
     /// This method is called by the projection engine when a batch of events
     /// of type TEvent has been collected. The batch size is controlled by
-    /// <see cref="Engine.ProjectionOptions.BatchSize"/> and
-    /// <see cref="Engine.ProjectionOptions.BatchTimeout"/>.
+    /// <see cref="BbQ.Events.Engine.ProjectionOptions.BatchSize"/> and
+    /// <see cref="BbQ.Events.Engine.ProjectionOptions.BatchTimeout"/>.
     /// 
     /// Guidelines:
     /// - Must be idempotent (safe to call multiple times with the same batch)

@@ -365,7 +365,6 @@ services.AddProjection<UserProfileBatchProjection>(options =>
 {
     options.BatchSize = 50;                              // Events per batch
     options.BatchTimeout = TimeSpan.FromSeconds(5);      // Max wait for full batch
-    options.MaxDegreeOfParallelism = 4;                  // Parallel batch processing
     options.AutoCheckpoint = true;                       // Checkpoint after each batch
 });
 services.AddProjectionEngine();
@@ -377,7 +376,7 @@ services.AddProjectionEngine();
 | `BatchTimeout` | 5 seconds | Max time to wait for a full batch |
 | `AutoCheckpoint` | true | Save checkpoint after each batch |
 | `CheckpointBatchSize` | 100 | Checkpoint after N events (non-batch mode, or when AutoCheckpoint is off) |
-| `MaxDegreeOfParallelism` | 1 | Concurrent batch processing |
+| `MaxDegreeOfParallelism` | 1 | Max concurrent partition workers (applies to partitioned projections with multiple partitions) |
 
 When `BatchSize` is 0 the engine processes events one-at-a-time (the default behaviour).
 When `BatchSize > 0` the engine collects events and dispatches them via `ProjectBatchAsync`.

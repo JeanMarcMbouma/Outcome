@@ -621,12 +621,12 @@ internal class DefaultProjectionEngine : IProjectionEngine
                 partitionKey,
                 startupModeDescription);
             
-            // Determine if this partition is used for batch processing
-            var isBatchMode = options.BatchSize > 0;
-            
-            if (isBatchMode)
+            // When BatchSize > 0, a mixed-mode loop handles both batch and
+            // single-item work items in the same partition channel.  Otherwise
+            // the simpler single-mode loop is used (no batching overhead).
+            if (options.BatchSize > 0)
             {
-                await ProcessPartitionBatchModeAsync(
+                await ProcessPartitionMixedModeAsync(
                     options, partitionKey, checkpointKey, channel, semaphore,
                     currentPosition, eventsProcessedSinceCheckpoint, ct);
             }
@@ -712,11 +712,14 @@ internal class DefaultProjectionEngine : IProjectionEngine
     }
 
     /// <summary>
-    /// Processes events in configurable batches for <see cref="Projections.IProjectionBatchHandler{TEvent}"/> handlers.
-    /// Events are collected until <see cref="ProjectionOptions.BatchSize"/> is reached or
-    /// <see cref="ProjectionOptions.BatchTimeout"/> expires, then dispatched as a batch.
+    /// Processes a partition channel that may contain both batch-handler and single-handler
+    /// work items.  Batch-handler items (<see cref="Projections.IProjectionBatchHandler{TEvent}"/>)
+    /// are accumulated until <see cref="ProjectionOptions.BatchSize"/> is reached or
+    /// <see cref="ProjectionOptions.BatchTimeout"/> expires, then dispatched as a group.
+    /// Non-batch items are processed individually and cause any pending batch to be flushed first,
+    /// preserving ordering.
     /// </summary>
-    private async Task ProcessPartitionBatchModeAsync(
+    private async Task ProcessPartitionMixedModeAsync(
         ProjectionOptions options,
         string partitionKey,
         string checkpointKey,
@@ -726,138 +729,259 @@ internal class DefaultProjectionEngine : IProjectionEngine
         int eventsProcessedSinceCheckpoint,
         CancellationToken ct)
     {
-        var batch = new List<WorkItem>(options.BatchSize);
+        var batchItems = new List<WorkItem>(options.BatchSize);
         var batchTimer = Stopwatch.StartNew();
 
         _logger.LogInformation(
-            "Batch partition worker started for {ProjectionName}:{PartitionKey} (BatchSize={BatchSize}, BatchTimeout={BatchTimeout}ms, AutoCheckpoint={AutoCheckpoint})",
+            "Mixed-mode partition worker started for {ProjectionName}:{PartitionKey} (BatchSize={BatchSize}, BatchTimeout={BatchTimeout}ms, AutoCheckpoint={AutoCheckpoint})",
             options.ProjectionName, partitionKey,
             options.BatchSize, options.BatchTimeout.TotalMilliseconds, options.AutoCheckpoint);
 
-        while (await WaitToReadWithTimeoutAsync(channel.Reader, options.BatchTimeout, batchTimer, ct))
+        while (await WaitToReadWithTimeoutAsync(channel.Reader, options.BatchTimeout, batchTimer, batchItems.Count, ct))
         {
             while (channel.Reader.TryRead(out var workItem))
             {
-                batch.Add(workItem);
+                // Only accumulate batch-handler items; process others immediately
+                if (IsBatchHandlerItem(workItem))
+                {
+                    batchItems.Add(workItem);
 
-                if (batch.Count >= options.BatchSize)
-                    break;
+                    if (batchItems.Count >= options.BatchSize)
+                        break;
+                }
+                else
+                {
+                    // Flush any pending batch before processing a non-batch item
+                    // to preserve strict ordering within the partition
+                    if (batchItems.Count > 0)
+                    {
+                        var (ok, pos, evSinceChk) = await FlushBatchAsync(
+                            batchItems, options, partitionKey, checkpointKey,
+                            channel, semaphore, currentPosition,
+                            eventsProcessedSinceCheckpoint, ct);
+                        if (!ok) return;
+                        currentPosition = pos;
+                        eventsProcessedSinceCheckpoint = evSinceChk;
+                        batchItems.Clear();
+                        batchTimer.Restart();
+                    }
+
+                    // Process the single item
+                    await semaphore.WaitAsync(ct);
+                    try
+                    {
+                        var shouldContinue = await ProcessWorkItemWithErrorHandlingAsync(
+                            workItem, options, partitionKey, currentPosition, ct);
+
+                        if (!shouldContinue)
+                        {
+                            _logger.LogWarning(
+                                "Stopping projection worker for {ProjectionName}:{PartitionKey} due to error handling policy",
+                                options.ProjectionName, partitionKey);
+                            return;
+                        }
+
+                        currentPosition++;
+                        eventsProcessedSinceCheckpoint++;
+
+                        _monitor?.RecordEventProcessed(options.ProjectionName, partitionKey, currentPosition);
+                        _monitor?.RecordQueueDepth(options.ProjectionName, partitionKey, channel.Reader.Count);
+
+                        if (eventsProcessedSinceCheckpoint >= options.CheckpointBatchSize)
+                        {
+                            await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, ct);
+                            _monitor?.RecordCheckpointWritten(options.ProjectionName, partitionKey, currentPosition);
+                            eventsProcessedSinceCheckpoint = 0;
+                        }
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                }
             }
 
-            var batchFull = batch.Count >= options.BatchSize;
+            var batchFull = batchItems.Count >= options.BatchSize;
             var timeoutExpired = batchTimer.Elapsed >= options.BatchTimeout;
 
-            if ((batchFull || timeoutExpired) && batch.Count > 0)
+            if ((batchFull || timeoutExpired) && batchItems.Count > 0)
             {
-                await semaphore.WaitAsync(ct);
-                try
-                {
-                    var shouldContinue = await ProcessBatchWithErrorHandlingAsync(
-                        batch, options, partitionKey, currentPosition, ct);
-
-                    if (!shouldContinue)
-                    {
-                        _logger.LogWarning(
-                            "Stopping projection worker for {ProjectionName}:{PartitionKey} due to error handling policy",
-                            options.ProjectionName, partitionKey);
-                        return;
-                    }
-
-                    var batchCount = batch.Count;
-                    currentPosition += batchCount;
-                    eventsProcessedSinceCheckpoint += batchCount;
-
-                    _monitor?.RecordEventProcessed(options.ProjectionName, partitionKey, currentPosition);
-                    _monitor?.RecordQueueDepth(options.ProjectionName, partitionKey, channel.Reader.Count);
-
-                    if (options.AutoCheckpoint)
-                    {
-                        await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, ct);
-                        _monitor?.RecordCheckpointWritten(options.ProjectionName, partitionKey, currentPosition);
-
-                        _logger.LogDebug(
-                            "Checkpoint saved for {ProjectionName}:{PartitionKey} at position {Position} after batch of {BatchCount}",
-                            options.ProjectionName, partitionKey, currentPosition, batchCount);
-                        
-                        eventsProcessedSinceCheckpoint = 0;
-                    }
-                    else if (eventsProcessedSinceCheckpoint >= options.CheckpointBatchSize)
-                    {
-                        await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, ct);
-                        _monitor?.RecordCheckpointWritten(options.ProjectionName, partitionKey, currentPosition);
-                        eventsProcessedSinceCheckpoint = 0;
-                    }
-                }
-                finally
-                {
-                    semaphore.Release();
-                }
-
-                batch.Clear();
+                var (ok, pos, evSinceChk) = await FlushBatchAsync(
+                    batchItems, options, partitionKey, checkpointKey,
+                    channel, semaphore, currentPosition,
+                    eventsProcessedSinceCheckpoint, ct);
+                if (!ok) return;
+                currentPosition = pos;
+                eventsProcessedSinceCheckpoint = evSinceChk;
+                batchItems.Clear();
                 batchTimer.Restart();
             }
         }
 
-        // Flush remaining events on shutdown
-        if (batch.Count > 0)
+        // Flush remaining batch items on shutdown
+        if (batchItems.Count > 0)
         {
             _logger.LogInformation(
                 "Flushing final batch of {BatchCount} events for {ProjectionName}:{PartitionKey}",
-                batch.Count, options.ProjectionName, partitionKey);
+                batchItems.Count, options.ProjectionName, partitionKey);
 
-            await semaphore.WaitAsync(ct);
-            try
-            {
-                var shouldContinue = await ProcessBatchWithErrorHandlingAsync(
-                    batch, options, partitionKey, currentPosition, ct);
-
-                if (shouldContinue)
-                {
-                    currentPosition += batch.Count;
-                    eventsProcessedSinceCheckpoint += batch.Count;
-                }
-            }
-            finally
-            {
-                semaphore.Release();
-            }
+            var (_, pos, evSinceChk) = await FlushBatchAsync(
+                batchItems, options, partitionKey, checkpointKey,
+                channel, semaphore, currentPosition,
+                eventsProcessedSinceCheckpoint, ct);
+            currentPosition = pos;
+            eventsProcessedSinceCheckpoint = evSinceChk;
         }
 
         await FlushFinalCheckpointAsync(options, partitionKey, checkpointKey, currentPosition, eventsProcessedSinceCheckpoint, ct);
     }
 
     /// <summary>
+    /// Returns true when the work item targets an <see cref="Projections.IProjectionBatchHandler{TEvent}"/>.
+    /// </summary>
+    private static bool IsBatchHandlerItem(WorkItem workItem)
+    {
+        return workItem.Cache.BatchHandlerInterface.IsAssignableFrom(workItem.HandlerServiceType);
+    }
+
+    /// <summary>
+    /// Flushes accumulated batch items, grouping by <c>(HandlerServiceType, EventType)</c> so that
+    /// each handler receives only events of the correct type.
+    /// </summary>
+    /// <returns>
+    /// A tuple of (shouldContinue, updatedPosition, updatedEventsProcessedSinceCheckpoint).
+    /// </returns>
+    private async Task<(bool Ok, long Position, int EventsSinceCheckpoint)> FlushBatchAsync(
+        List<WorkItem> batchItems,
+        ProjectionOptions options,
+        string partitionKey,
+        string checkpointKey,
+        Channel<WorkItem> channel,
+        SemaphoreSlim semaphore,
+        long currentPosition,
+        int eventsProcessedSinceCheckpoint,
+        CancellationToken ct)
+    {
+        await semaphore.WaitAsync(ct);
+        try
+        {
+            // Group by (HandlerServiceType, EventType) so each handler gets the right typed list
+            var groups = batchItems
+                .GroupBy(w => (w.HandlerServiceType, w.EventType));
+
+            foreach (var group in groups)
+            {
+                var groupItems = group.ToList();
+                var shouldContinue = await ProcessBatchWithErrorHandlingAsync(
+                    groupItems, options, partitionKey, currentPosition, ct);
+
+                if (!shouldContinue)
+                {
+                    _logger.LogWarning(
+                        "Stopping projection worker for {ProjectionName}:{PartitionKey} due to error handling policy",
+                        options.ProjectionName, partitionKey);
+                    return (false, currentPosition, eventsProcessedSinceCheckpoint);
+                }
+
+                currentPosition += groupItems.Count;
+                eventsProcessedSinceCheckpoint += groupItems.Count;
+            }
+
+            _monitor?.RecordEventProcessed(options.ProjectionName, partitionKey, currentPosition);
+            _monitor?.RecordQueueDepth(options.ProjectionName, partitionKey, channel.Reader.Count);
+
+            if (options.AutoCheckpoint)
+            {
+                await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, ct);
+                _monitor?.RecordCheckpointWritten(options.ProjectionName, partitionKey, currentPosition);
+
+                _logger.LogDebug(
+                    "Checkpoint saved for {ProjectionName}:{PartitionKey} at position {Position} after batch of {BatchCount}",
+                    options.ProjectionName, partitionKey, currentPosition, batchItems.Count);
+
+                eventsProcessedSinceCheckpoint = 0;
+            }
+            else if (eventsProcessedSinceCheckpoint >= options.CheckpointBatchSize)
+            {
+                await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, ct);
+                _monitor?.RecordCheckpointWritten(options.ProjectionName, partitionKey, currentPosition);
+                eventsProcessedSinceCheckpoint = 0;
+            }
+        }
+        finally
+        {
+            semaphore.Release();
+        }
+
+        return (true, currentPosition, eventsProcessedSinceCheckpoint);
+    }
+
+    /// <summary>
     /// Waits for data in the channel reader, respecting batch timeout.
     /// Returns false when the channel is completed (no more data).
+    /// When the timeout has expired and the batch is empty, awaits new data
+    /// to avoid busy-waiting.
     /// </summary>
     private static async Task<bool> WaitToReadWithTimeoutAsync(
         ChannelReader<WorkItem> reader,
         TimeSpan batchTimeout,
         Stopwatch batchTimer,
+        int currentBatchCount,
         CancellationToken ct)
     {
         var remaining = batchTimeout - batchTimer.Elapsed;
         if (remaining <= TimeSpan.Zero)
         {
-            // Timeout already expired; check if there's data or channel completed
-            return !reader.Completion.IsCompleted;
+            if (currentBatchCount > 0)
+            {
+                // Timeout expired with pending data – signal the caller to flush
+                return !reader.Completion.IsCompleted;
+            }
+
+            // Timeout expired but the batch is empty.  Wait for new data
+            // without a timeout to avoid a busy-wait spin loop.
+            var hasData = await reader.WaitToReadAsync(ct).ConfigureAwait(false);
+            if (hasData)
+            {
+                batchTimer.Restart();
+            }
+            return hasData;
         }
 
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeoutCts.CancelAfter(remaining);
         try
         {
-            return await reader.WaitToReadAsync(timeoutCts.Token);
+            var hasData = await reader.WaitToReadAsync(timeoutCts.Token).ConfigureAwait(false);
+            return hasData;
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            // Batch timeout expired, not external cancellation – check if channel is still open
-            return !reader.Completion.IsCompleted;
+            // Batch timeout expired, not external cancellation
+            if (currentBatchCount > 0)
+            {
+                return !reader.Completion.IsCompleted;
+            }
+
+            // Empty batch + timeout – wait for new data instead of spinning
+            if (reader.Completion.IsCompleted)
+            {
+                return false;
+            }
+
+            var hasData = await reader.WaitToReadAsync(ct).ConfigureAwait(false);
+            if (hasData)
+            {
+                batchTimer.Restart();
+            }
+            return hasData;
         }
     }
 
     /// <summary>
     /// Processes a batch of work items by invoking the batch handler.
+    /// All items in the list must share the same <see cref="WorkItem.HandlerServiceType"/>
+    /// and <see cref="WorkItem.EventType"/>.
     /// </summary>
     private async Task<bool> ProcessBatchWithErrorHandlingAsync(
         List<WorkItem> batch,
@@ -977,12 +1101,13 @@ internal class DefaultProjectionEngine : IProjectionEngine
 
     /// <summary>
     /// Invokes the batch handler with a typed list of events.
+    /// All items must share the same <see cref="WorkItem.HandlerServiceType"/>
+    /// and <see cref="WorkItem.EventType"/>.
     /// </summary>
     private async Task InvokeBatchHandlerAsync(List<WorkItem> batch, CancellationToken ct)
     {
         if (batch.Count == 0) return;
 
-        // All work items in a partition share the same handler service type and cache
         var firstItem = batch[0];
         var cache = firstItem.Cache;
 
