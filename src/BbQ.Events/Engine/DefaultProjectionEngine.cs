@@ -940,12 +940,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
 
             // Timeout expired but the batch is empty.  Wait for new data
             // without a timeout to avoid a busy-wait spin loop.
-            var hasData = await reader.WaitToReadAsync(ct).ConfigureAwait(false);
-            if (hasData)
-            {
-                batchTimer.Restart();
-            }
-            return hasData;
+            return await WaitForNewDataAsync(reader, batchTimer, ct).ConfigureAwait(false);
         }
 
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -969,13 +964,24 @@ internal class DefaultProjectionEngine : IProjectionEngine
                 return false;
             }
 
-            var hasData = await reader.WaitToReadAsync(ct).ConfigureAwait(false);
-            if (hasData)
-            {
-                batchTimer.Restart();
-            }
-            return hasData;
+            return await WaitForNewDataAsync(reader, batchTimer, ct).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Awaits new data on the channel, restarting the batch timer when data arrives.
+    /// </summary>
+    private static async Task<bool> WaitForNewDataAsync(
+        ChannelReader<WorkItem> reader,
+        Stopwatch batchTimer,
+        CancellationToken ct)
+    {
+        var hasData = await reader.WaitToReadAsync(ct).ConfigureAwait(false);
+        if (hasData)
+        {
+            batchTimer.Restart();
+        }
+        return hasData;
     }
 
     /// <summary>
