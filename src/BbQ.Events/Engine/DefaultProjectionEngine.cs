@@ -1376,7 +1376,7 @@ internal sealed class DefaultProjectionEngine : IProjectionEngine
     /// <summary>
     /// Represents work to be processed by a partition worker.
     /// </summary>
-    private class WorkItem
+    private sealed class WorkItem
     {
         public Type HandlerServiceType { get; set; } = null!;
         public Type EventType { get; set; } = null!;
@@ -1387,7 +1387,7 @@ internal sealed class DefaultProjectionEngine : IProjectionEngine
     /// <summary>
     /// Represents a partition worker with its channel and task.
     /// </summary>
-    private class PartitionWorker
+    private sealed class PartitionWorker
     {
         public Channel<WorkItem> Channel { get; set; } = null!;
         public Task Task { get; set; } = null!;
@@ -1396,7 +1396,7 @@ internal sealed class DefaultProjectionEngine : IProjectionEngine
     /// <summary>
     /// Caches reflection information for a specific event type to avoid repeated reflection lookups.
     /// </summary>
-    private class ReflectionCache
+    private sealed class ReflectionCache
     {
         public MethodInfo SubscribeMethod { get; }
         public MethodInfo GetEnumeratorMethod { get; }
