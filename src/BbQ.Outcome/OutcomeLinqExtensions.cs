@@ -170,7 +170,7 @@
             /// </example>
             public async Task<Outcome<T>> Where(Func<T, bool> predicate)
             {
-                var result = await task;
+                var result = await task.ConfigureAwait(false);
                 if (!result.IsSuccess) 
                     return result;
                 // Apply predicate; return validation error if predicate fails

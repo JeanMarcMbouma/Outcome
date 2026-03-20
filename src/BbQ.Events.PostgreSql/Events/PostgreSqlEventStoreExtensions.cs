@@ -37,6 +37,6 @@ public static class PostgreSqlEventStoreExtensions
         }
 
         var initializer = new PostgreSqlSchemaInitializer(postgreSqlEventStore.ConnectionString);
-        await initializer.EnsureSchemaAsync(cancellationToken);
+        await initializer.EnsureSchemaAsync(cancellationToken).ConfigureAwait(false);
     }
 }

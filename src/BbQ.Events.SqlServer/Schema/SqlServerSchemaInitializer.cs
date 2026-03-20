@@ -13,7 +13,7 @@ namespace BbQ.Events.SqlServer.Schema;
 /// It is idempotent and safe to run multiple times - it will check for existing
 /// tables before attempting to create them.
 /// </remarks>
-public class SqlServerSchemaInitializer : ISchemaInitializer
+public sealed class SqlServerSchemaInitializer : ISchemaInitializer
 {
     private readonly string _connectionString;
 
@@ -33,12 +33,12 @@ public class SqlServerSchemaInitializer : ISchemaInitializer
     public async Task EnsureSchemaAsync(CancellationToken cancellationToken = default)
     {
         await using var connection = new SqlConnection(_connectionString);
-        await connection.OpenAsync(cancellationToken);
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
         // Check and create tables in order
-        await EnsureTableAsync(connection, "BbQ_Events", "Schema.CreateEventsTable.sql", cancellationToken);
-        await EnsureTableAsync(connection, "BbQ_Streams", "Schema.CreateStreamsTable.sql", cancellationToken);
-        await EnsureTableAsync(connection, "BbQ_ProjectionCheckpoints", "Schema.CreateCheckpointTable.sql", cancellationToken);
+        await EnsureTableAsync(connection, "BbQ_Events", "Schema.CreateEventsTable.sql", cancellationToken).ConfigureAwait(false);
+        await EnsureTableAsync(connection, "BbQ_Streams", "Schema.CreateStreamsTable.sql", cancellationToken).ConfigureAwait(false);
+        await EnsureTableAsync(connection, "BbQ_ProjectionCheckpoints", "Schema.CreateCheckpointTable.sql", cancellationToken).ConfigureAwait(false);
     }
 
     private async Task EnsureTableAsync(
@@ -56,7 +56,7 @@ public class SqlServerSchemaInitializer : ISchemaInitializer
         await using var checkCommand = new SqlCommand(checkSql, connection);
         checkCommand.Parameters.AddWithValue("@TableName", tableName);
 
-        var exists = (int)(await checkCommand.ExecuteScalarAsync(cancellationToken)) > 0;
+        var exists = (int)(await checkCommand.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) > 0;
 
         if (exists)
         {
@@ -66,7 +66,7 @@ public class SqlServerSchemaInitializer : ISchemaInitializer
         // Load and execute the SQL script
         var sql = LoadEmbeddedResource(resourceName);
         await using var createCommand = new SqlCommand(sql, connection);
-        await createCommand.ExecuteNonQueryAsync(cancellationToken);
+        await createCommand.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private string LoadEmbeddedResource(string resourcePath)

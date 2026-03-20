@@ -5,7 +5,7 @@ namespace BbQ.Events.SqlServer.Events;
 /// <summary>
 /// Configuration options for SQL Server event store.
 /// </summary>
-public class SqlServerEventStoreOptions
+public sealed class SqlServerEventStoreOptions
 {
     /// <summary>
     /// Gets or sets the connection string for SQL Server.

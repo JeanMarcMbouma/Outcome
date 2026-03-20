@@ -7,7 +7,7 @@ namespace BbQ.Events.SqlServer.Configuration;
 /// <summary>
 /// Hosted service that ensures the database schema is created on application startup.
 /// </summary>
-internal class SqlServerSchemaInitializerHostedService : IHostedService
+internal sealed class SqlServerSchemaInitializerHostedService : IHostedService
 {
     private readonly ISchemaInitializer _schemaInitializer;
     private readonly ILogger<SqlServerSchemaInitializerHostedService> _logger;
@@ -25,7 +25,7 @@ internal class SqlServerSchemaInitializerHostedService : IHostedService
         try
         {
             _logger.LogInformation("Ensuring SQL Server event store schema exists...");
-            await _schemaInitializer.EnsureSchemaAsync(cancellationToken);
+            await _schemaInitializer.EnsureSchemaAsync(cancellationToken).ConfigureAwait(false);
             _logger.LogInformation("SQL Server event store schema initialized successfully");
         }
         catch (Exception ex)

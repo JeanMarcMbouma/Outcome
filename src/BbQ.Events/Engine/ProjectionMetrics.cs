@@ -23,7 +23,7 @@ namespace BbQ.Events.Engine;
 /// Thread safety: This class uses internal locking to ensure thread-safe updates
 /// when multiple threads modify the same metrics instance concurrently.
 /// </remarks>
-public class ProjectionMetrics
+public sealed class ProjectionMetrics
 {
     private readonly object _lock = new();
     private long _currentPosition;

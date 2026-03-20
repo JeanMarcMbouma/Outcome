@@ -36,7 +36,7 @@ public sealed class LoggingBehavior<TRequest, TResponse>(ILogger<LoggingBehavior
         Func<TRequest, CancellationToken, Task<TResponse>> next)
     {
         _log.LogInformation("Handling {Request}", typeof(TRequest).Name);
-        var response = await next(request, ct);
+        var response = await next(request, ct).ConfigureAwait(false);
         _log.LogInformation("Handled {Request} -> {Response}", typeof(TRequest).Name, response?.ToString());
         return response;
     }

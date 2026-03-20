@@ -24,7 +24,7 @@ public static class EventStoreTestHelpers
         
         foreach (var @event in events)
         {
-            var position = await store.AppendAsync(stream, @event, ct);
+            var position = await store.AppendAsync(stream, @event, ct).ConfigureAwait(false);
             positions.Add(position);
         }
         
@@ -64,7 +64,7 @@ public static class EventStoreTestHelpers
     {
         var events = new List<StoredEvent<TEvent>>();
         
-        await foreach (var storedEvent in store.ReadAsync<TEvent>(stream, fromPosition, ct))
+        await foreach (var storedEvent in store.ReadAsync<TEvent>(stream, fromPosition, ct).ConfigureAwait(false))
         {
             events.Add(storedEvent);
         }
@@ -89,7 +89,7 @@ public static class EventStoreTestHelpers
     {
         var events = new List<TEvent>();
         
-        await foreach (var storedEvent in store.ReadAsync<TEvent>(stream, fromPosition, ct))
+        await foreach (var storedEvent in store.ReadAsync<TEvent>(stream, fromPosition, ct).ConfigureAwait(false))
         {
             events.Add(storedEvent.Event);
         }
@@ -112,7 +112,7 @@ public static class EventStoreTestHelpers
     {
         var count = 0;
         
-        await foreach (var _ in store.ReadAsync<TEvent>(stream, 0, ct))
+        await foreach (var _ in store.ReadAsync<TEvent>(stream, 0, ct).ConfigureAwait(false))
         {
             count++;
         }

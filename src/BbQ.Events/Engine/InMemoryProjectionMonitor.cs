@@ -27,7 +27,7 @@ namespace BbQ.Events.Engine;
 /// Console.WriteLine($"Lag: {metrics?.Lag}, Events/sec: {metrics?.EventsPerSecond}");
 /// </code>
 /// </remarks>
-public class InMemoryProjectionMonitor : IProjectionMonitor
+public sealed class InMemoryProjectionMonitor : IProjectionMonitor
 {
     private readonly ConcurrentDictionary<string, ProjectionMetrics> _metrics = new();
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _partitionsByProjection = new();

@@ -35,7 +35,7 @@ namespace BbQ.Events.Events;
 /// }
 /// </code>
 /// </remarks>
-public class InMemoryEventStore : IEventStore
+public sealed class InMemoryEventStore : IEventStore
 {
     private readonly ConcurrentDictionary<string, StreamData> _streams = new();
     
@@ -141,7 +141,7 @@ public class InMemoryEventStore : IEventStore
     /// <summary>
     /// Thread-safe storage for a single stream's events.
     /// </summary>
-    private class StreamData
+    private sealed class StreamData
     {
         private readonly List<StoredEventData> _events = new();
         private readonly object _lock = new();

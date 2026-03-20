@@ -28,7 +28,7 @@ namespace BbQ.Events.Engine;
 /// - Logs errors but continues processing other handlers
 /// - Creates a DI scope per event for handler resolution and processing
 /// </remarks>
-internal class DefaultProjectionEngine : IProjectionEngine
+internal sealed class DefaultProjectionEngine : IProjectionEngine
 {
     private const string DefaultPartitionKey = "_default";
     
@@ -91,14 +91,14 @@ internal class DefaultProjectionEngine : IProjectionEngine
 
         try
         {
-            await Task.WhenAll(tasks);
+            await Task.WhenAll(tasks).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
             _logger.LogInformation("Projection engine stopping gracefully...");
             
             // Await all partition workers to complete
-            await GracefulShutdownAsync();
+            await GracefulShutdownAsync().ConfigureAwait(false);
             
             _logger.LogInformation("Projection engine stopped gracefully");
         }
@@ -107,7 +107,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
             _logger.LogError(ex, "Projection engine encountered an error");
             
             // Attempt graceful shutdown even on error
-            await GracefulShutdownAsync();
+            await GracefulShutdownAsync().ConfigureAwait(false);
             
             throw;
         }
@@ -128,7 +128,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
         
         // Wait for all workers to complete
         var workerTasks = _partitionWorkers.Values.Select(w => w.Task).ToList();
-        await Task.WhenAll(workerTasks);
+        await Task.WhenAll(workerTasks).ConfigureAwait(false);
         
         _logger.LogInformation("All partition workers stopped");
         
@@ -190,7 +190,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
                 }
                 
                 var moveNextTask = (ValueTask<bool>)moveNextResult;
-                if (!await moveNextTask)
+                if (!await moveNextTask.ConfigureAwait(false))
                 {
                     break;
                 }
@@ -198,7 +198,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
                 var currentEvent = currentProperty.GetValue(enumerator);
                 if (currentEvent != null)
                 {
-                    await DispatchEventToHandlersAsync(eventType, currentEvent, handlerServiceTypes, cache, ct);
+                    await DispatchEventToHandlersAsync(eventType, currentEvent, handlerServiceTypes, cache, ct).ConfigureAwait(false);
                 }
             }
         }
@@ -336,7 +336,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
                         partitionKey,
                         options,
                         cache,
-                        ct);
+                        ct).ConfigureAwait(false);
                 }
                 // Check if it's a batch projection handler
                 else if (cache.BatchHandlerInterface.IsAssignableFrom(handlerServiceType))
@@ -351,7 +351,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
                         DefaultPartitionKey,
                         options,
                         cache,
-                        ct);
+                        ct).ConfigureAwait(false);
                 }
                 // Check if it's a regular projection handler
                 else if (cache.RegularHandlerInterface.IsAssignableFrom(handlerServiceType))
@@ -367,7 +367,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
                         DefaultPartitionKey,
                         options,
                         cache,
-                        ct);
+                        ct).ConfigureAwait(false);
                 }
 
                 _logger.LogDebug("Successfully routed {EventType} to {HandlerType}", 
@@ -468,7 +468,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
                     partitionKey,
                     channel,
                     semaphore,
-                    CancellationToken.None),
+                    CancellationToken.None).ConfigureAwait(false),
                 CancellationToken.None);
             
             return new PartitionWorker
@@ -487,7 +487,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
             Cache = cache
         };
         
-        await WriteToChannelWithBackpressureAsync(worker.Channel, workItem, options, partitionKey, ct);
+        await WriteToChannelWithBackpressureAsync(worker.Channel, workItem, options, partitionKey, ct).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -533,7 +533,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
         if (options.BackpressureStrategy == BackpressureStrategy.Block)
         {
             // Block mode: use WriteAsync which waits for space
-            await channel.Writer.WriteAsync(item, ct);
+            await channel.Writer.WriteAsync(item, ct).ConfigureAwait(false);
         }
         else
         {
@@ -578,7 +578,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
             {
                 case ProjectionStartupMode.Resume:
                     // Load checkpoint and resume from last position
-                    checkpoint = await _checkpointStore.GetCheckpointAsync(checkpointKey, ct);
+                    checkpoint = await _checkpointStore.GetCheckpointAsync(checkpointKey, ct).ConfigureAwait(false);
                     startupModeDescription = checkpoint.HasValue 
                         ? $"Resume from checkpoint {checkpoint.Value}" 
                         : "Resume from beginning";
@@ -589,7 +589,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
                     checkpoint = null;
                     startupModeDescription = "Replay from beginning";
                     // Reset the checkpoint in storage to ensure clean replay
-                    await _checkpointStore.ResetCheckpointAsync(checkpointKey, ct);
+                    await _checkpointStore.ResetCheckpointAsync(checkpointKey, ct).ConfigureAwait(false);
                     break;
                     
                 case ProjectionStartupMode.CatchUp:
@@ -628,13 +628,13 @@ internal class DefaultProjectionEngine : IProjectionEngine
             {
                 await ProcessPartitionMixedModeAsync(
                     options, partitionKey, checkpointKey, channel, semaphore,
-                    currentPosition, eventsProcessedSinceCheckpoint, ct);
+                    currentPosition, eventsProcessedSinceCheckpoint, ct).ConfigureAwait(false);
             }
             else
             {
                 await ProcessPartitionSingleModeAsync(
                     options, partitionKey, checkpointKey, channel, semaphore,
-                    currentPosition, eventsProcessedSinceCheckpoint, ct);
+                    currentPosition, eventsProcessedSinceCheckpoint, ct).ConfigureAwait(false);
             }
             
             _logger.LogInformation(
@@ -666,14 +666,14 @@ internal class DefaultProjectionEngine : IProjectionEngine
         int eventsProcessedSinceCheckpoint,
         CancellationToken ct)
     {
-        await foreach (var workItem in channel.Reader.ReadAllAsync(ct))
+        await foreach (var workItem in channel.Reader.ReadAllAsync(ct).ConfigureAwait(false))
         {
-            await semaphore.WaitAsync(ct);
+            await semaphore.WaitAsync(ct).ConfigureAwait(false);
             
             try
             {
                 var shouldContinue = await ProcessWorkItemWithErrorHandlingAsync(
-                    workItem, options, partitionKey, currentPosition, ct);
+                    workItem, options, partitionKey, currentPosition, ct).ConfigureAwait(false);
                 
                 if (!shouldContinue)
                 {
@@ -691,7 +691,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
                 
                 if (eventsProcessedSinceCheckpoint >= options.CheckpointBatchSize)
                 {
-                    await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, ct);
+                    await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, ct).ConfigureAwait(false);
                     _monitor?.RecordCheckpointWritten(options.ProjectionName, partitionKey, currentPosition);
                     
                     _logger.LogDebug(
@@ -708,7 +708,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
         }
         
         // Final checkpoint flush on shutdown
-        await FlushFinalCheckpointAsync(options, partitionKey, checkpointKey, currentPosition, eventsProcessedSinceCheckpoint, ct);
+        await FlushFinalCheckpointAsync(options, partitionKey, checkpointKey, currentPosition, eventsProcessedSinceCheckpoint, ct).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -737,7 +737,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
             options.ProjectionName, partitionKey,
             options.BatchSize, options.BatchTimeout.TotalMilliseconds, options.AutoCheckpoint);
 
-        while (await WaitToReadWithTimeoutAsync(channel.Reader, options.BatchTimeout, batchTimer, batchItems.Count, ct))
+        while (await WaitToReadWithTimeoutAsync(channel.Reader, options.BatchTimeout, batchTimer, batchItems.Count, ct).ConfigureAwait(false))
         {
             while (channel.Reader.TryRead(out var workItem))
             {
@@ -758,7 +758,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
                         var (ok, pos, evSinceChk) = await FlushBatchAsync(
                             batchItems, options, partitionKey, checkpointKey,
                             channel, semaphore, currentPosition,
-                            eventsProcessedSinceCheckpoint, ct);
+                            eventsProcessedSinceCheckpoint, ct).ConfigureAwait(false);
                         if (!ok) return;
                         currentPosition = pos;
                         eventsProcessedSinceCheckpoint = evSinceChk;
@@ -767,11 +767,11 @@ internal class DefaultProjectionEngine : IProjectionEngine
                     }
 
                     // Process the single item
-                    await semaphore.WaitAsync(ct);
+                    await semaphore.WaitAsync(ct).ConfigureAwait(false);
                     try
                     {
                         var shouldContinue = await ProcessWorkItemWithErrorHandlingAsync(
-                            workItem, options, partitionKey, currentPosition, ct);
+                            workItem, options, partitionKey, currentPosition, ct).ConfigureAwait(false);
 
                         if (!shouldContinue)
                         {
@@ -789,7 +789,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
 
                         if (eventsProcessedSinceCheckpoint >= options.CheckpointBatchSize)
                         {
-                            await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, ct);
+                            await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, ct).ConfigureAwait(false);
                             _monitor?.RecordCheckpointWritten(options.ProjectionName, partitionKey, currentPosition);
                             eventsProcessedSinceCheckpoint = 0;
                         }
@@ -809,7 +809,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
                 var (ok, pos, evSinceChk) = await FlushBatchAsync(
                     batchItems, options, partitionKey, checkpointKey,
                     channel, semaphore, currentPosition,
-                    eventsProcessedSinceCheckpoint, ct);
+                    eventsProcessedSinceCheckpoint, ct).ConfigureAwait(false);
                 if (!ok) return;
                 currentPosition = pos;
                 eventsProcessedSinceCheckpoint = evSinceChk;
@@ -828,12 +828,12 @@ internal class DefaultProjectionEngine : IProjectionEngine
             var (_, pos, evSinceChk) = await FlushBatchAsync(
                 batchItems, options, partitionKey, checkpointKey,
                 channel, semaphore, currentPosition,
-                eventsProcessedSinceCheckpoint, ct);
+                eventsProcessedSinceCheckpoint, ct).ConfigureAwait(false);
             currentPosition = pos;
             eventsProcessedSinceCheckpoint = evSinceChk;
         }
 
-        await FlushFinalCheckpointAsync(options, partitionKey, checkpointKey, currentPosition, eventsProcessedSinceCheckpoint, ct);
+        await FlushFinalCheckpointAsync(options, partitionKey, checkpointKey, currentPosition, eventsProcessedSinceCheckpoint, ct).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -862,7 +862,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
         int eventsProcessedSinceCheckpoint,
         CancellationToken ct)
     {
-        await semaphore.WaitAsync(ct);
+        await semaphore.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             // Group by (HandlerServiceType, EventType) so each handler gets the right typed list
@@ -873,7 +873,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
             {
                 var groupItems = group.ToList();
                 var shouldContinue = await ProcessBatchWithErrorHandlingAsync(
-                    groupItems, options, partitionKey, currentPosition, ct);
+                    groupItems, options, partitionKey, currentPosition, ct).ConfigureAwait(false);
 
                 if (!shouldContinue)
                 {
@@ -892,7 +892,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
 
             if (options.AutoCheckpoint)
             {
-                await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, ct);
+                await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, ct).ConfigureAwait(false);
                 _monitor?.RecordCheckpointWritten(options.ProjectionName, partitionKey, currentPosition);
 
                 _logger.LogDebug(
@@ -903,7 +903,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
             }
             else if (eventsProcessedSinceCheckpoint >= options.CheckpointBatchSize)
             {
-                await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, ct);
+                await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, ct).ConfigureAwait(false);
                 _monitor?.RecordCheckpointWritten(options.ProjectionName, partitionKey, currentPosition);
                 eventsProcessedSinceCheckpoint = 0;
             }
@@ -1003,7 +1003,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
         {
             try
             {
-                await InvokeBatchHandlerAsync(batch, ct);
+                await InvokeBatchHandlerAsync(batch, ct).ConfigureAwait(false);
                 return true;
             }
             catch (Exception ex)
@@ -1020,7 +1020,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
         {
             try
             {
-                await InvokeBatchHandlerAsync(batch, ct);
+                await InvokeBatchHandlerAsync(batch, ct).ConfigureAwait(false);
 
                 if (attempt > 0)
                 {
@@ -1054,7 +1054,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
 
                 try
                 {
-                    await Task.Delay(delay, ct);
+                    await Task.Delay(delay, ct).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {
@@ -1124,7 +1124,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
         var typedList = cache.CreateTypedBatchList(batch.Select(w => w.Event));
 
         var projectTask = (ValueTask)cache.ProjectBatchMethod.Invoke(handler, new[] { typedList, ct })!;
-        await projectTask;
+        await projectTask.ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1142,7 +1142,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
         {
             try
             {
-                await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, ct);
+                await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, ct).ConfigureAwait(false);
                 _monitor?.RecordCheckpointWritten(options.ProjectionName, partitionKey, currentPosition);
 
                 _logger.LogInformation(
@@ -1180,7 +1180,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
         {
             try
             {
-                await ProcessWorkItemAsync(workItem, ct);
+                await ProcessWorkItemAsync(workItem, ct).ConfigureAwait(false);
                 return true;
             }
             catch (Exception ex)
@@ -1192,7 +1192,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
                     partitionKey,
                     currentPosition,
                     errorHandling.Strategy,
-                    1);
+                    1).ConfigureAwait(false);
             }
         }
         
@@ -1204,7 +1204,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
         {
             try
             {
-                await ProcessWorkItemAsync(workItem, ct);
+                await ProcessWorkItemAsync(workItem, ct).ConfigureAwait(false);
                 
                 // Success - log retry success if this wasn't the first attempt
                 if (attempt > 0)
@@ -1242,7 +1242,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
                         partitionKey,
                         currentPosition,
                         errorHandling.FallbackStrategy,
-                        attempt);
+                        attempt).ConfigureAwait(false);
                 }
                 
                 // Log retry attempt with structured data
@@ -1259,7 +1259,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
                 // Wait before retrying
                 try
                 {
-                    await Task.Delay(delay, ct);
+                    await Task.Delay(delay, ct).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {
@@ -1357,26 +1357,26 @@ internal class DefaultProjectionEngine : IProjectionEngine
         if (workItem.Cache.RegularHandlerInterface.IsAssignableFrom(workItem.HandlerServiceType))
         {
             var projectTask = (ValueTask)workItem.Cache.RegularProjectMethod.Invoke(handler, new[] { workItem.Event, ct })!;
-            await projectTask;
+            await projectTask.ConfigureAwait(false);
         }
         else if (workItem.Cache.PartitionedHandlerInterface.IsAssignableFrom(workItem.HandlerServiceType))
         {
             var projectTask = (ValueTask)workItem.Cache.PartitionedProjectMethod.Invoke(handler, new[] { workItem.Event, ct })!;
-            await projectTask;
+            await projectTask.ConfigureAwait(false);
         }
         else if (workItem.Cache.BatchHandlerInterface.IsAssignableFrom(workItem.HandlerServiceType))
         {
             // Single-event fallback for batch handlers (when BatchSize is 0 / not configured)
             var typedList = workItem.Cache.CreateTypedBatchList(new[] { workItem.Event });
             var projectTask = (ValueTask)workItem.Cache.ProjectBatchMethod.Invoke(handler, new[] { typedList, ct })!;
-            await projectTask;
+            await projectTask.ConfigureAwait(false);
         }
     }
 
     /// <summary>
     /// Represents work to be processed by a partition worker.
     /// </summary>
-    private class WorkItem
+    private sealed class WorkItem
     {
         public Type HandlerServiceType { get; set; } = null!;
         public Type EventType { get; set; } = null!;
@@ -1387,7 +1387,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
     /// <summary>
     /// Represents a partition worker with its channel and task.
     /// </summary>
-    private class PartitionWorker
+    private sealed class PartitionWorker
     {
         public Channel<WorkItem> Channel { get; set; } = null!;
         public Task Task { get; set; } = null!;
@@ -1396,7 +1396,7 @@ internal class DefaultProjectionEngine : IProjectionEngine
     /// <summary>
     /// Caches reflection information for a specific event type to avoid repeated reflection lookups.
     /// </summary>
-    private class ReflectionCache
+    private sealed class ReflectionCache
     {
         public MethodInfo SubscribeMethod { get; }
         public MethodInfo GetEnumeratorMethod { get; }
