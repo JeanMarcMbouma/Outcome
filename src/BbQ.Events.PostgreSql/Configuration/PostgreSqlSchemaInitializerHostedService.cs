@@ -7,7 +7,7 @@ namespace BbQ.Events.PostgreSql.Configuration;
 /// <summary>
 /// Hosted service that ensures the database schema is created on application startup.
 /// </summary>
-internal class PostgreSqlSchemaInitializerHostedService : IHostedService
+internal sealed class PostgreSqlSchemaInitializerHostedService : IHostedService
 {
     private readonly ISchemaInitializer _schemaInitializer;
     private readonly ILogger<PostgreSqlSchemaInitializerHostedService> _logger;
@@ -25,7 +25,7 @@ internal class PostgreSqlSchemaInitializerHostedService : IHostedService
         try
         {
             _logger.LogInformation("Ensuring PostgreSQL event store schema exists...");
-            await _schemaInitializer.EnsureSchemaAsync(cancellationToken);
+            await _schemaInitializer.EnsureSchemaAsync(cancellationToken).ConfigureAwait(false);
             _logger.LogInformation("PostgreSQL event store schema initialized successfully");
         }
         catch (Exception ex)

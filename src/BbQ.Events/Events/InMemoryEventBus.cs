@@ -84,8 +84,8 @@ internal sealed class InMemoryEventBus : IEventBus
 
     private async Task PublishAfterHandlersAsync<TEvent>(Task handlersTask, TEvent @event, CancellationToken ct)
     {
-        await handlersTask;
-        await PublishToSubscribers(@event, ct);
+        await handlersTask.ConfigureAwait(false);
+        await PublishToSubscribers(@event, ct).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -164,7 +164,7 @@ internal sealed class InMemoryEventBus : IEventBus
     {
         try
         {
-            await handlerTask;
+            await handlerTask.ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -269,7 +269,7 @@ internal sealed class InMemoryEventBus : IEventBus
     {
         try
         {
-            await writeTask;
+            await writeTask.ConfigureAwait(false);
         }
         catch (ChannelClosedException)
         {
@@ -310,7 +310,7 @@ internal sealed class InMemoryEventBus : IEventBus
         try
         {
             // Read from the channel until cancellation
-            await foreach (var @event in channel.Reader.ReadAllAsync(ct))
+            await foreach (var @event in channel.Reader.ReadAllAsync(ct).ConfigureAwait(false))
             {
                 yield return @event;
             }

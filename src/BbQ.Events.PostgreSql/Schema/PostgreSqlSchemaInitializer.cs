@@ -13,7 +13,7 @@ namespace BbQ.Events.PostgreSql.Schema;
 /// It is idempotent and safe to run multiple times - it will check for existing
 /// tables before attempting to create them.
 /// </remarks>
-public class PostgreSqlSchemaInitializer : ISchemaInitializer
+public sealed class PostgreSqlSchemaInitializer : ISchemaInitializer
 {
     private readonly string _connectionString;
 
@@ -33,12 +33,12 @@ public class PostgreSqlSchemaInitializer : ISchemaInitializer
     public async Task EnsureSchemaAsync(CancellationToken cancellationToken = default)
     {
         await using var connection = new NpgsqlConnection(_connectionString);
-        await connection.OpenAsync(cancellationToken);
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
         // Check and create tables in order
-        await EnsureTableAsync(connection, "bbq_events", "Schema.CreateEventsTable.sql", cancellationToken);
-        await EnsureTableAsync(connection, "bbq_streams", "Schema.CreateStreamsTable.sql", cancellationToken);
-        await EnsureTableAsync(connection, "bbq_projection_checkpoints", "Schema.CreateCheckpointTable.sql", cancellationToken);
+        await EnsureTableAsync(connection, "bbq_events", "Schema.CreateEventsTable.sql", cancellationToken).ConfigureAwait(false);
+        await EnsureTableAsync(connection, "bbq_streams", "Schema.CreateStreamsTable.sql", cancellationToken).ConfigureAwait(false);
+        await EnsureTableAsync(connection, "bbq_projection_checkpoints", "Schema.CreateCheckpointTable.sql", cancellationToken).ConfigureAwait(false);
     }
 
     private async Task EnsureTableAsync(
@@ -57,7 +57,7 @@ public class PostgreSqlSchemaInitializer : ISchemaInitializer
         await using var checkCommand = new NpgsqlCommand(checkSql, connection);
         checkCommand.Parameters.AddWithValue("@tableName", tableName);
 
-        var exists = Convert.ToInt64(await checkCommand.ExecuteScalarAsync(cancellationToken)) > 0;
+        var exists = Convert.ToInt64(await checkCommand.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) > 0;
 
         if (exists)
         {
@@ -67,7 +67,7 @@ public class PostgreSqlSchemaInitializer : ISchemaInitializer
         // Load and execute the SQL script
         var sql = LoadEmbeddedResource(resourceName);
         await using var createCommand = new NpgsqlCommand(sql, connection);
-        await createCommand.ExecuteNonQueryAsync(cancellationToken);
+        await createCommand.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private string LoadEmbeddedResource(string resourcePath)

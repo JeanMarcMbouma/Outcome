@@ -5,7 +5,7 @@ namespace BbQ.Events.PostgreSql.Events;
 /// <summary>
 /// Configuration options for PostgreSQL event store.
 /// </summary>
-public class PostgreSqlEventStoreOptions
+public sealed class PostgreSqlEventStoreOptions
 {
     /// <summary>
     /// Gets or sets the connection string for PostgreSQL.

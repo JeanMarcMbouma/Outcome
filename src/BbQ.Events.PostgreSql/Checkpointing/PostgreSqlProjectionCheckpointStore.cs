@@ -25,7 +25,7 @@ namespace BbQ.Events.PostgreSql.Checkpointing;
 /// - Operations are fully async for optimal scalability
 /// - Connections are properly disposed in all code paths
 /// </remarks>
-public class PostgreSqlProjectionCheckpointStore : IProjectionCheckpointStore
+public sealed class PostgreSqlProjectionCheckpointStore : IProjectionCheckpointStore
 {
     private readonly string _connectionString;
 
@@ -58,7 +58,7 @@ public class PostgreSqlProjectionCheckpointStore : IProjectionCheckpointStore
         }
 
         await using var connection = new NpgsqlConnection(_connectionString);
-        await connection.OpenAsync(ct);
+        await connection.OpenAsync(ct).ConfigureAwait(false);
 
         await using var command = connection.CreateCommand();
         command.CommandText = @"
@@ -69,7 +69,7 @@ public class PostgreSqlProjectionCheckpointStore : IProjectionCheckpointStore
         
         command.Parameters.AddWithValue("@projection_name", projectionName);
 
-        var result = await command.ExecuteScalarAsync(ct);
+        var result = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
         
         return result == null || result == DBNull.Value 
             ? null 
@@ -95,7 +95,7 @@ public class PostgreSqlProjectionCheckpointStore : IProjectionCheckpointStore
         }
 
         await using var connection = new NpgsqlConnection(_connectionString);
-        await connection.OpenAsync(ct);
+        await connection.OpenAsync(ct).ConfigureAwait(false);
 
         await using var command = connection.CreateCommand();
         command.CommandText = @"
@@ -107,7 +107,7 @@ public class PostgreSqlProjectionCheckpointStore : IProjectionCheckpointStore
         command.Parameters.AddWithValue("@projection_name", projectionName);
         command.Parameters.AddWithValue("@position", checkpoint);
 
-        await command.ExecuteNonQueryAsync(ct);
+        await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -124,7 +124,7 @@ public class PostgreSqlProjectionCheckpointStore : IProjectionCheckpointStore
         }
 
         await using var connection = new NpgsqlConnection(_connectionString);
-        await connection.OpenAsync(ct);
+        await connection.OpenAsync(ct).ConfigureAwait(false);
 
         await using var command = connection.CreateCommand();
         command.CommandText = @"
@@ -134,6 +134,6 @@ public class PostgreSqlProjectionCheckpointStore : IProjectionCheckpointStore
         
         command.Parameters.AddWithValue("@projection_name", projectionName);
 
-        await command.ExecuteNonQueryAsync(ct);
+        await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 }

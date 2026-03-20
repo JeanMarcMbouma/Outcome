@@ -37,6 +37,6 @@ public static class SqlServerEventStoreExtensions
         }
 
         var initializer = new SqlServerSchemaInitializer(sqlServerEventStore.ConnectionString);
-        await initializer.EnsureSchemaAsync(cancellationToken);
+        await initializer.EnsureSchemaAsync(cancellationToken).ConfigureAwait(false);
     }
 }

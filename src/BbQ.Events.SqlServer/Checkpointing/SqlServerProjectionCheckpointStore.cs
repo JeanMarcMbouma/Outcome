@@ -25,7 +25,7 @@ namespace BbQ.Events.SqlServer.Checkpointing;
 /// - Operations are fully async for optimal scalability
 /// - Connections are properly disposed in all code paths
 /// </remarks>
-public class SqlServerProjectionCheckpointStore : IProjectionCheckpointStore
+public sealed class SqlServerProjectionCheckpointStore : IProjectionCheckpointStore
 {
     private readonly string _connectionString;
 
@@ -58,7 +58,7 @@ public class SqlServerProjectionCheckpointStore : IProjectionCheckpointStore
         }
 
         await using var connection = new SqlConnection(_connectionString);
-        await connection.OpenAsync(ct);
+        await connection.OpenAsync(ct).ConfigureAwait(false);
 
         await using var command = connection.CreateCommand();
         command.CommandText = @"
@@ -69,7 +69,7 @@ public class SqlServerProjectionCheckpointStore : IProjectionCheckpointStore
         
         command.Parameters.AddWithValue("@ProjectionName", projectionName);
 
-        var result = await command.ExecuteScalarAsync(ct);
+        var result = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
         
         return result == null || result == DBNull.Value 
             ? null 
@@ -95,7 +95,7 @@ public class SqlServerProjectionCheckpointStore : IProjectionCheckpointStore
         }
 
         await using var connection = new SqlConnection(_connectionString);
-        await connection.OpenAsync(ct);
+        await connection.OpenAsync(ct).ConfigureAwait(false);
 
         await using var command = connection.CreateCommand();
         command.CommandText = @"
@@ -114,7 +114,7 @@ public class SqlServerProjectionCheckpointStore : IProjectionCheckpointStore
         command.Parameters.AddWithValue("@PartitionKey", DBNull.Value);
         command.Parameters.AddWithValue("@Position", checkpoint);
 
-        await command.ExecuteNonQueryAsync(ct);
+        await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -131,7 +131,7 @@ public class SqlServerProjectionCheckpointStore : IProjectionCheckpointStore
         }
 
         await using var connection = new SqlConnection(_connectionString);
-        await connection.OpenAsync(ct);
+        await connection.OpenAsync(ct).ConfigureAwait(false);
 
         await using var command = connection.CreateCommand();
         command.CommandText = @"
@@ -141,6 +141,6 @@ public class SqlServerProjectionCheckpointStore : IProjectionCheckpointStore
         
         command.Parameters.AddWithValue("@ProjectionName", projectionName);
 
-        await command.ExecuteNonQueryAsync(ct);
+        await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 }

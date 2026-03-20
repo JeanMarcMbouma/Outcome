@@ -10,7 +10,7 @@ namespace BbQ.Events.Engine;
 /// enabling rebuild scenarios. It works with the projection handler registry
 /// and checkpoint store to manage projection state.
 /// </summary>
-internal class DefaultProjectionRebuilder : IProjectionRebuilder
+internal sealed class DefaultProjectionRebuilder : IProjectionRebuilder
 {
     private readonly IProjectionCheckpointStore _checkpointStore;
     private readonly ILogger<DefaultProjectionRebuilder> _logger;
@@ -46,7 +46,7 @@ internal class DefaultProjectionRebuilder : IProjectionRebuilder
         var resetTasks = projectionNames.Select(projectionName => 
             ResetProjectionAsync(projectionName, ct).AsTask());
 
-        await Task.WhenAll(resetTasks);
+        await Task.WhenAll(resetTasks).ConfigureAwait(false);
 
         _logger.LogInformation("Successfully reset all {Count} projection(s)", projectionNames.Count);
     }
@@ -66,7 +66,7 @@ internal class DefaultProjectionRebuilder : IProjectionRebuilder
         _logger.LogInformation("Resetting projection: {ProjectionName}", projectionName);
 
         // Reset the main projection checkpoint (for non-partitioned projections)
-        await _checkpointStore.ResetCheckpointAsync(projectionName, ct);
+        await _checkpointStore.ResetCheckpointAsync(projectionName, ct).ConfigureAwait(false);
 
         // Note: For partitioned projections, this resets the main checkpoint only.
         // Individual partition checkpoints are tracked with keys like "ProjectionName:PartitionKey"
@@ -109,7 +109,7 @@ internal class DefaultProjectionRebuilder : IProjectionRebuilder
             projectionName,
             partitionKey);
 
-        await _checkpointStore.ResetCheckpointAsync(checkpointKey, ct);
+        await _checkpointStore.ResetCheckpointAsync(checkpointKey, ct).ConfigureAwait(false);
 
         _logger.LogInformation(
             "Successfully reset partition for projection: {ProjectionName}, partition: {PartitionKey}",

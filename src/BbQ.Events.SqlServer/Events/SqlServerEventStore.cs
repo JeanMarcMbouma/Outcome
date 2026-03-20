@@ -27,7 +27,7 @@ namespace BbQ.Events.SqlServer.Events;
 /// - BbQ_Events table must exist (see Schema/CreateEventsTable.sql)
 /// - BbQ_Streams table must exist (see Schema/CreateStreamsTable.sql)
 /// </remarks>
-public class SqlServerEventStore : IEventStore
+public sealed class SqlServerEventStore : IEventStore
 {
     private readonly SqlServerEventStoreOptions _options;
     private readonly JsonSerializerOptions _jsonOptions;
@@ -82,7 +82,7 @@ public class SqlServerEventStore : IEventStore
         }
 
         await using var connection = new SqlConnection(_options.ConnectionString);
-        await connection.OpenAsync(ct);
+        await connection.OpenAsync(ct).ConfigureAwait(false);
 
         await using var command = connection.CreateCommand();
         command.CommandText = SqlConstants.AppendEventSql;
@@ -95,7 +95,7 @@ public class SqlServerEventStore : IEventStore
         command.AddParameter("@EventData", eventData);
         command.AddParameter("@Metadata", _options.IncludeMetadata ? CreateMetadata() : null);
 
-        var result = await command.ExecuteScalarAsync(ct);
+        var result = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
         return Convert.ToInt64(result);
     }
 
@@ -119,16 +119,16 @@ public class SqlServerEventStore : IEventStore
         }
 
         await using var connection = new SqlConnection(_options.ConnectionString);
-        await connection.OpenAsync(ct);
+        await connection.OpenAsync(ct).ConfigureAwait(false);
 
         await using var command = connection.CreateCommand();
         command.CommandText = SqlConstants.ReadEventsSql;
         command.AddParameter("@StreamName", stream);
         command.AddParameter("@FromPosition", fromPosition);
 
-        await using var reader = await command.ExecuteReaderAsync(ct);
+        await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
 
-        while (await reader.ReadAsync(ct))
+        while (await reader.ReadAsync(ct).ConfigureAwait(false))
         {
             var position = reader.GetLong(SqlConstants.Position);
             var eventType = reader.GetString(reader.GetOrdinal(SqlConstants.EventType));
@@ -160,13 +160,13 @@ public class SqlServerEventStore : IEventStore
         }
 
         await using var connection = new SqlConnection(_options.ConnectionString);
-        await connection.OpenAsync(ct);
+        await connection.OpenAsync(ct).ConfigureAwait(false);
 
         await using var command = connection.CreateCommand();
         command.CommandText = SqlConstants.GetStreamPositionSql;
         command.AddParameter("@StreamName", stream);
 
-        var result = await command.ExecuteScalarAsync(ct);
+        var result = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
         
         return result == null || result == DBNull.Value 
             ? null 

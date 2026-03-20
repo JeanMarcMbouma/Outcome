@@ -27,7 +27,7 @@ namespace BbQ.Events.PostgreSql.Events;
 /// - bbq_events table must exist (see Schema/CreateEventsTable.sql)
 /// - bbq_streams table must exist (see Schema/CreateStreamsTable.sql)
 /// </remarks>
-public class PostgreSqlEventStore : IEventStore
+public sealed class PostgreSqlEventStore : IEventStore
 {
     private readonly PostgreSqlEventStoreOptions _options;
     private readonly JsonSerializerOptions _jsonOptions;
@@ -83,7 +83,7 @@ public class PostgreSqlEventStore : IEventStore
         }
 
         await using var connection = new NpgsqlConnection(_options.ConnectionString);
-        await connection.OpenAsync(ct);
+        await connection.OpenAsync(ct).ConfigureAwait(false);
 
         await using var command = connection.CreateCommand();
         command.CommandText = PostgreSqlConstants.AppendEventSqlSimplified;
@@ -96,7 +96,7 @@ public class PostgreSqlEventStore : IEventStore
         command.AddParameter("@event_data", eventData);
         command.AddParameter("@metadata", _options.IncludeMetadata ? CreateMetadata() : null);
 
-        var result = await command.ExecuteScalarAsync(ct);
+        var result = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
         return Convert.ToInt64(result);
     }
 
@@ -120,16 +120,16 @@ public class PostgreSqlEventStore : IEventStore
         }
 
         await using var connection = new NpgsqlConnection(_options.ConnectionString);
-        await connection.OpenAsync(ct);
+        await connection.OpenAsync(ct).ConfigureAwait(false);
 
         await using var command = connection.CreateCommand();
         command.CommandText = PostgreSqlConstants.ReadEventsSql;
         command.AddParameter("@stream_name", stream);
         command.AddParameter("@from_position", fromPosition);
 
-        await using var reader = await command.ExecuteReaderAsync(ct);
+        await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
 
-        while (await reader.ReadAsync(ct))
+        while (await reader.ReadAsync(ct).ConfigureAwait(false))
         {
             var position = reader.GetLong(PostgreSqlConstants.Position);
             var eventType = reader.GetString(reader.GetOrdinal(PostgreSqlConstants.EventType));
@@ -161,13 +161,13 @@ public class PostgreSqlEventStore : IEventStore
         }
 
         await using var connection = new NpgsqlConnection(_options.ConnectionString);
-        await connection.OpenAsync(ct);
+        await connection.OpenAsync(ct).ConfigureAwait(false);
 
         await using var command = connection.CreateCommand();
         command.CommandText = PostgreSqlConstants.GetStreamPositionSql;
         command.AddParameter("@stream_name", stream);
 
-        var result = await command.ExecuteScalarAsync(ct);
+        var result = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
         
         return result == null || result == DBNull.Value 
             ? null 

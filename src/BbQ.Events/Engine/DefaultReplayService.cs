@@ -35,7 +35,7 @@ namespace BbQ.Events.Engine;
 /// continues. This ensures replay can complete even if some events fail. Consider this
 /// behavior when replaying critical projections.
 /// </remarks>
-internal class DefaultReplayService : IReplayService
+internal sealed class DefaultReplayService : IReplayService
 {
     private readonly IProjectionCheckpointStore _checkpointStore;
     private readonly IServiceProvider _serviceProvider;
@@ -135,7 +135,7 @@ internal class DefaultReplayService : IReplayService
         else if (options.FromCheckpoint)
         {
             // Resume from checkpoint
-            var checkpoint = await _checkpointStore.GetCheckpointAsync(checkpointKey, cancellationToken);
+            var checkpoint = await _checkpointStore.GetCheckpointAsync(checkpointKey, cancellationToken).ConfigureAwait(false);
             startPosition = checkpoint ?? 0;
             _logger.LogInformation(
                 "Replay will resume from checkpoint position {Position} for {CheckpointKey}",
@@ -161,7 +161,7 @@ internal class DefaultReplayService : IReplayService
                 "Resetting checkpoint for {CheckpointKey} before replay. " +
                 "To resume interrupted replay, use FromCheckpoint=true or specify FromPosition again.",
                 checkpointKey);
-            await _checkpointStore.ResetCheckpointAsync(checkpointKey, cancellationToken);
+            await _checkpointStore.ResetCheckpointAsync(checkpointKey, cancellationToken).ConfigureAwait(false);
         }
 
         // Log replay plan
@@ -216,7 +216,7 @@ internal class DefaultReplayService : IReplayService
             checkpointKey,
             startPosition,
             options,
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
 
         _logger.LogInformation(
             "Replay completed for {CheckpointKey}",
@@ -324,7 +324,7 @@ internal class DefaultReplayService : IReplayService
                 continue;
             }
             
-            var result = await task;
+            var result = await task.ConfigureAwait(false);
             eventsProcessed = result.Item1;
             currentPosition = result.Item2;
         }
@@ -336,7 +336,7 @@ internal class DefaultReplayService : IReplayService
             (options.CheckpointMode == CheckpointMode.FinalOnly || 
             (normalCheckpointing && eventsProcessed % batchSize != 0)))
         {
-            await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, cancellationToken);
+            await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, cancellationToken).ConfigureAwait(false);
             _logger.LogInformation(
                 "Final checkpoint saved for {CheckpointKey} at position {Position}",
                 checkpointKey,
@@ -394,7 +394,7 @@ internal class DefaultReplayService : IReplayService
         long currentPosition = startPosition;
         
         // Read events from the event store starting from the specified position
-        await foreach (var storedEvent in _eventStore!.ReadAsync<TEvent>(streamName, startPosition, cancellationToken))
+        await foreach (var storedEvent in _eventStore!.ReadAsync<TEvent>(streamName, startPosition, cancellationToken).ConfigureAwait(false))
         {
             var position = storedEvent.Position;
             var @event = storedEvent.Event;
@@ -439,7 +439,7 @@ internal class DefaultReplayService : IReplayService
                             var result = projectMethod.Invoke(handler, new object[] { @event, cancellationToken });
                             if (result is ValueTask projectTask)
                             {
-                                await projectTask;
+                                await projectTask.ConfigureAwait(false);
                             }
                         }
                         catch (System.Reflection.TargetInvocationException tie) when (tie.InnerException != null)
@@ -469,7 +469,7 @@ internal class DefaultReplayService : IReplayService
             // Checkpoint if needed (normal mode with batch size reached)
             if (normalCheckpointing && eventsProcessed % batchSize == 0)
             {
-                await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, cancellationToken);
+                await _checkpointStore.SaveCheckpointAsync(checkpointKey, currentPosition, cancellationToken).ConfigureAwait(false);
                 _logger.LogDebug(
                     "Checkpoint saved for {CheckpointKey} at position {Position} ({EventsProcessed} events processed)",
                     checkpointKey,

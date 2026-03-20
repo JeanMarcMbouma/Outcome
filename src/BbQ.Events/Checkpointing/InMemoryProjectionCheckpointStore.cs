@@ -19,7 +19,7 @@ namespace BbQ.Events.Checkpointing;
 /// - Distributed caches
 /// - File systems
 /// </remarks>
-public class InMemoryProjectionCheckpointStore : IProjectionCheckpointStore
+public sealed class InMemoryProjectionCheckpointStore : IProjectionCheckpointStore
 {
     private readonly ConcurrentDictionary<string, long> _checkpoints = new();
 
