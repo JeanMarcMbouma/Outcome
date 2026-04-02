@@ -59,8 +59,9 @@ public sealed class RabbitMqEventBusOptions
     /// Gets or sets the exchange name used for event publishing.
     /// </summary>
     /// <remarks>
-    /// The exchange is declared as a fanout exchange, ensuring all bound queues
-    /// receive published events. Default is "bbq.events".
+    /// The exchange is declared as a topic exchange, using event type full names
+    /// as routing keys. All bound queues matching the routing key receive published
+    /// events. Default is "bbq.events".
     /// </remarks>
     public string ExchangeName { get; set; } = "bbq.events";
 
