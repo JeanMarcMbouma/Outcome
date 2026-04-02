@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <PackageId>BbQ.Events.RabbitMQ</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>Jean</Authors>
+    <Company>JM Mbouma</Company>
+    <Description>RabbitMQ implementation of IEventBus for BbQ.Events, providing distributed pub/sub messaging with durable event delivery across multiple processes and services.</Description>
+    <PackageTags>events rabbitmq event-driven messaging pubsub distributed event-bus bbq cqrs</PackageTags>
+    <RepositoryUrl>https://github.com/JeanMarcMbouma/Outcome</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/JeanMarcMbouma/Outcome</PackageProjectUrl>
+    <RepositoryType>git</RepositoryType>
+    <LicenseExpression>MIT</LicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>BbQ.Events.RabbitMQ</RootNamespace>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Title>BbQ.Events.RabbitMQ</Title>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="RabbitMQ.Client" Version="7.2.1" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BbQ.Events\BbQ.Events.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+</Project>
