@@ -1,0 +1,47 @@
+name: Publish BbQ.Events.RabbitMQ to NuGet
+
+on:
+  push:
+    tags:
+      - 'rabbitmq-v*'  # Triggers on tags like rabbitmq-v0.1.0, rabbitmq-v1.0.0
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: |
+          8.0.x
+          9.0.x
+          10.0.x
+
+    - name: Restore dependencies
+      run: dotnet restore src/BbQ.Events.RabbitMQ/BbQ.Events.RabbitMQ.csproj
+
+    - name: Build
+      run: dotnet build src/BbQ.Events.RabbitMQ/BbQ.Events.RabbitMQ.csproj --configuration Release --no-restore
+
+    - name: Test
+      run: dotnet test tests/BbQ.Events.RabbitMQ.Tests/BbQ.Events.RabbitMQ.Tests.csproj --configuration Release --verbosity normal
+
+    - name: Pack
+      run: dotnet pack src/BbQ.Events.RabbitMQ/BbQ.Events.RabbitMQ.csproj --configuration Release --no-build --output ./artifacts
+      
+    - name: NuGet login (OIDC → temp API key)
+      uses: NuGet/login@v1
+      id: login
+      with:
+        user: ${{ secrets.NUGET_USER }}
+        
+    - name: Push to NuGet
+      run: dotnet nuget push ./artifacts/*.nupkg --api-key ${{steps.login.outputs.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json --skip-duplicate
