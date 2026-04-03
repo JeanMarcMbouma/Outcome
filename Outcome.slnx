@@ -11,8 +11,10 @@
     <Project Path="src/BbQ.Events.SourceGenerators/BbQ.Events.SourceGenerators.csproj" />
     <Project Path="src/BbQ.Events.SqlServer/BbQ.Events.SqlServer.csproj" />
     <Project Path="src/BbQ.Events.PostgreSql/BbQ.Events.PostgreSql.csproj" />
+    <Project Path="src/BbQ.Events.RabbitMQ/BbQ.Events.RabbitMQ.csproj" />
     <Project Path="tests/BbQ.Events.SqlServer.Tests/BbQ.Events.SqlServer.Tests.csproj" />
     <Project Path="tests/BbQ.Events.PostgreSql.Tests/BbQ.Events.PostgreSql.Tests.csproj" />
+    <Project Path="tests/BbQ.Events.RabbitMQ.Tests/BbQ.Events.RabbitMQ.Tests.csproj" />
     <Project Path="tests/BbQ.Events.Benchmarks/BbQ.Events.Benchmarks.csproj" />
   </Folder>
   <Folder Name="/Samples/">

@@ -61,6 +61,9 @@ jobs:
       - name: Pack NuGet BbQ.Events.SourceGenerators
         run: dotnet pack src/BbQ.Events.SourceGenerators/BbQ.Events.SourceGenerators.csproj --configuration Release --no-build -o ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
       
+      - name: Pack NuGet BbQ.Events.RabbitMQ
+        run: dotnet pack src/BbQ.Events.RabbitMQ/BbQ.Events.RabbitMQ.csproj --configuration Release --no-build -o ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
+      
       - name: NuGet login (OIDC → temp API key)
         uses: NuGet/login@v1
         id: login
