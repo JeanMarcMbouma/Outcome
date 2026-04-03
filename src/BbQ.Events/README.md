@@ -42,7 +42,7 @@ dotnet run -c Release --project tests/BbQ.Events.Benchmarks/BbQ.Events.Benchmark
 ### 1. Register the Event Bus
 
 ```csharp
-using BbQ.Events.DependencyInjection;
+using BbQ.Events.Configuration;
 
 services.AddInMemoryEventBus();
 ```
@@ -572,7 +572,7 @@ The rebuilder API is designed to be easily integrated into CLI applications:
 
 ```csharp
 using BbQ.Events;
-using BbQ.Events.DependencyInjection;
+using BbQ.Events.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 // Configure services

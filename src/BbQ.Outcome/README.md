@@ -13,7 +13,7 @@ BbQ.Outcome takes this idea further:
 - **LINQ integration**: Native `Select`/`SelectMany` support for sync + async queries.
 - **Deconstruction**: Tuple-style unpacking `(isSuccess, value, errors)` for ergonomic handling.
 - **Friendly ToString**: Human-readable logging like `Success: 42` or `Errors: [DIV_ZERO: Division by zero]`.
-- **Multi-targeting**: Works across `netstandard2.0`, `net6.0`, and `net8.0`.
+- **Multi-targeting**: Works across `net8.0`, `net9.0`, and `net10.0`.
 - **Source Link enabled**: Step directly into source when debugging NuGet packages.
 - **Source generator support**: Auto-generate `Error<T>` helper properties from enums with the `[QbqOutcome]` attribute.
 

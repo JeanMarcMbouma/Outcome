@@ -269,14 +269,27 @@ The package follows a feature-based folder structure:
 
 ```
 BbQ.Events.PostgreSql/
-  Checkpointing/            # Projection checkpoint store
+  Events/                     # Event store implementation
+    PostgreSqlEventStore.cs
+    PostgreSqlEventStoreExtensions.cs
+    PostgreSqlEventStoreOptions.cs
+
+  Checkpointing/              # Projection checkpoint store
     PostgreSqlProjectionCheckpointStore.cs
   
-  Schema/                   # SQL schema scripts
+  Schema/                     # SQL schema scripts
+    CreateEventsTable.sql
+    CreateStreamsTable.sql
     CreateCheckpointTable.sql
+    PostgreSqlSchemaInitializer.cs
   
-  Configuration/            # DI extensions
+  Configuration/              # DI extensions
     ServiceCollectionExtensions.cs
+    PostgreSqlSchemaInitializerHostedService.cs
+
+  Internal/                   # Internal helpers (not public API)
+    PostgreSqlConstants.cs
+    PostgreSqlHelpers.cs
 ```
 
 This structure:
