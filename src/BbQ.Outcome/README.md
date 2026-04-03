@@ -11,6 +11,7 @@ BbQ.Outcome takes this idea further:
 - **Structured errors**: Rich `Error` record with `Code`, `Description`, and `Severity`.
 - **Async composition**: `BindAsync`, `MapAsync`, `CombineAsync` for natural async pipelines.
 - **LINQ integration**: Native `Select`/`SelectMany` support for sync + async queries.
+- **IAsyncEnumerable streaming**: `Select`, `Bind`, `Map`, `Where`, `Values`, `Errors` over `IAsyncEnumerable<Outcome<T>>` streams.
 - **Deconstruction**: Tuple-style unpacking `(isSuccess, value, errors)` for ergonomic handling.
 - **Friendly ToString**: Human-readable logging like `Success: 42` or `Errors: [DIV_ZERO: Division by zero]`.
 - **Multi-targeting**: Works across `net8.0`, `net9.0`, and `net10.0`.
@@ -262,6 +263,68 @@ else
     foreach (var error in errors)
     {
         Console.WriteLine($"[{error.Severity}] {error.Code}: {error.Description}");
+    }
+}
+```
+
+### IAsyncEnumerable Streaming
+
+Process async streams of outcomes with railway-oriented composition — useful when consuming `IAsyncEnumerable<Outcome<T>>` from CQRS streaming queries or event subscriptions:
+
+```csharp
+IAsyncEnumerable<Outcome<Order>> orderStream = mediator.Stream(query, ct);
+
+// Transform, filter, and extract values from the stream
+await foreach (var name in orderStream
+    .Where(o => o.Total > 100)
+    .Map(o => o.CustomerName)
+    .Values())
+{
+    Console.WriteLine(name);
+}
+```
+
+#### Available Stream Operations
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `Select` | `IAsyncEnumerable<Outcome<TResult>>` | LINQ-style map over success values; errors propagate |
+| `Map` | `IAsyncEnumerable<Outcome<TResult>>` | Functor map (alias for Select, for API consistency) |
+| `Bind` | `IAsyncEnumerable<Outcome<TResult>>` | Monadic flatMap producing new outcomes |
+| `SelectMany` | `IAsyncEnumerable<Outcome<TResult>>` | LINQ flatMap with projection |
+| `Where` | `IAsyncEnumerable<Outcome<T>>` | Predicate filter (failures become validation errors) |
+| `Values` | `IAsyncEnumerable<T>` | Extract only success values, discard errors |
+| `Errors` | `IAsyncEnumerable<IReadOnlyList<object?>>` | Extract only error lists, discard successes |
+
+All methods support `CancellationToken` and use `ConfigureAwait(false)`.
+
+#### Bind over a Stream
+
+```csharp
+// Validate each item in the stream; invalid items become error outcomes
+var validated = orderStream.Bind(order =>
+    order.Total > 0
+        ? Outcome<Order>.From(order)
+        : Outcome<Order>.Validation("INVALID_TOTAL", "Order total must be positive"));
+
+await foreach (var outcome in validated)
+{
+    outcome.Switch(
+        onSuccess: order => Console.WriteLine($"Valid order: {order.Id}"),
+        onError: errors => Console.WriteLine($"Invalid: {errors[0]}")
+    );
+}
+```
+
+#### Collecting Errors from a Stream
+
+```csharp
+// Log only errors from the stream
+await foreach (var errorList in orderStream.Errors())
+{
+    foreach (var error in errorList)
+    {
+        logger.LogWarning("Stream error: {Error}", error);
     }
 }
 ```
