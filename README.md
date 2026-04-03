@@ -10,6 +10,7 @@ A modern C# functional result type for error-aware programming.
 - **Structured errors** with `Code`, `Description`, and `Severity`
 - **Async composition** with `BindAsync`, `MapAsync`, `CombineAsync`
 - **LINQ integration** with native `Select`/`SelectMany` support
+- **IAsyncEnumerable streaming** with `Select`, `Bind`, `Map`, `Where`, `Values`, `Errors` over async streams
 - **Source generator** support for auto-generating error helpers
 - **Multi-targeting** across `net8.0`, `net9.0`, and `net10.0`
 
@@ -190,6 +191,7 @@ public class GetUserQueryHandler : IRequestHandler<GetUserQuery, Outcome<User>>
 |---------|---------|------|--------|
 | Structured error handling | ✅ | ✅ | - |
 | Async composition | ✅ | ✅ | ✅ |
+| IAsyncEnumerable streaming | ✅ | ✅ | ✅ |
 | Source-generated helpers | ✅ | ✅ | ✅ |
 | LINQ integration | ✅ | - | - |
 | Mediator pattern | - | ✅ | - |
