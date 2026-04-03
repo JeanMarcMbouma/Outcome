@@ -125,6 +125,7 @@ internal sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
             // Create a queue for this subscriber
             var queueName = $"{_options.QueuePrefix}.{eventType.Name}.{Guid.NewGuid():N}";
             var durable = _options.DurableQueues;
+            // Non-durable queues are exclusive (tied to this connection only)
             var exclusive = !durable;
             var autoDelete = exclusive || _options.AutoDeleteQueues;
 
@@ -177,6 +178,7 @@ internal sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
 
                     try
                     {
+                        // Reject without requeue — failed messages are discarded to avoid poison-message loops
                         await channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false, ct).ConfigureAwait(false);
                     }
                     catch (Exception nackEx)
