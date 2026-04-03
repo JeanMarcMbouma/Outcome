@@ -1,4 +1,5 @@
 using System.Text.Json;
+using BbQ.Events.RabbitMQ.Internal;
 
 namespace BbQ.Events.RabbitMQ.Events;
 
@@ -63,16 +64,16 @@ public sealed class RabbitMqEventBusOptions
     /// as routing keys. All bound queues matching the routing key receive published
     /// events. Default is "bbq.events".
     /// </remarks>
-    public string ExchangeName { get; set; } = "bbq.events";
+    public string ExchangeName { get; set; } = RabbitMqConstants.DefaultExchangeName;
 
     /// <summary>
     /// Gets or sets the queue name prefix for subscriber queues.
     /// </summary>
     /// <remarks>
-    /// Each subscriber creates a queue named "{QueuePrefix}.{EventTypeName}".
+    /// Each subscriber creates a queue named "{QueuePrefix}.{EventTypeName}.{Guid}".
     /// Default is "bbq".
     /// </remarks>
-    public string QueuePrefix { get; set; } = "bbq";
+    public string QueuePrefix { get; set; } = RabbitMqConstants.DefaultQueuePrefix;
 
     /// <summary>
     /// Gets or sets whether queues should be durable (survive broker restart).

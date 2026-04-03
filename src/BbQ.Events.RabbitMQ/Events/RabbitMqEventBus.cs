@@ -1,7 +1,6 @@
 // -------------------------------
 // RabbitMQ Event Bus Implementation
 // -------------------------------
-using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
@@ -49,6 +48,7 @@ internal sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
     private readonly ConnectionFactory _connectionFactory;
 
     private readonly SemaphoreSlim _connectionLock = new(1, 1);
+    private readonly SemaphoreSlim _publishChannelLock = new(1, 1);
     private IConnection? _connection;
     private IChannel? _publishChannel;
     private bool _exchangeDeclared;
@@ -124,11 +124,15 @@ internal sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
 
             // Create a queue for this subscriber
             var queueName = $"{_options.QueuePrefix}.{eventType.Name}.{Guid.NewGuid():N}";
+            var durable = _options.DurableQueues;
+            var exclusive = !durable;
+            var autoDelete = exclusive || _options.AutoDeleteQueues;
+
             await channel.QueueDeclareAsync(
                 queue: queueName,
-                durable: false,
-                exclusive: true,
-                autoDelete: true,
+                durable: durable,
+                exclusive: exclusive,
+                autoDelete: autoDelete,
                 arguments: null,
                 cancellationToken: ct).ConfigureAwait(false);
 
@@ -170,6 +174,15 @@ internal sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
                     _logger.LogError(ex,
                         "Error processing RabbitMQ message for event type {EventType}",
                         eventType.Name);
+
+                    try
+                    {
+                        await channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false, ct).ConfigureAwait(false);
+                    }
+                    catch (Exception nackEx)
+                    {
+                        _logger.LogDebug(nackEx, "Error sending Nack for delivery tag {DeliveryTag}", ea.DeliveryTag);
+                    }
                 }
             };
 
@@ -243,6 +256,7 @@ internal sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
         }
 
         _connectionLock.Dispose();
+        _publishChannelLock.Dispose();
     }
 
     private ConnectionFactory CreateConnectionFactory()
@@ -299,8 +313,16 @@ internal sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
             if (_publishChannel is { IsOpen: true })
                 return _publishChannel;
 
-            var connection = await EnsureConnectionAsync(ct).ConfigureAwait(false);
-            _publishChannel = await connection.CreateChannelAsync(cancellationToken: ct).ConfigureAwait(false);
+            // Inline connection creation to avoid re-entrant lock
+            if (_connection is not { IsOpen: true })
+            {
+                _logger.LogDebug("Creating RabbitMQ connection to {HostName}", _options.HostName);
+                _connection = await _connectionFactory.CreateConnectionAsync(ct).ConfigureAwait(false);
+                _exchangeDeclared = false;
+                _publishChannel = null;
+            }
+
+            _publishChannel = await _connection.CreateChannelAsync(cancellationToken: ct).ConfigureAwait(false);
             return _publishChannel;
         }
         finally
@@ -329,40 +351,48 @@ internal sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
 
     private async Task PublishToRabbitMqAsync<TEvent>(TEvent @event, CancellationToken ct)
     {
-        var channel = await EnsurePublishChannelAsync(ct).ConfigureAwait(false);
-        await EnsureExchangeAsync(channel, ct).ConfigureAwait(false);
-
-        var eventType = typeof(TEvent);
-        var routingKey = GetRoutingKey(eventType);
-        var json = JsonSerializer.Serialize(@event, _jsonOptions);
-        var body = Encoding.UTF8.GetBytes(json);
-
-        var properties = new BasicProperties
+        await _publishChannelLock.WaitAsync(ct).ConfigureAwait(false);
+        try
         {
-            ContentType = RabbitMqConstants.JsonContentType,
-            DeliveryMode = _options.PersistentMessages
-                ? DeliveryModes.Persistent
-                : DeliveryModes.Transient,
-            MessageId = Guid.NewGuid().ToString(),
-            Timestamp = new AmqpTimestamp(DateTimeOffset.UtcNow.ToUnixTimeSeconds()),
-            Type = eventType.FullName ?? eventType.Name,
-        };
-        properties.Headers = new Dictionary<string, object?>
+            var channel = await EnsurePublishChannelAsync(ct).ConfigureAwait(false);
+            await EnsureExchangeAsync(channel, ct).ConfigureAwait(false);
+
+            var eventType = typeof(TEvent);
+            var routingKey = GetRoutingKey(eventType);
+            var json = JsonSerializer.Serialize(@event, _jsonOptions);
+            var body = Encoding.UTF8.GetBytes(json);
+
+            var properties = new BasicProperties
+            {
+                ContentType = RabbitMqConstants.JsonContentType,
+                DeliveryMode = _options.PersistentMessages
+                    ? DeliveryModes.Persistent
+                    : DeliveryModes.Transient,
+                MessageId = Guid.NewGuid().ToString(),
+                Timestamp = new AmqpTimestamp(DateTimeOffset.UtcNow.ToUnixTimeSeconds()),
+                Type = eventType.FullName ?? eventType.Name,
+            };
+            properties.Headers = new Dictionary<string, object?>
+            {
+                [RabbitMqConstants.EventTypeHeader] = eventType.FullName ?? eventType.Name
+            };
+
+            await channel.BasicPublishAsync(
+                exchange: _options.ExchangeName,
+                routingKey: routingKey,
+                mandatory: false,
+                basicProperties: properties,
+                body: body,
+                cancellationToken: ct).ConfigureAwait(false);
+
+            _logger.LogDebug(
+                "Event of type {EventType} published to RabbitMQ exchange '{ExchangeName}' with routing key '{RoutingKey}'",
+                eventType.Name, _options.ExchangeName, routingKey);
+        }
+        finally
         {
-            [RabbitMqConstants.EventTypeHeader] = eventType.FullName ?? eventType.Name
-        };
-
-        await channel.BasicPublishAsync(
-            exchange: _options.ExchangeName,
-            routingKey: routingKey,
-            mandatory: false,
-            basicProperties: properties,
-            body: body,
-            cancellationToken: ct).ConfigureAwait(false);
-
-        _logger.LogDebug(
-            "Event of type {EventType} published to RabbitMQ exchange '{ExchangeName}' with routing key '{RoutingKey}'",
-            eventType.Name, _options.ExchangeName, routingKey);
+            _publishChannelLock.Release();
+        }
     }
 
     private Task ExecuteHandlers<TEvent>(TEvent @event, CancellationToken ct)
