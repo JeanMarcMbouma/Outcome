@@ -248,6 +248,7 @@ The package follows a feature-based folder structure:
 BbQ.Events.SqlServer/
   Events/                    # Event store implementation
     SqlServerEventStore.cs
+    SqlServerEventStoreExtensions.cs
     SqlServerEventStoreOptions.cs
   
   Checkpointing/            # Projection checkpoint store
@@ -257,9 +258,11 @@ BbQ.Events.SqlServer/
     CreateEventsTable.sql
     CreateStreamsTable.sql
     CreateCheckpointTable.sql
+    SqlServerSchemaInitializer.cs
   
   Configuration/            # DI extensions
     ServiceCollectionExtensions.cs
+    SqlServerSchemaInitializerHostedService.cs
   
   Internal/                 # Internal helpers (not public API)
     SqlHelpers.cs

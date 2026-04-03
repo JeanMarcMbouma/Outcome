@@ -11,7 +11,7 @@ A modern C# functional result type for error-aware programming.
 - **Async composition** with `BindAsync`, `MapAsync`, `CombineAsync`
 - **LINQ integration** with native `Select`/`SelectMany` support
 - **Source generator** support for auto-generating error helpers
-- **Multi-targeting** across `netstandard2.0`, `net6.0`, and `net8.0`
+- **Multi-targeting** across `net8.0`, `net9.0`, and `net10.0`
 
 ```csharp
 dotnet add package BbQ.Outcome
@@ -55,6 +55,14 @@ dotnet add package BbQ.Events
 ```
 
 [📖 Full Documentation 📖](./src/BbQ.Events/README.md)
+
+### Extension Packages
+
+| Package | Description | Documentation |
+|---------|-------------|---------------|
+| [BbQ.Events.SqlServer](./src/BbQ.Events.SqlServer/README.md) | SQL Server event store and checkpoint persistence | [📖 Docs](./src/BbQ.Events.SqlServer/README.md) |
+| [BbQ.Events.PostgreSql](./src/BbQ.Events.PostgreSql/README.md) | PostgreSQL event store and checkpoint persistence | [📖 Docs](./src/BbQ.Events.PostgreSql/README.md) |
+| [BbQ.Events.RabbitMQ](./src/BbQ.Events.RabbitMQ/README.md) | RabbitMQ distributed event bus | [📖 Docs](./src/BbQ.Events.RabbitMQ/README.md) |
 
 ## 🚀 Quick Start
 
@@ -136,6 +144,11 @@ dotnet add package BbQ.Cqrs
 
 # Event-driven architecture
 dotnet add package BbQ.Events
+
+# Extension packages (optional)
+dotnet add package BbQ.Events.SqlServer     # SQL Server event store & checkpoints
+dotnet add package BbQ.Events.PostgreSql    # PostgreSQL event store & checkpoints
+dotnet add package BbQ.Events.RabbitMQ      # RabbitMQ distributed event bus
 ```
 
 ## 🔗 Integration
@@ -197,6 +210,9 @@ public class GetUserQueryHandler : IRequestHandler<GetUserQuery, Outcome<User>>
 - **[BbQ.Outcome Documentation](./src/BbQ.Outcome/README.md)** - Complete guide to using BbQ.Outcome for functional error handling
 - **[BbQ.Cqrs Documentation](./src/BbQ.Cqrs/README.md)** - Complete guide to CQRS pattern implementation
 - **[BbQ.Events Documentation](./src/BbQ.Events/README.md)** - Complete guide to event-driven architecture
+- **[BbQ.Events.SqlServer Documentation](./src/BbQ.Events.SqlServer/README.md)** - SQL Server event store and checkpoint persistence
+- **[BbQ.Events.PostgreSql Documentation](./src/BbQ.Events.PostgreSql/README.md)** - PostgreSQL event store and checkpoint persistence
+- **[BbQ.Events.RabbitMQ Documentation](./src/BbQ.Events.RabbitMQ/README.md)** - RabbitMQ distributed event bus
 - **[Outcome Error Helper Properties](./src/BbQ.Outcome/README.md)** - Strongly typed error patterns with source generators
 
 ## 🤝 Contributing
