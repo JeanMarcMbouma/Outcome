@@ -41,8 +41,8 @@ namespace BbQ.Outcome
                 // If the outcome carries a value, produce the success branch result,
                 // otherwise produce the error branch result using the stored errors.
                 return outcome.IsSuccess
-                    ? onSuccess(outcome.Value)
-                    : onError(outcome.Errors);
+                    ? onSuccess(outcome.ValueUnchecked)
+                    : onError(outcome.ErrorsUnchecked);
             }
 
             /// <summary>
@@ -65,9 +65,9 @@ namespace BbQ.Outcome
                 Action<IReadOnlyList<object?>> onError)
             {
                 if (outcome.IsSuccess)
-                    onSuccess(outcome.Value);
+                    onSuccess(outcome.ValueUnchecked);
                 else
-                    onError(outcome.Errors);
+                    onError(outcome.ErrorsUnchecked);
             }
 
             /// <summary>
@@ -91,8 +91,8 @@ namespace BbQ.Outcome
             public Outcome<TResult> Bind<TResult>(Func<T, Outcome<TResult>> binder)
             {
                 return outcome.IsSuccess
-                    ? binder(outcome.Value)
-                    : Outcome<TResult>.FromErrors(outcome.Errors!);
+                    ? binder(outcome.ValueUnchecked)
+                    : Outcome<TResult>.FromErrors(outcome.ErrorsUnchecked);
             }
 
             /// <summary>
@@ -114,8 +114,8 @@ namespace BbQ.Outcome
             public Outcome<TResult> Map<TResult>(Func<T, TResult> mapper)
             {
                 return outcome.IsSuccess
-                    ? Outcome<TResult>.From(mapper(outcome.Value))
-                    : Outcome<TResult>.FromErrors(outcome.Errors!);
+                    ? Outcome<TResult>.From(mapper(outcome.ValueUnchecked))
+                    : Outcome<TResult>.FromErrors(outcome.ErrorsUnchecked);
             }
 
             /// <summary>
@@ -144,15 +144,16 @@ namespace BbQ.Outcome
                 {
                     if (item.IsSuccess)
                     {
-                        values ??= [];
-                        values.Add(item.Value);
+                        values ??= new List<T>(outcomes.Length);
+                        values.Add(item.ValueUnchecked);
                     }
                     else
                     {
                         errors ??= [];
-                        for (var i = 0; i < item.Errors.Count; i++)
+                        var itemErrors = item.ErrorsUnchecked;
+                        for (var i = 0; i < itemErrors.Count; i++)
                         {
-                            errors.Add(item.Errors[i]);
+                            errors.Add(itemErrors[i]);
                         }
                     }
                 }
@@ -187,10 +188,10 @@ namespace BbQ.Outcome
             {
                 if (!outcome.IsSuccess)
                 {
-                    return Task.FromResult(Outcome<TResult>.FromErrors(outcome.Errors!));
+                    return Task.FromResult(Outcome<TResult>.FromErrors(outcome.ErrorsUnchecked));
                 }
 
-                return AwaitMapAsync(outcome.Value, mapper);
+                return AwaitMapAsync(outcome.ValueUnchecked, mapper);
 
                 static async Task<Outcome<TResult>> AwaitMapAsync(T value, Func<T, Task<TResult>> map)
                 {
@@ -218,10 +219,10 @@ namespace BbQ.Outcome
             {
                 if (!outcome.IsSuccess)
                 {
-                    return Task.FromResult(Outcome<TResult>.FromErrors(outcome.Errors!));
+                    return Task.FromResult(Outcome<TResult>.FromErrors(outcome.ErrorsUnchecked));
                 }
 
-                return AwaitBindAsync(outcome.Value, binder);
+                return AwaitBindAsync(outcome.ValueUnchecked, binder);
 
                 static async Task<Outcome<TResult>> AwaitBindAsync(T value, Func<T, Task<Outcome<TResult>>> bind)
                 {
@@ -263,14 +264,15 @@ namespace BbQ.Outcome
 
                     if (result.IsSuccess)
                     {
-                        values[valueCount++] = result.Value;
+                        values[valueCount++] = result.ValueUnchecked;
                     }
                     else
                     {
                         errors ??= [];
-                        for (var j = 0; j < result.Errors.Count; j++)
+                        var resultErrors = result.ErrorsUnchecked;
+                        for (var j = 0; j < resultErrors.Count; j++)
                         {
-                            errors.Add(result.Errors[j]);
+                            errors.Add(resultErrors[j]);
                         }
                     }
                 }

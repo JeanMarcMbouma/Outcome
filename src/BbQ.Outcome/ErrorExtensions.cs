@@ -6,7 +6,7 @@ namespace BbQ.Outcome
     /// </summary>
     public static class ErrorExtensions
     {
-        // C# 14 extension type for Error<TCode> — provides static factory methods for error construction
+        // C# 14 extension type for Error<TCode> ï¿½ provides static factory methods for error construction
         extension<TCode>(Error<TCode>)
         {
             /// <summary>
@@ -85,6 +85,29 @@ namespace BbQ.Outcome
         public static Outcome<T> AsOutcome<TCode, T>(this Error<TCode> error)
         {
             return Outcome<T>.FromError(error);
+        }
+
+        /// <summary>
+        /// Converts this error to a strongly-typed <see cref="Outcome{T, TError}"/>.
+        /// Avoids boxing when the error type is known at compile time.
+        /// </summary>
+        /// <typeparam name="T">The success value type of the target outcome.</typeparam>
+        /// <typeparam name="TCode">The type of the error code.</typeparam>
+        /// <param name="error">The error to convert.</param>
+        /// <returns>A typed error outcome containing this error.</returns>
+        /// <example>
+        /// <code>
+        /// public Outcome&lt;int, Error&lt;AppError&gt;&gt; Divide(int a, int b)
+        /// {
+        ///     if (b == 0)
+        ///         return new Error&lt;AppError&gt;(AppError.DivideByZero, "Cannot divide by zero").AsTypedOutcome&lt;int, AppError&gt;();
+        ///     return a / b;
+        /// }
+        /// </code>
+        /// </example>
+        public static Outcome<T, Error<TCode>> AsTypedOutcome<T, TCode>(this Error<TCode> error)
+        {
+            return Outcome<T, Error<TCode>>.FromError(error);
         }
     }
 }

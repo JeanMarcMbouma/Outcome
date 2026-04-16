@@ -31,8 +31,8 @@
             /// </example>
             public Outcome<TResult> Select<TResult>(Func<T, TResult> selector)
                 => outcome.IsSuccess
-                    ? Outcome<TResult>.From(selector(outcome.Value))
-                    : Outcome<TResult>.FromErrors(outcome.Errors!);
+                    ? Outcome<TResult>.From(selector(outcome.ValueUnchecked))
+                    : Outcome<TResult>.FromErrors(outcome.ErrorsUnchecked);
 
             /// <summary>
             /// Monadic bind with projection, implementing the LINQ SelectMany (flatMap) pattern.
@@ -59,8 +59,8 @@
                 Func<T, Outcome<TIntermediate>> binder,
                 Func<T, TIntermediate, TResult> projector)
                 => outcome.IsSuccess
-                    ? binder(outcome.Value).Select(intermediate => projector(outcome.Value, intermediate))
-                    : Outcome<TResult>.FromErrors(outcome.Errors!);
+                    ? binder(outcome.ValueUnchecked).Select(intermediate => projector(outcome.ValueUnchecked, intermediate))
+                    : Outcome<TResult>.FromErrors(outcome.ErrorsUnchecked);
 
             /// <summary>
             /// Filters the outcome using a predicate.
@@ -87,7 +87,7 @@
                 if (!outcome.IsSuccess) 
                     return outcome;
                 // If predicate passes, keep the outcome; otherwise create a validation error
-                return predicate(outcome.Value!) ? outcome : Outcome<T>.Validation("FILTER_FAIL", "Predicate not satisfied");
+                return predicate(outcome.ValueUnchecked) ? outcome : Outcome<T>.Validation("FILTER_FAIL", "Predicate not satisfied");
             }
         }
 
@@ -115,8 +115,8 @@
             {
                 var outcome = await task.ConfigureAwait(false);
                 return outcome.IsSuccess
-                    ? Outcome<TResult>.From(selector(outcome.Value))
-                    : Outcome<TResult>.FromErrors(outcome.Errors!);
+                    ? Outcome<TResult>.From(selector(outcome.ValueUnchecked))
+                    : Outcome<TResult>.FromErrors(outcome.ErrorsUnchecked);
             }
 
             /// <summary>
@@ -145,8 +145,8 @@
             {
                 var outcome = await task.ConfigureAwait(false);
                 return outcome.IsSuccess
-                    ? binder(outcome.Value).Select(intermediate => projector(outcome.Value, intermediate))
-                    : Outcome<TResult>.FromErrors(outcome.Errors!);
+                    ? binder(outcome.ValueUnchecked).Select(intermediate => projector(outcome.ValueUnchecked, intermediate))
+                    : Outcome<TResult>.FromErrors(outcome.ErrorsUnchecked);
             }
 
             /// <summary>
@@ -174,7 +174,7 @@
                 if (!result.IsSuccess) 
                     return result;
                 // Apply predicate; return validation error if predicate fails
-                return predicate(result.Value)
+                return predicate(result.ValueUnchecked)
                     ? result
                     : Outcome<T>.Validation("FILTER_FAIL", "Predicate not satisfied");
             }

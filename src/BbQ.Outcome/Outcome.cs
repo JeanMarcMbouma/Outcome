@@ -1,8 +1,13 @@
-﻿namespace BbQ.Outcome
+﻿using System.Runtime.CompilerServices;
+
+namespace BbQ.Outcome
 {
     /// <summary>
-    /// A discriminated union (result type) that represents either a successful value of type <typeparam name="T"/>
-    /// or a list of errors. This is the core abstraction for functional error handling in Outcome.
+    /// A discriminated union (result type) that represents either a successful value of type <typeparamref name="T"/>
+    /// or a list of errors. This is a thin wrapper over <see cref="Outcome{T, TError}">Outcome&lt;T, object?&gt;</see>
+    /// that stores errors as <see cref="IReadOnlyList{T}">IReadOnlyList&lt;object?&gt;</see>, supporting heterogeneous error types.
+    /// 
+    /// For a strongly-typed variant that avoids boxing, use <see cref="Outcome{T, TError}"/> directly.
     /// 
     /// Use <see cref="From(T)"/> to construct a success outcome, or <see cref="FromErrors(IReadOnlyList{object})"/>
     /// to construct a failure outcome. The <see cref="IsSuccess"/> property indicates which case you're in.
@@ -10,93 +15,91 @@
     /// <typeparam name="T">The type of the successful value.</typeparam>
     public readonly struct Outcome<T> : IOutcome<T>
     {
-        private readonly T? _value;
-        private readonly IReadOnlyList<object?> _errors;
+        private readonly Outcome<T, object?> _inner;
 
         /// <summary>
         /// Gets a value indicating whether this outcome represents a successful operation.
         /// When true, <see cref="Value"/> can be accessed safely.
         /// When false, <see cref="Errors"/> can be accessed safely.
         /// </summary>
-        public bool IsSuccess { get; }
+        public bool IsSuccess => _inner.IsSuccess;
 
         /// <summary>
         /// Gets a value indicating whether this outcome represents a failed operation.
         /// This is the logical inverse of <see cref="IsSuccess"/>.
         /// </summary>
-        public bool IsError => !IsSuccess;
+        public bool IsError => _inner.IsError;
 
         /// <summary>
         /// Gets the successful value. Only accessible when <see cref="IsSuccess"/> is true.
         /// </summary>
         /// <exception cref="InvalidOperationException">Thrown when attempting to access the value of a failure outcome.</exception>
-        public T Value
-        {
-            get
-            {
-                // Prevent accidental access to the value when the outcome is a failure
-                if (!IsSuccess)
-                    throw new InvalidOperationException("Cannot access Value when Outcome is a failure.");
-                return _value!;
-            }
-        }
+        public T Value => _inner.Value;
 
         /// <summary>
         /// Gets the list of errors. Only accessible when <see cref="IsSuccess"/> is false.
         /// </summary>
         /// <exception cref="InvalidOperationException">Thrown when attempting to access errors of a success outcome.</exception>
-        public IReadOnlyList<object?> Errors
+        public IReadOnlyList<object?> Errors => _inner.Errors;
+
+        /// <summary>
+        /// Private constructor wrapping the inner typed outcome.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private Outcome(Outcome<T, object?> inner) => _inner = inner;
+
+        /// <summary>
+        /// Gets the successful value without validation checks.
+        /// Only safe to call after confirming <see cref="IsSuccess"/> is true.
+        /// </summary>
+        internal T ValueUnchecked
         {
-            get
-            {
-                // Prevent accidental access to errors when the outcome is a success
-                if (IsSuccess)
-                    throw new InvalidOperationException("Cannot access Errors when Outcome is a success.");
-                return _errors;
-            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => _inner.ValueUnchecked;
         }
 
         /// <summary>
-        /// Private constructor for creating a success outcome with a value.
+        /// Gets the error list without validation checks.
+        /// Only safe to call after confirming <see cref="IsSuccess"/> is false.
         /// </summary>
-        private Outcome(T value) => (_value, IsSuccess, _errors) = (value, true, Array.Empty<object?>());
-
-        /// <summary>
-        /// Private constructor for creating a failure outcome with errors.
-        /// </summary>
-        private Outcome(IReadOnlyList<object?> errors) => (_errors, _value, IsSuccess) = (errors, default, false);
+        internal IReadOnlyList<object?> ErrorsUnchecked
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => _inner.ErrorsUnchecked;
+        }
 
         /// <summary>
         /// Creates a successful outcome containing the specified value.
         /// </summary>
         /// <param name="value">The value to wrap in a success outcome.</param>
         /// <returns>An outcome representing success with the given value.</returns>
-        public static Outcome<T> From(T value) => new(value);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Outcome<T> From(T value) => new(Outcome<T, object?>.From(value));
 
         /// <summary>
         /// Creates a failure outcome containing the specified errors.
         /// </summary>
         /// <param name="errors">A list of errors that occurred during the operation.</param>
         /// <returns>An outcome representing failure with the given errors.</returns>
-        public static Outcome<T> FromErrors(IReadOnlyList<object?> errors) => new(errors);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Outcome<T> FromErrors(IReadOnlyList<object?> errors) => new(Outcome<T, object?>.FromErrors(errors));
 
         /// <summary>
-        /// Implicitly converts a value of type <typeparam name="T"/> to an <see cref="Outcome{T}"/> success.
+        /// Implicitly converts a value of type <typeparamref name="T"/> to an <see cref="Outcome{T}"/> success.
         /// Enables ergonomic return statements like <c>return 42;</c> in a method returning <see cref="Outcome{T}"/>.
         /// </summary>
-        public static implicit operator Outcome<T>(T value) => new(value);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static implicit operator Outcome<T>(T value) => new(Outcome<T, object?>.From(value));
 
         /// <summary>
         /// Gets all errors of a specific type from the outcome.
         /// Filters the error collection to return only errors matching the specified error code type.
         /// </summary>
-        /// <typeparam name="T">The outcome's success value type.</typeparam>
         /// <typeparam name="TCode">The error code type to filter by.</typeparam>
-        /// <param name="outcome">The outcome to extract errors from.</param>
         /// <returns>An enumerable of strongly-typed errors matching the specified code type.</returns>
         /// <example>
         /// <code>
-        /// var appErrors = outcome.GetErrors&lt;Unit, AppError&gt;();
+        /// var appErrors = outcome.GetErrors&lt;AppError&gt;();
         /// foreach (var error in appErrors)
         /// {
         ///     Console.WriteLine($"Error: {error.Code} - {error.Description}");
@@ -108,7 +111,7 @@
             if (IsSuccess)
                 return Array.Empty<Error<TCode>>();
 
-            return EnumerateTypedErrors<TCode>(_errors);
+            return EnumerateTypedErrors<TCode>(_inner.ErrorsUnchecked);
         }
 
         private static IEnumerable<Error<TCode>> EnumerateTypedErrors<TCode>(IReadOnlyList<object?> errors)
@@ -126,13 +129,11 @@
         /// Gets the first error of a specific type from the outcome, or null if none exists.
         /// Useful for handling a single error from a known type.
         /// </summary>
-        /// <typeparam name="T">The outcome's success value type.</typeparam>
         /// <typeparam name="TCode">The error code type to retrieve.</typeparam>
-        /// <param name="outcome">The outcome to extract an error from.</param>
         /// <returns>The first strongly-typed error, or null if no errors of that type exist.</returns>
         /// <example>
         /// <code>
-        /// var error = outcome.GetError&lt;int, AppError&gt;();
+        /// var error = outcome.GetError&lt;AppError&gt;();
         /// if (error != null)
         /// {
         ///     Console.WriteLine($"Error: {error.Code} - {error.Description}");
@@ -142,16 +143,13 @@
         public Error<TCode>? GetError<TCode>()
         {
             if (IsSuccess)
-            {
                 return null;
-            }
 
-            for (var i = 0; i < _errors.Count; i++)
+            var errors = _inner.ErrorsUnchecked;
+            for (var i = 0; i < errors.Count; i++)
             {
-                if (_errors[i] is Error<TCode> typedError)
-                {
+                if (errors[i] is Error<TCode> typedError)
                     return typedError;
-                }
             }
 
             return null;
@@ -160,15 +158,13 @@
         /// <summary>
         /// Checks if the outcome contains any errors of a specific type.
         /// </summary>
-        /// <typeparam name="T">The outcome's success value type.</typeparam>
         /// <typeparam name="TCode">The error code type to check for.</typeparam>
-        /// <param name="outcome">The outcome to check.</param>
         /// <returns>True if the outcome contains at least one error of the specified type; otherwise, false.</returns>
         /// <example>
         /// <code>
-        /// if (outcome.HasErrors&lt;Unit, AppError&gt;())
+        /// if (outcome.HasErrors&lt;AppError&gt;())
         /// {
-        ///     var errors = outcome.GetErrors&lt;Unit, AppError&gt;();
+        ///     var errors = outcome.GetErrors&lt;AppError&gt;();
         ///     // Handle errors
         /// }
         /// </code>
@@ -176,16 +172,13 @@
         public bool HasErrors<TCode>()
         {
             if (IsSuccess)
-            {
                 return false;
-            }
 
-            for (var i = 0; i < _errors.Count; i++)
+            var errors = _inner.ErrorsUnchecked;
+            for (var i = 0; i < errors.Count; i++)
             {
-                if (_errors[i] is Error<TCode>)
-                {
+                if (errors[i] is Error<TCode>)
                     return true;
-                }
             }
 
             return false;
@@ -195,14 +188,12 @@
         /// Gets errors of a specific type that match a predicate condition.
         /// Useful for filtering errors by code or other properties.
         /// </summary>
-        /// <typeparam name="T">The outcome's success value type.</typeparam>
         /// <typeparam name="TCode">The error code type to filter.</typeparam>
-        /// <param name="outcome">The outcome to extract errors from.</param>
         /// <param name="predicate">A function to filter errors by.</param>
         /// <returns>An enumerable of strongly-typed errors matching the predicate.</returns>
         /// <example>
         /// <code>
-        /// var validationErrors = outcome.GetErrors&lt;int, AppError&gt;(
+        /// var validationErrors = outcome.GetErrors&lt;AppError&gt;(
         ///     e => e.Severity == ErrorSeverity.Validation
         /// );
         /// </code>
@@ -213,7 +204,7 @@
             if (IsSuccess)
                 return Array.Empty<Error<TCode>>();
 
-            return EnumerateTypedErrors(_errors, predicate);
+            return EnumerateTypedErrors(_inner.ErrorsUnchecked, predicate);
 
             static IEnumerable<Error<TCode>> EnumerateTypedErrors(
                 IReadOnlyList<object?> errors,
@@ -228,14 +219,12 @@
                 }
             }
         }
+
         /// <summary>
         /// Returns a human-readable string representation of the outcome.
         /// Success outcomes display "Success: {value}"; failure outcomes display "Error: [error1, error2, ...]".
         /// </summary>
-        public override string ToString()
-        {
-            return IsSuccess ? $"Success: {Value}" : $"Error: [{string.Join(", ", Errors)}]";
-        }
+        public override string ToString() => _inner.ToString();
 
         /// <summary>
         /// Deconstructs the outcome into three components: success flag, value, and errors.
@@ -250,9 +239,7 @@
         /// </example>
         public void Deconstruct(out bool isSuccess, out T? value, out IReadOnlyList<object?>? errors)
         {
-            isSuccess = IsSuccess;
-            value = IsSuccess ? _value : default;
-            errors = IsSuccess ? null : _errors;
+            _inner.Deconstruct(out isSuccess, out value, out errors);
         }
 
         /// <summary>
@@ -267,8 +254,7 @@
         /// </example>
         public void Deconstruct(out T? value, out IReadOnlyList<object?>? errors)
         {
-            value = _value;
-            errors = _errors;
+            _inner.Deconstruct(out value, out errors);
         }
     }
 }

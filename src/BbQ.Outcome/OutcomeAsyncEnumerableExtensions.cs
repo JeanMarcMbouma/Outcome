@@ -42,8 +42,8 @@ namespace BbQ.Outcome
                 await foreach (var item in source.WithCancellation(cancellationToken).ConfigureAwait(false))
                 {
                     yield return item.IsSuccess
-                        ? Outcome<TResult>.From(selector(item.Value))
-                        : Outcome<TResult>.FromErrors(item.Errors!);
+                        ? Outcome<TResult>.From(selector(item.ValueUnchecked))
+                        : Outcome<TResult>.FromErrors(item.ErrorsUnchecked);
                 }
             }
 
@@ -74,8 +74,8 @@ namespace BbQ.Outcome
                 await foreach (var item in source.WithCancellation(cancellationToken).ConfigureAwait(false))
                 {
                     yield return item.IsSuccess
-                        ? binder(item.Value).Select(intermediate => projector(item.Value, intermediate))
-                        : Outcome<TResult>.FromErrors(item.Errors!);
+                        ? binder(item.ValueUnchecked).Select(intermediate => projector(item.ValueUnchecked, intermediate))
+                        : Outcome<TResult>.FromErrors(item.ErrorsUnchecked);
                 }
             }
 
@@ -109,7 +109,7 @@ namespace BbQ.Outcome
                         continue;
                     }
 
-                    yield return predicate(item.Value)
+                    yield return predicate(item.ValueUnchecked)
                         ? item
                         : Outcome<T>.Validation("FILTER_FAIL", "Predicate not satisfied");
                 }
@@ -138,8 +138,8 @@ namespace BbQ.Outcome
                 await foreach (var item in source.WithCancellation(cancellationToken).ConfigureAwait(false))
                 {
                     yield return item.IsSuccess
-                        ? binder(item.Value)
-                        : Outcome<TResult>.FromErrors(item.Errors!);
+                        ? binder(item.ValueUnchecked)
+                        : Outcome<TResult>.FromErrors(item.ErrorsUnchecked);
                 }
             }
 
@@ -169,8 +169,8 @@ namespace BbQ.Outcome
                 await foreach (var item in source.WithCancellation(cancellationToken).ConfigureAwait(false))
                 {
                     yield return item.IsSuccess
-                        ? Outcome<TResult>.From(mapper(item.Value))
-                        : Outcome<TResult>.FromErrors(item.Errors!);
+                        ? Outcome<TResult>.From(mapper(item.ValueUnchecked))
+                        : Outcome<TResult>.FromErrors(item.ErrorsUnchecked);
                 }
             }
 
@@ -195,7 +195,7 @@ namespace BbQ.Outcome
                 await foreach (var item in source.WithCancellation(cancellationToken).ConfigureAwait(false))
                 {
                     if (item.IsSuccess)
-                        yield return item.Value;
+                        yield return item.ValueUnchecked;
                 }
             }
 
@@ -219,7 +219,7 @@ namespace BbQ.Outcome
                 await foreach (var item in source.WithCancellation(cancellationToken).ConfigureAwait(false))
                 {
                     if (item.IsError)
-                        yield return item.Errors;
+                        yield return item.ErrorsUnchecked;
                 }
             }
         }

@@ -198,6 +198,22 @@ The `ErrorSeverity` enum provides the following levels:
 - **Documentation-driven**: Descriptions are extracted from XML doc comments (`<summary>` tags) or `[Description]` attributes.
 - **Flexibility**: Choose between explicit `[Description]` attributes or self-documenting XML comments.
 - **Severity control**: Customize error severity per enum member with `[ErrorSeverity(...)]`.
+
+## ⚡ Performance
+
+Both `Outcome<T>` (untyped errors) and `Outcome<T, TError>` (typed errors) are zero-allocation `readonly struct` types. Hot-path operations use internal unchecked accessors and `[AggressiveInlining]` to ensure the JIT can fully inline composition chains.
+
+`Outcome<T>` wraps `Outcome<T, object?>` internally. Despite this extra layer of indirection, Map, Bind, Match, and Pipeline operations perform at **near-identical speed** to the direct `Outcome<T, TError>` type across .NET 8, 9, and 10:
+
+| Operation | .NET 8 (ns) | .NET 9 (ns) | .NET 10 (ns) | Allocations |
+|---|---:|---:|---:|---|
+| Create (success) | ~1.7 | ~2.0 | ~1.6 | 0 B |
+| Map (success) | ~1.9 | ~1.7 | ~2.0 | 0 B |
+| Bind (success) | ~2.0–7.2 | ~2.2 | ~2.3 | 0 B |
+| Match (success) | <1 | <1 | <1 | 0 B |
+| Pipeline (Map+Bind chain) | ~16 | ~15 | ~13 | 32 B |
+
+Full benchmark results: [tests/BbQ.Outcome.Benchmarks/README.md](../../tests/BbQ.Outcome.Benchmarks/README.md)
 - **Consistent naming**: Property names follow the pattern `{EnumMember}Error`.
 - **Type-safe**: Full compile-time type checking with `Error<YourEnumType>`.
 
