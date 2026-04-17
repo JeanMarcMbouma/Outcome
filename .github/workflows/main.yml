@@ -10,6 +10,10 @@ on:
       - 'postgresql-v*'
       - 'sqlserver-v*'
 
+permissions:
+  id-token: write
+  contents: read
+
 # Each job runs only when the tag matches its pattern, then delegates
 # to the corresponding reusable workflow.
 
