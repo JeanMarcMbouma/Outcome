@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'sqlserver-v*'  # Triggers on tags like sqlserver-v0.1.0, sqlserver-v1.0.0
+  workflow_call:         # Allow main.yml to call this workflow
+
 permissions:
   id-token: write
   contents: read
@@ -37,8 +39,12 @@ jobs:
       env:
         TEST_SQLSERVER_CONNECTION_STRING: "Server=(localdb)\\mssqllocaldb;Database=BbQEventsTest;Integrated Security=true"
 
+    - name: Extract version
+      id: version
+      run: echo "version=${GITHUB_REF_NAME#sqlserver-v}" >> $GITHUB_OUTPUT
+
     - name: Pack
-      run: dotnet pack src/BbQ.Events.SqlServer/BbQ.Events.SqlServer.csproj --configuration Release --no-build --output ./artifacts
+      run: dotnet pack src/BbQ.Events.SqlServer/BbQ.Events.SqlServer.csproj --configuration Release --no-build --output ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
 
       
     - name: NuGet login (OIDC → temp API key)

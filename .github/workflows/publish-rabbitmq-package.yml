@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'rabbitmq-v*'  # Triggers on tags like rabbitmq-v0.1.0, rabbitmq-v1.0.0
+  workflow_call:        # Allow main.yml to call this workflow
+
 permissions:
   id-token: write
   contents: read
@@ -34,8 +36,12 @@ jobs:
     - name: Test
       run: dotnet test tests/BbQ.Events.RabbitMQ.Tests/BbQ.Events.RabbitMQ.Tests.csproj --configuration Release --verbosity normal
 
+    - name: Extract version
+      id: version
+      run: echo "version=${GITHUB_REF_NAME#rabbitmq-v}" >> $GITHUB_OUTPUT
+
     - name: Pack
-      run: dotnet pack src/BbQ.Events.RabbitMQ/BbQ.Events.RabbitMQ.csproj --configuration Release --no-build --output ./artifacts
+      run: dotnet pack src/BbQ.Events.RabbitMQ/BbQ.Events.RabbitMQ.csproj --configuration Release --no-build --output ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
       
     - name: NuGet login (OIDC → temp API key)
       uses: NuGet/login@v1

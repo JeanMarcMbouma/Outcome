@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'postgresql-v*'  # Triggers on tags like postgresql-v0.1.0, postgresql-v1.0.0
+  workflow_call:           # Allow main.yml to call this workflow
+
 permissions:
   id-token: write
   contents: read
@@ -35,8 +37,12 @@ jobs:
       run: dotnet test tests/BbQ.Events.PostgreSql.Tests/BbQ.Events.PostgreSql.Tests.csproj --configuration Release --verbosity normal
       # Tests use Testcontainers which requires Docker
 
+    - name: Extract version
+      id: version
+      run: echo "version=${GITHUB_REF_NAME#postgresql-v}" >> $GITHUB_OUTPUT
+
     - name: Pack
-      run: dotnet pack src/BbQ.Events.PostgreSql/BbQ.Events.PostgreSql.csproj --configuration Release --no-build --output ./artifacts
+      run: dotnet pack src/BbQ.Events.PostgreSql/BbQ.Events.PostgreSql.csproj --configuration Release --no-build --output ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
       
     - name: NuGet login (OIDC → temp API key)
       uses: NuGet/login@v1

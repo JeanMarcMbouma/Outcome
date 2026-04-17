@@ -120,6 +120,13 @@ namespace BbQ.Outcome
         public static implicit operator Outcome<T, TError>(T value) => new(value);
 
         /// <summary>
+        /// Implicitly converts a value of type <typeparamref name="TError"/> to a failure <see cref="Outcome{T, TError}"/>.
+        /// Enables ergonomic return statements like <c>return MyError.SomeError;</c>.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static implicit operator Outcome<T, TError>(TError error) => new([error]);
+
+        /// <summary>
         /// Returns a human-readable string representation of the outcome.
         /// </summary>
         public override string ToString()
