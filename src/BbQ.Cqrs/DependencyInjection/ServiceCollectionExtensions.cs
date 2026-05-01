@@ -58,6 +58,9 @@ public static class ServiceCollectionExtensions
             services.AddScoped<ICommandDispatcher, CommandDispatcher>();
             services.AddScoped<IQueryDispatcher, QueryDispatcher>();
 
+            services.AddScoped<IStreamer>(sv => sv.GetRequiredService<IMediator>());
+            services.AddScoped<ISender>(sv => sv.GetRequiredService<IMediator>());
+
             // Scan and register all request handlers from the provided assemblies
             services.Scan(s => s.FromAssemblies(assemblies)
                 .AddClasses(c => c.AssignableTo(typeof(IRequestHandler<>)), false)

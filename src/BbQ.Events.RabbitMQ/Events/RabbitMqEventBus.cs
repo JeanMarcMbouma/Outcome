@@ -402,8 +402,8 @@ internal sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
         Task? singleTask = null;
         List<Task>? tasks = null;
         var handlerCount = 0;
-
-        foreach (var handler in _serviceProvider.GetServices<IEventHandler<TEvent>>())
+        using var scope = _serviceProvider.CreateScope();
+        foreach (var handler in scope.ServiceProvider.GetServices<IEventHandler<TEvent>>())
         {
             handlerCount++;
 

@@ -1,0 +1,38 @@
+﻿// -------------------------------
+// Core contracts (Outcome-centric)
+// -------------------------------
+namespace BbQ.Cqrs
+{
+    public interface ISender
+    {
+        /// <summary>
+        /// Sends a request through the pipeline and returns a response.
+        /// </summary>
+        /// <typeparam name="TRequest">The request type, must implement IRequest&lt;TResponse&gt;</typeparam>
+        /// <typeparam name="TResponse">The response type returned by the handler</typeparam>
+        /// <param name="request">The request to send</param>
+        /// <param name="ct">Optional cancellation token for async operations</param>
+        /// <returns>A task containing the response from the handler</returns>
+        /// <remarks>
+        /// The request is passed through all registered IPipelineBehavior implementations
+        /// in registration order, with the handler invoked at the end of the chain.
+        /// </remarks>
+        Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken ct = default);
+
+        /// <summary>
+        /// Sends a fire-and-forget request through the pipeline.
+        /// </summary>
+        /// <remarks>
+        /// The request must implement IRequest (fire-and-forget variant).
+        /// The handler must implement IRequestHandler&lt;TRequest&gt; (single type parameter).
+        /// 
+        /// The request is passed through all registered IPipelineBehavior&lt;TRequest, Unit&gt; 
+        /// implementations in registration order, with the handler invoked at the end of the chain.
+        /// 
+        /// Unlike the generic Send method, this overload does not return a response value.
+        /// It is useful for operations like sending emails, publishing events, or executing 
+        /// commands where the return value is not important.
+        /// </remarks>
+        Task Send(IRequest request, CancellationToken ct = default);
+    }
+}
