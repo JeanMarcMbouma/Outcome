@@ -39,15 +39,16 @@ namespace BbQ.Cqrs;
 ///             -> Handler.Handle()
 /// </code>
 /// </remarks>
-internal sealed class QueryDispatcher(IServiceProvider sp) : IQueryDispatcher
+internal sealed class QueryDispatcher(IServiceProvider sp) : IQueryDispatcher, IDisposable
 {
-    private readonly IServiceProvider _sp = sp;
+    private readonly IServiceScope _scope = sp.CreateScope();
 
     private readonly ConcurrentDictionary<(Type Qry, Type Res),
         Func<object, CancellationToken, Task>> _dispatchCache = new();
 
     private readonly ConcurrentDictionary<(Type Qry, Type Item),
         object> _streamCache = new();
+    private bool _disposedValue;
 
     /// <summary>
     /// Dispatches a query through the CQRS pipeline and returns a response.
@@ -91,11 +92,11 @@ internal sealed class QueryDispatcher(IServiceProvider sp) : IQueryDispatcher
     {
         Task<TResponse> Terminal(TQuery qry, CancellationToken token)
         {
-            var handler = _sp.GetRequiredService<IRequestHandler<TQuery, TResponse>>();
+            var handler = _scope.ServiceProvider.GetRequiredService<IRequestHandler<TQuery, TResponse>>();
             return handler.Handle(qry, token);
         }
 
-        var behaviors = _sp
+        var behaviors = _scope.ServiceProvider
             .GetServices<IPipelineBehavior<TQuery, TResponse>>()
             .Reverse()
             .ToArray();
@@ -155,11 +156,11 @@ internal sealed class QueryDispatcher(IServiceProvider sp) : IQueryDispatcher
     {
         IAsyncEnumerable<TItem> Terminal(TQuery qry, CancellationToken token)
         {
-            var handler = _sp.GetRequiredService<IStreamHandler<TQuery, TItem>>();
+            var handler = _scope.ServiceProvider.GetRequiredService<IStreamHandler<TQuery, TItem>>();
             return handler.Handle(qry, token);
         }
 
-        var behaviors = _sp
+        var behaviors = _scope.ServiceProvider
             .GetServices<IStreamPipelineBehavior<TQuery, TItem>>()
             .Reverse()
             .ToArray();
@@ -172,5 +173,24 @@ internal sealed class QueryDispatcher(IServiceProvider sp) : IQueryDispatcher
         }
 
         return (qry, token) => pipeline((TQuery)qry, token);
+    }
+
+    private void Dispose(bool disposing)
+    {
+        if (!_disposedValue)
+        {
+            if (disposing)
+            {
+                _scope.Dispose();
+            }
+
+            _disposedValue = true;
+        }
+    }
+
+    public void Dispose()
+    {
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
     }
 }
