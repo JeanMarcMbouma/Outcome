@@ -79,7 +79,7 @@ internal sealed class CommandDispatcher(IServiceProvider sp) : ICommandDispatche
             return (Func<object, CancellationToken, Task>)factoryMethod.Invoke(this, null)!;
         });
 
-        return await (Task<TResponse>)dispatcher(command, ct);
+        return await ((Task<TResponse>)dispatcher(command, ct)).ConfigureAwait(false);
     }
 
     private Func<object, CancellationToken, Task> CreateDispatcherCore<TCommand, TResponse>()

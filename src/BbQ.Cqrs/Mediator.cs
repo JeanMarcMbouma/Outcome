@@ -153,7 +153,7 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator, IDisposable
     /// such as sending emails, publishing events, or executing background jobs.
     /// If no handler is registered, GetRequiredService() throws InvalidOperationException.
     /// </remarks>
-    public Task Send(IRequest request, CancellationToken ct = default)
+    public async Task Send(IRequest request, CancellationToken ct = default)
     {
         // Resolve strongly-typed handler - throws if not registered
         var key = (request.GetType(), typeof(Unit));
@@ -194,7 +194,7 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator, IDisposable
             return pipeline;
         });
 
-        return dispatcher(request!, ct);
+        await dispatcher(request!, ct).ConfigureAwait(false);
     }
 
     /// <summary>
