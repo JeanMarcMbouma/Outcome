@@ -39,13 +39,12 @@ namespace BbQ.Cqrs;
 ///             -> Handler.Handle()
 /// </code>
 /// </remarks>
-internal sealed class CommandDispatcher(IServiceProvider sp) : ICommandDispatcher, IDisposable
+internal sealed class CommandDispatcher(IServiceProvider sp) : ICommandDispatcher
 {
-    private readonly IServiceScope _scope = sp.CreateScope();
+    private readonly IServiceProvider _sp = sp;
 
     private readonly ConcurrentDictionary<(Type Cmd, Type Res),
         Func<object, CancellationToken, Task>> _dispatchCache = new();
-    private bool _disposedValue;
 
     /// <summary>
     /// Dispatches a command through the CQRS pipeline and returns a response.
@@ -69,9 +68,11 @@ internal sealed class CommandDispatcher(IServiceProvider sp) : ICommandDispatche
     {
         // Resolve strongly-typed handler - throws if not registered
         var key = (command.GetType(), typeof(TResponse));
+
         var dispatcher = _dispatchCache.GetOrAdd(key, k =>
         {
             var (cmdType, resType) = k;
+
             var factoryMethod = typeof(CommandDispatcher)
                 .GetMethod(nameof(CreateDispatcherCore), BindingFlags.Instance | BindingFlags.NonPublic)!
                 .MakeGenericMethod(cmdType, resType);
@@ -87,11 +88,11 @@ internal sealed class CommandDispatcher(IServiceProvider sp) : ICommandDispatche
     {
         Task<TResponse> Terminal(TCommand cmd, CancellationToken token)
         {
-            var handler = _scope.ServiceProvider.GetRequiredService<IRequestHandler<TCommand, TResponse>>();
+            var handler = _sp.GetRequiredService<IRequestHandler<TCommand, TResponse>>();
             return handler.Handle(cmd, token);
         }
 
-        var behaviors = _scope.ServiceProvider
+        var behaviors = _sp
             .GetServices<IPipelineBehavior<TCommand, TResponse>>()
             .Reverse()
             .ToArray();
@@ -127,23 +128,5 @@ internal sealed class CommandDispatcher(IServiceProvider sp) : ICommandDispatche
     public Task Dispatch(ICommand<Unit> command, CancellationToken ct = default)
     {
         return Dispatch<Unit>(command, ct);
-    }
-
-    private void Dispose(bool disposing)
-    {
-        if (!_disposedValue)
-        {
-            if (disposing)
-            {
-                _scope.Dispose();
-            }
-            _disposedValue = true;
-        }
-    }
-
-    public void Dispose()
-    {
-        Dispose(disposing: true);
-        GC.SuppressFinalize(this);
     }
 }

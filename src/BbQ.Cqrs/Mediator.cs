@@ -34,20 +34,17 @@ namespace BbQ.Cqrs;
 /// var result = await commandDispatcher.Dispatch(new CreateUserCommand());
 /// </code>
 /// </remarks>
-internal sealed class Mediator(IServiceProvider sp) : IMediator, IDisposable
+internal sealed class Mediator(IServiceProvider sp) : IMediator
 {
-    private readonly IServiceScope _scope = sp.CreateScope();
-    ICommandDispatcher? _commandDispatcher;
-    IQueryDispatcher? _queryDispatcher;
-    private  ICommandDispatcher CommandDispatcher => _commandDispatcher ??= _scope.ServiceProvider.GetRequiredService<ICommandDispatcher>();
-    private  IQueryDispatcher QueryDispatcher => _queryDispatcher ??= _scope.ServiceProvider.GetRequiredService<IQueryDispatcher>();
+    private readonly IServiceProvider _sp = sp;
+    private readonly ICommandDispatcher _commandDispatcher = sp.GetRequiredService<ICommandDispatcher>();
+    private readonly IQueryDispatcher _queryDispatcher = sp.GetRequiredService<IQueryDispatcher>();
 
     private readonly ConcurrentDictionary<(Type Req, Type Res),
         Func<object, CancellationToken, Task>> _fireAndForgetCache = new();
     
     private readonly ConcurrentDictionary<(Type Req, Type Res),
         Func<object, CancellationToken, Task>> _genericRequestCache = new();
-    private bool _disposedValue;
 
 
     /// <summary>
@@ -74,8 +71,8 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator, IDisposable
         // Route to appropriate dispatcher based on request type
         return request switch
         {
-            ICommand<TResponse> command => CommandDispatcher.Dispatch(command, ct),
-            IQuery<TResponse> query => QueryDispatcher.Dispatch(query, ct),
+            ICommand<TResponse> command => _commandDispatcher.Dispatch(command, ct),
+            IQuery<TResponse> query => _queryDispatcher.Dispatch(query, ct),
             // Fallback for requests that implement IRequest<TResponse> directly
             _ => HandleGenericRequest(request, ct)
         };
@@ -99,14 +96,14 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator, IDisposable
 
             Task<TResponse> terminal(object req, CancellationToken token)
             {
-                var handler = _scope.ServiceProvider.GetRequiredService(handlerType);
+                var handler = _sp.GetRequiredService(handlerType);
                 return (Task<TResponse>)handleMethod.Invoke(handler, [req, token])!;
             }
 
             // Resolve behaviors (outermost first, wrap inner)
             // First registered becomes outermost: FIFO before handler, LIFO after handler
             var behaviorType = typeof(IPipelineBehavior<,>).MakeGenericType(reqType, resType);
-            var behaviors = _scope.ServiceProvider.GetServices(behaviorType).Reverse().ToArray();
+            var behaviors = _sp.GetServices(behaviorType).Reverse().ToArray();
 
             Func<object, CancellationToken, Task<TResponse>> pipeline = terminal;
             foreach (var b in behaviors)
@@ -161,13 +158,14 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator, IDisposable
         var dispatcher = _fireAndForgetCache.GetOrAdd(key, k =>
         {
             var (reqType, resType) = k;
+
             // Resolve handler
             var handlerType = typeof(IRequestHandler<>).MakeGenericType(reqType);
             var handleMethod = handlerType.GetMethod("Handle")!;
 
             Task<Unit> terminal(object req, CancellationToken token)
             {
-                var handler = _scope.ServiceProvider.GetRequiredService(handlerType);
+                var handler = _sp.GetRequiredService(handlerType);
                 handleMethod.Invoke(handler, [req, token]);
                 return Task.FromResult(Unit.Value);
             }
@@ -175,7 +173,7 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator, IDisposable
             // Resolve behaviors (outermost first, wrap inner)
             // First registered becomes outermost: FIFO before handler, LIFO after handler
             var behaviorType = typeof(IPipelineBehavior<,>).MakeGenericType(reqType, resType);
-            var behaviors = _scope.ServiceProvider.GetServices(behaviorType).Reverse().ToArray();
+            var behaviors = _sp.GetServices(behaviorType).Reverse().ToArray();
 
             Func<object, CancellationToken, Task<Unit>> pipeline = terminal;
             foreach (var b in behaviors)
@@ -221,30 +219,12 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator, IDisposable
         // Route to appropriate dispatcher based on request type
         return request switch
         {
-            IStreamQuery<TItem> query => QueryDispatcher.Stream(query, ct),
+            IStreamQuery<TItem> query => _queryDispatcher.Stream(query, ct),
             // Could add IStreamCommand support in the future if needed
             _ => throw new InvalidOperationException(
                 $"Stream request type '{request.GetType().Name}' is not supported. " +
                 $"Currently only IStreamQuery<{typeof(TItem).Name}> is supported. " +
                 $"Ensure the request implements this interface.")
         };
-    }
-
-    private void Dispose(bool disposing)
-    {
-        if (!_disposedValue)
-        {
-            if (disposing)
-            {
-                _scope.Dispose();
-            }
-            _disposedValue = true;
-        }
-    }
-
-    public void Dispose()
-    {
-        Dispose(disposing: true);
-        GC.SuppressFinalize(this);
     }
 }
