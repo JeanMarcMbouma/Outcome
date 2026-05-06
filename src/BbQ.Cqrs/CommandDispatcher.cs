@@ -65,7 +65,7 @@ internal sealed class CommandDispatcher(IServiceProvider sp) : ICommandDispatche
     /// If no handler is registered, GetRequiredService() throws InvalidOperationException.
     /// If no behaviors are registered, the command goes directly to the handler.
     /// </remarks>
-    public Task<TResponse> Dispatch<TResponse>(ICommand<TResponse> command, CancellationToken ct = default)
+    public async Task<TResponse> Dispatch<TResponse>(ICommand<TResponse> command, CancellationToken ct = default)
     {
         // Resolve strongly-typed handler - throws if not registered
         var key = (command.GetType(), typeof(TResponse));
@@ -79,7 +79,7 @@ internal sealed class CommandDispatcher(IServiceProvider sp) : ICommandDispatche
             return (Func<object, CancellationToken, Task>)factoryMethod.Invoke(this, null)!;
         });
 
-        return (Task<TResponse>)dispatcher(command, ct);
+        return await (Task<TResponse>)dispatcher(command, ct);
     }
 
     private Func<object, CancellationToken, Task> CreateDispatcherCore<TCommand, TResponse>()
@@ -124,9 +124,9 @@ internal sealed class CommandDispatcher(IServiceProvider sp) : ICommandDispatche
     /// such as sending emails, publishing events, or executing background jobs.
     /// If no handler is registered, GetRequiredService() throws InvalidOperationException.
     /// </remarks>
-    public Task Dispatch(ICommand<Unit> command, CancellationToken ct = default)
+    public async Task Dispatch(ICommand<Unit> command, CancellationToken ct = default)
     {
-        return Dispatch<Unit>(command, ct);
+        await Dispatch<Unit>(command, ct).ConfigureAwait(false);
     }
 
     private void Dispose(bool disposing)

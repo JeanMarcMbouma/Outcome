@@ -68,7 +68,7 @@ internal sealed class QueryDispatcher(IServiceProvider sp) : IQueryDispatcher, I
     /// If no handler is registered, GetRequiredService() throws InvalidOperationException.
     /// If no behaviors are registered, the query goes directly to the handler.
     /// </remarks>
-    public Task<TResponse> Dispatch<TResponse>(IQuery<TResponse> query, CancellationToken ct = default)
+    public async Task<TResponse> Dispatch<TResponse>(IQuery<TResponse> query, CancellationToken ct = default)
     {
         // Resolve strongly-typed handler - throws if not registered
         var key = (query.GetType(), typeof(TResponse));
@@ -84,7 +84,7 @@ internal sealed class QueryDispatcher(IServiceProvider sp) : IQueryDispatcher, I
             return (Func<object, CancellationToken, Task>)factoryMethod.Invoke(this, null)!;
         });
 
-        return (Task<TResponse>)dispatcher(query, ct);
+        return await (Task<TResponse>)dispatcher(query, ct);
     }
 
     private Func<object, CancellationToken, Task> CreateDispatcherCore<TQuery, TResponse>()

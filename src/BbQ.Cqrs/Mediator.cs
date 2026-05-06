@@ -69,16 +69,16 @@ internal sealed class Mediator(IServiceProvider sp) : IMediator, IDisposable
     /// For requests that implement IRequest&lt;TResponse&gt; directly (not recommended),
     /// the mediator falls back to directly resolving and executing the handler.
     /// </remarks>
-    public Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken ct = default)
+    public async Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken ct = default)
     {
         // Route to appropriate dispatcher based on request type
-        return request switch
+        return await (request switch
         {
             ICommand<TResponse> command => CommandDispatcher.Dispatch(command, ct),
             IQuery<TResponse> query => QueryDispatcher.Dispatch(query, ct),
             // Fallback for requests that implement IRequest<TResponse> directly
             _ => HandleGenericRequest(request, ct)
-        };
+        }).ConfigureAwait(false);
     }
 
     /// <summary>
