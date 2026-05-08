@@ -44,3 +44,21 @@ namespace BbQ.Cqrs;
 /// - Return Outcome&lt;T&gt; for proper error handling
 /// </remarks>
 public interface ICommand<TResponse> : IRequest<TResponse> { }
+
+/// <summary>
+/// Represents a command in the CQRS pattern.
+/// </summary>
+/// <remarks>
+/// A command expresses an intention to change application state.
+/// It extends <see cref="IRequest"/> so it can be dispatched through MediatR.
+/// </remarks>
+/// <example>
+/// <code>
+/// public sealed record CreateUserCommand(string Name) : ICommand;
+///
+/// // Dispatching a command
+/// await _mediator.Send(new CreateUserCommand("Jean"));
+/// </code>
+/// </example>
+public interface ICommand : IRequest;
+

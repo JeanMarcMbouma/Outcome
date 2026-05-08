@@ -90,7 +90,7 @@ public class CommandDispatcherTests
 // Test command and handler implementations
 public record TestCommand(string Value) : ICommand<Outcome<string>>;
 
-public class TestCommandHandler : IRequestHandler<TestCommand, Outcome<string>>
+public class TestCommandHandler : ICommandHandler<TestCommand, Outcome<string>>
 {
     public Task<Outcome<string>> Handle(TestCommand request, CancellationToken ct)
     {

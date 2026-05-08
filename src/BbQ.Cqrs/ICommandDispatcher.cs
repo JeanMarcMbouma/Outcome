@@ -75,4 +75,16 @@ public interface ICommandDispatcher
     /// sending notifications or executing background operations.
     /// </remarks>
     Task Dispatch(ICommand<Unit> command, CancellationToken ct = default);
+
+    /// <summary>
+    /// Dispatches a fire-and-forget command through the pipeline.
+    /// </summary>
+    /// <param name="command">The command to dispatch</param>
+    /// <param name="ct">Optional cancellation token for async operations</param>
+    /// <returns>A task that completes when the command has been handled</returns>
+    /// <remarks>
+    /// Used for commands that don't return a meaningful value, such as
+    /// sending notifications or executing background operations.
+    /// </remarks>
+    Task Dispatch(ICommand command, CancellationToken ct = default);
 }

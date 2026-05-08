@@ -107,6 +107,31 @@ internal sealed class CommandDispatcher(IServiceProvider sp) : ICommandDispatche
         return (cmd, token) => pipeline((TCommand)cmd, token);
     }
 
+    private Func<object, CancellationToken, Task> CreateFireAndForgetDispatcherCore<TCommand>()
+        where TCommand : ICommand
+    {
+        async Task<Unit> Terminal(TCommand cmd, CancellationToken token)
+        {
+            var handler = _sp.GetRequiredService<IRequestHandler<TCommand>>();
+            await handler.Handle(cmd, token);
+            return Unit.Value;
+        }
+
+        var behaviors = _sp
+            .GetServices<IPipelineBehavior<TCommand, Unit>>()
+            .Reverse()
+            .ToArray();
+
+        Func<TCommand, CancellationToken, Task<Unit>> pipeline = Terminal;
+        foreach (var behavior in behaviors)
+        {
+            var next = pipeline;
+            pipeline = (cmd, token) => behavior.Handle(cmd, token, next);
+        }
+
+        return (cmd, token) => pipeline((TCommand)cmd, token);
+    }
+
     /// <summary>
     /// Dispatches a fire-and-forget command through the CQRS pipeline.
     /// </summary>
@@ -128,5 +153,40 @@ internal sealed class CommandDispatcher(IServiceProvider sp) : ICommandDispatche
     public Task Dispatch(ICommand<Unit> command, CancellationToken ct = default)
     {
         return Dispatch<Unit>(command, ct);
+    }
+
+    /// <summary>
+    /// Dispatches a fire-and-forget command through the CQRS pipeline.
+    /// </summary>
+    /// <param name="command">The command to dispatch</param>
+    /// <param name="ct">Cancellation token for async operations</param>
+    /// <returns>A task that completes when the handler finishes executing</returns>
+    /// <remarks>
+    /// Process:
+    /// 1. Resolves the handler implementing IRequestHandler&lt;TCommand, Unit&gt;
+    /// 2. Resolves all behaviors as IPipelineBehavior&lt;TCommand, Unit&gt;
+    /// 3. Composes behaviors in reverse order
+    /// 4. Invokes the composed pipeline with the command
+    /// 5. Returns the task without unwrapping any response value
+    /// 
+    /// This overload is useful for commands that don't need to return a value,
+    /// such as sending emails, publishing events, or executing background jobs.
+    /// If no handler is registered, GetRequiredService() throws InvalidOperationException.
+    /// </remarks>
+    public Task Dispatch(ICommand command, CancellationToken ct = default)
+    {
+        var key = (command.GetType(), typeof(Unit));
+
+        var dispatcher = _dispatchCache.GetOrAdd(key, k =>
+        {
+            var (cmdType, resType) = k;
+
+            var factoryMethod = typeof(CommandDispatcher)
+                .GetMethod(nameof(CreateFireAndForgetDispatcherCore), BindingFlags.Instance | BindingFlags.NonPublic)!
+                .MakeGenericMethod(cmdType);
+
+            return (Func<object, CancellationToken, Task>)factoryMethod.Invoke(this, null)!;
+        });
+        return dispatcher(command, ct);
     }
 }

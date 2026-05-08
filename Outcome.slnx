@@ -1,27 +1,28 @@
 <Solution>
   <Folder Name="/CQRS/">
-    <Project Path="src/BbQ.Cqrs/BbQ.Cqrs.csproj" />
-    <Project Path="src/BbQ.Cqrs.SourceGenerators/BbQ.Cqrs.SourceGenerators.csproj" />
     <Project Path="src/BbQ.Cqrs.Samples/BbQ.Cqrs.Samples.csproj" />
-    <Project Path="tests/BbQ.Cqrs.Tests/BbQ.Cqrs.Tests.csproj" />
+    <Project Path="src/BbQ.Cqrs.SourceGenerators/BbQ.Cqrs.SourceGenerators.csproj" />
+    <Project Path="src/BbQ.Cqrs/BbQ.Cqrs.csproj" />
     <Project Path="tests/BbQ.Cqrs.Benchmarks/BbQ.Cqrs.Benchmarks.csproj" />
+    <Project Path="tests/BbQ.Cqrs.SourceGenerators.Tests/BbQ.Cqrs.SourceGenerators.Tests.csproj" />
+    <Project Path="tests/BbQ.Cqrs.Tests/BbQ.Cqrs.Tests.csproj" />
   </Folder>
   <Folder Name="/Events/">
-    <Project Path="src/BbQ.Events/BbQ.Events.csproj" />
-    <Project Path="src/BbQ.Events.SourceGenerators/BbQ.Events.SourceGenerators.csproj" />
-    <Project Path="src/BbQ.Events.SqlServer/BbQ.Events.SqlServer.csproj" />
     <Project Path="src/BbQ.Events.PostgreSql/BbQ.Events.PostgreSql.csproj" />
     <Project Path="src/BbQ.Events.RabbitMQ/BbQ.Events.RabbitMQ.csproj" />
-    <Project Path="tests/BbQ.Events.SqlServer.Tests/BbQ.Events.SqlServer.Tests.csproj" />
+    <Project Path="src/BbQ.Events.SourceGenerators/BbQ.Events.SourceGenerators.csproj" />
+    <Project Path="src/BbQ.Events.SqlServer/BbQ.Events.SqlServer.csproj" />
+    <Project Path="src/BbQ.Events/BbQ.Events.csproj" />
+    <Project Path="tests/BbQ.Events.Benchmarks/BbQ.Events.Benchmarks.csproj" />
     <Project Path="tests/BbQ.Events.PostgreSql.Tests/BbQ.Events.PostgreSql.Tests.csproj" />
     <Project Path="tests/BbQ.Events.RabbitMQ.Tests/BbQ.Events.RabbitMQ.Tests.csproj" />
-    <Project Path="tests/BbQ.Events.Benchmarks/BbQ.Events.Benchmarks.csproj" />
+    <Project Path="tests/BbQ.Events.SqlServer.Tests/BbQ.Events.SqlServer.Tests.csproj" />
   </Folder>
   <Folder Name="/Samples/">
     <Project Path="samples/BbQ.Events.Samples/BbQ.Events.Samples.csproj" Id="f2343415-bdae-4ab0-be93-2159e9840f4b" />
   </Folder>
   <Project Path="src/BbQ.Outcome.SourceGenerators/BbQ.Outcome.SourceGenerators.csproj" />
-  <Project Path="tests/BbQ.Outcome.Tests/BbQ.Outcome.Tests.csproj" />
-  <Project Path="tests/BbQ.Outcome.Benchmarks/BbQ.Outcome.Benchmarks.csproj" />
   <Project Path="src/BbQ.Outcome/BbQ.Outcome.csproj" />
+  <Project Path="tests/BbQ.Outcome.Benchmarks/BbQ.Outcome.Benchmarks.csproj" />
+  <Project Path="tests/BbQ.Outcome.Tests/BbQ.Outcome.Tests.csproj" />
 </Solution>
