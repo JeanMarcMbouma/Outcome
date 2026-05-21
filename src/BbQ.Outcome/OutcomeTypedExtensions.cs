@@ -182,5 +182,85 @@ namespace BbQ.Outcome
                 return Outcome<T, TError>.FromErrors(errors.ToList());
             }
         }
+        extension<T, TError>(Task<Outcome<T, TError>> task)
+        {
+            /// <summary>
+            /// Asynchronously matches over the outcome produced by the task.
+            /// Awaits the task and then applies the appropriate callback based on success or error.
+            /// </summary>
+            /// <typeparam name="TResult">The result type returned by the callbacks.</typeparam>
+            /// <param name="onSuccess">Callback invoked with the successful value. Must not be null.</param>
+            /// <param name="onError">Callback invoked with the error list when outcome is a failure. Must not be null.</param>
+            /// <returns>A task that resolves to the result from either the success or error branch.</returns>
+            public async Task<TResult> MatchAsync<TResult>(
+                Func<T, TResult> onSuccess,
+                Func<IReadOnlyList<TError>, TResult> onError)
+            {
+                var outcome = await task.ConfigureAwait(false);
+                return outcome.Match(onSuccess, onError);
+            }
+
+            /// <summary>
+            /// Asynchronously executes one of two actions depending on whether the awaited outcome is success or error.
+            /// </summary>
+            /// <param name="onSuccess">Callback invoked with the successful value. Must not be null.</param>
+            /// <param name="onError">Callback invoked with the error list when outcome is a failure. Must not be null.</param>
+            /// <returns>A task that resolves to the result from either the success or error branch.</returns>
+            public async Task SwitchAsync(
+                Action<T> onSuccess,
+                Action<IReadOnlyList<TError>> onError)
+            {
+                var outcome = await task.ConfigureAwait(false);
+                outcome.Switch(onSuccess, onError);
+            }
+
+            /// <summary>
+            /// Asynchronously binds the underlying Outcome<T> to the specified asynchronous binder and returns the
+            /// resulting Outcome<TResult>.
+            /// </summary>
+            /// <remarks>If the awaited outcome is a failure, the binder is not invoked and the
+            /// failure is returned. The implementation uses ConfigureAwait(false) to avoid capturing the
+            /// synchronization context.</remarks>
+            /// <typeparam name="TResult">The type of the value contained in the resulting Outcome.</typeparam>
+            /// <param name="binder">A function that receives a value of type T and returns a Task producing an Outcome<TResult>.</param>
+            /// <returns>A Task that yields an Outcome<TResult, TError> produced by applying the binder to the successful result, or the
+            /// original failure if the outcome is unsuccessful.</returns>
+            public async Task<Outcome<TResult, TError>> BindAsync<TResult>(Func<T, Task<Outcome<TResult, TError>>> binder)
+            {
+                var outcome = await task.ConfigureAwait(false);
+                return await outcome.BindAsync(binder).ConfigureAwait(false);
+            }
+
+            /// <summary>
+            /// Asynchronously maps the successful result of the underlying Outcome<T> to an Outcome<TResult> using the
+            /// provided asynchronous mapping function.
+            /// </summary>
+            /// <remarks>Awaits the underlying Task<Outcome<T>> before applying the mapper.</remarks>
+            /// <typeparam name="TResult">The type of the mapped result.</typeparam>
+            /// <param name="mapper">An asynchronous function that maps a successful value of type T to a value of type TResult.</param>
+            /// <returns>A task that yields an Outcome<TResult, TError> containing the mapped value on success, or the original failure.</returns>
+            public async Task<Outcome<TResult, TError>> MapAsync<TResult>(Func<T, Task<TResult>> mapper)
+            {
+                var outcome = await task.ConfigureAwait(false);
+                return await outcome.MapAsync(mapper).ConfigureAwait(false);
+            }
+
+            /// <summary>
+            /// Asynchronously combines the current task with the specified Outcome<T> tasks and returns a single
+            /// Outcome containing their results.
+            /// </summary>
+            /// <remarks>The current instance's task is included implicitly as the first element of
+            /// the combined operation.</remarks>
+            /// <param name="tasks">Additional Outcome<T> tasks to combine with the current task.</param>
+            /// <returns>An Outcome<IEnumerable<T, TError>> containing the results of all tasks if all succeed; otherwise an Outcome
+            /// representing the aggregated failure(s).</returns>
+            public async Task<Outcome<IEnumerable<T>, TError>> CombineAsync(params Task<Outcome<T, TError>>[] tasks)
+            {
+                var allTasks = new Task<Outcome<T, TError>>[tasks.Length + 1];
+                allTasks[0] = task;
+                Array.Copy(tasks, 0, allTasks, 1, tasks.Length);
+                return await Outcome<T, TError>.CombineAsync(allTasks).ConfigureAwait(false);
+            }
+        }
     }
 }

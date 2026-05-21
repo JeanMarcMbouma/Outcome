@@ -31,6 +31,42 @@ namespace BbQ.Outcome.Tests
         }
 
         [Test]
+        public async Task MapAsync_SuccessOutcome_ShouldTransformTaskValueAsync()
+        {
+            // Arrange
+            var outcome = Task.FromResult(Outcome<int>.From(5));
+
+            // Act
+            var result = await outcome.MapAsync(async x =>
+            {
+                await Task.Delay(10);
+                return x * 2;
+            });
+
+            // Assert
+            Assert.That(result.IsSuccess, Is.True);
+            Assert.That(result.Value, Is.EqualTo(10));
+        }
+
+        [Test]
+        public async Task MapAsync_SuccessTypedOutcome_ShouldTransformTaskValueAsync()
+        {
+            // Arrange
+            var outcome = Task.FromResult(Outcome<int, string>.From(5));
+
+            // Act
+            var result = await outcome.MapAsync(async x =>
+            {
+                await Task.Delay(10);
+                return x * 2;
+            });
+
+            // Assert
+            Assert.That(result.IsSuccess, Is.True);
+            Assert.That(result.Value, Is.EqualTo(10));
+        }
+
+        [Test]
         public async Task MapAsync_ErrorOutcome_ShouldPropagateErrorWithoutInvokingMapper()
         {
             // Arrange
@@ -62,6 +98,42 @@ namespace BbQ.Outcome.Tests
             {
                 await Task.Delay(10);
                 return Outcome<int>.From(x * 2);
+            });
+
+            // Assert
+            Assert.That(result.IsSuccess, Is.True);
+            Assert.That(result.Value, Is.EqualTo(10));
+        }
+
+        [Test]
+        public async Task BindAsync_SuccessOutcome_ShouldChainTaskOutcomesAsync()
+        {
+            // Arrange
+            var outcome = Task.FromResult(Outcome<int>.From(5));
+
+            // Act
+            var result = await outcome.BindAsync(async x =>
+            {
+                await Task.Delay(10);
+                return Outcome<int>.From(x * 2);
+            });
+
+            // Assert
+            Assert.That(result.IsSuccess, Is.True);
+            Assert.That(result.Value, Is.EqualTo(10));
+        }
+
+        [Test]
+        public async Task BindAsync_SuccessTypedOutcome_ShouldChainTaskOutcomesAsync()
+        {
+            // Arrange
+            var outcome = Task.FromResult(Outcome<int, string>.From(5));
+
+            // Act
+            var result = await outcome.BindAsync(async x =>
+            {
+                await Task.Delay(10);
+                return Outcome<int, string>.From(x * 2);
             });
 
             // Assert
@@ -104,6 +176,38 @@ namespace BbQ.Outcome.Tests
         }
 
         [Test]
+        public async Task CombineAsync_AllSuccesses_ShouldReturnAggregatedTaskValues()
+        {
+            // Arrange
+            var task1 = Task.FromResult(Outcome<int>.From(1));
+            var task2 = Task.FromResult(Outcome<int>.From(2));
+            var task3 = Task.FromResult(Outcome<int>.From(3));
+
+            // Act
+            var result = await task1.CombineAsync([task2, task3]);
+
+            // Assert
+            Assert.That(result.IsSuccess, Is.True);
+            Assert.That(result.Value.ToList(), Is.EqualTo(new List<int> { 1, 2, 3 }));
+        }
+
+        [Test]
+        public async Task CombineAsync_AllTypeSuccesses_ShouldReturnAggregatedTaskValues()
+        {
+            // Arrange
+            var task1 = Task.FromResult(Outcome<int, string>.From(1));
+            var task2 = Task.FromResult(Outcome<int, string>.From(2));
+            var task3 = Task.FromResult(Outcome<int, string>.From(3));
+
+            // Act
+            var result = await task1.CombineAsync([task2, task3]);
+
+            // Assert
+            Assert.That(result.IsSuccess, Is.True);
+            Assert.That(result.Value.ToList(), Is.EqualTo(new List<int> { 1, 2, 3 }));
+        }
+
+        [Test]
         public async Task CombineAsync_WithErrors_ShouldAggregateAllErrors()
         {
             // Arrange
@@ -112,7 +216,7 @@ namespace BbQ.Outcome.Tests
             var task3 = Task.FromResult(Outcome<int>.FromErrors(["Error2"]));
 
             // Act
-            var result = await Outcome<int>.CombineAsync([task1, task2, task3]);
+            var result = await task1.CombineAsync([task2, task3]);
 
             // Assert
             Assert.That(result.IsError, Is.True);
