@@ -34,4 +34,5 @@
   <Project Path="src/BbQ.Outcome/BbQ.Outcome.csproj" />
   <Project Path="tests/BbQ.Outcome.Benchmarks/BbQ.Outcome.Benchmarks.csproj" />
   <Project Path="tests/BbQ.Outcome.Tests/BbQ.Outcome.Tests.csproj" />
+  <Project Path="tests/BbQ.Outcome.SourceGenerators.Tests/BbQ.Outcome.SourceGenerators.Tests.csproj" />
 </Solution>
