@@ -109,7 +109,6 @@ public sealed class OutcomeSourceGenerator : IIncrementalGenerator
         if (!symbol.ContainingNamespace.IsGlobalNamespace)
             sb.AppendLine("}");
 
-        // Reversible UTF-8 identity avoids namespace/underscore replacement collisions.
         var hint = BitConverter.ToString(Encoding.UTF8.GetBytes(typeName)).Replace("-", "") + ".Errors.g.cs";
         context.AddSource(hint, sb.ToString());
     }
@@ -125,18 +124,41 @@ public sealed class OutcomeSourceGenerator : IIncrementalGenerator
         var attribute = Attribute(field, "System.ComponentModel.DescriptionAttribute");
         if (attribute != null)
             return StringArgument(attribute) ?? field.Name;
-        var xml = field.GetDocumentationCommentXml();
-        if (!string.IsNullOrWhiteSpace(xml))
+        var summary = ReadSummary(field.GetDocumentationCommentXml());
+        if (summary != null)
+            return summary;
+
+        // Compilations that do not emit documentation may use DocumentationMode.None.
+        // The original comment text is still available, even without structured XML trivia.
+        foreach (var reference in field.DeclaringSyntaxReferences)
         {
-            try
+            var leading = reference.GetSyntax().GetLeadingTrivia().ToFullString();
+            var lines = leading.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None);
+            var xml = new StringBuilder("<member>");
+            foreach (var line in lines)
             {
-                var summary = XElement.Parse(xml).Element("summary")?.Value;
-                if (!string.IsNullOrWhiteSpace(summary))
-                    return Regex.Replace(summary!, @"\s+", " ").Trim();
+                var trimmed = line.TrimStart();
+                if (trimmed.StartsWith("///", StringComparison.Ordinal))
+                    xml.AppendLine(trimmed.Substring(3));
             }
-            catch (XmlException) { /* Invalid documentation falls back to the member name. */ }
+            xml.Append("</member>");
+            summary = ReadSummary(xml.ToString());
+            if (summary != null)
+                return summary;
         }
         return field.Name;
+    }
+
+    private static string? ReadSummary(string? xml)
+    {
+        if (string.IsNullOrWhiteSpace(xml))
+            return null;
+        try
+        {
+            var summary = XElement.Parse(xml!).Descendants("summary").FirstOrDefault()?.Value;
+            return string.IsNullOrWhiteSpace(summary) ? null : Regex.Replace(summary!, @"\s+", " ").Trim();
+        }
+        catch (XmlException) { return null; }
     }
 
     private static string Literal(string value)
