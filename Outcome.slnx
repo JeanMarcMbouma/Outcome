@@ -21,6 +21,12 @@
   <Folder Name="/Samples/">
     <Project Path="samples/BbQ.Events.Samples/BbQ.Events.Samples.csproj" Id="f2343415-bdae-4ab0-be93-2159e9840f4b" />
   </Folder>
+  <Folder Name="/Outcome Integrations/">
+    <Project Path="src/BbQ.Cqrs.Outcome/BbQ.Cqrs.Outcome.csproj" />
+    <Project Path="src/BbQ.Cqrs.Outcome.FluentValidation/BbQ.Cqrs.Outcome.FluentValidation.csproj" />
+    <Project Path="src/BbQ.Outcome.AspNetCore/BbQ.Outcome.AspNetCore.csproj" />
+    <Project Path="tests/BbQ.Outcome.Integrations.Tests/BbQ.Outcome.Integrations.Tests.csproj" />
+  </Folder>
   <Project Path="src/BbQ.Outcome.SourceGenerators/BbQ.Outcome.SourceGenerators.csproj" />
   <Project Path="src/BbQ.Outcome/BbQ.Outcome.csproj" />
   <Project Path="tests/BbQ.Outcome.Benchmarks/BbQ.Outcome.Benchmarks.csproj" />
