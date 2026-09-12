@@ -1,0 +1,80 @@
+name: Outcome extension validation
+
+on:
+  pull_request:
+    paths:
+      - 'src/BbQ.Outcome*/**'
+      - 'src/BbQ.Cqrs.Outcome*/**'
+      - 'src/BbQ.Cqrs.SourceGenerators/**'
+      - 'tests/BbQ.Outcome*/**'
+      - 'samples/BbQ.Outcome.AotSmoke/**'
+      - 'scripts/verify-outcome-*.py'
+      - '.github/workflows/outcome-extension-validation.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: outcome-extensions-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  aot-and-pack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - name: Publish Native AOT smoke executable
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          dotnet publish samples/BbQ.Outcome.AotSmoke/BbQ.Outcome.AotSmoke.csproj -c Release -r linux-x64 -o artifacts/aot
+      - name: Execute Native AOT smoke test
+        shell: bash
+        run: ./artifacts/aot/BbQ.Outcome.AotSmoke | tee artifacts/aot-smoke.log
+      - name: Build optional NuGet packages without publishing
+        shell: bash
+        run: |
+          for project in BbQ.Cqrs.Outcome BbQ.Cqrs.Outcome.FluentValidation BbQ.Outcome.AspNetCore BbQ.Outcome.SystemTextJson BbQ.Outcome.Diagnostics; do
+            dotnet pack "src/$project/$project.csproj" -c Release -o artifacts/packages
+          done
+          python3 scripts/verify-outcome-packages.py
+      - name: Preserve package and AOT evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: outcome-packages-and-aot
+          path: |
+            artifacts/packages/*.nupkg
+            artifacts/aot-smoke.log
+          if-no-files-found: warn
+          retention-days: 14
+
+  benchmarks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - name: Measure core success and failure extension paths
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          dotnet run -c Release -f net10.0 --project tests/BbQ.Outcome.Benchmarks/BbQ.Outcome.Benchmarks.csproj -- --filter '*ExtensionPointsBenchmarks*' --job Short > artifacts/benchmark.log 2>&1
+          python3 scripts/verify-outcome-benchmarks.py
+          cat BenchmarkDotNet.Artifacts/results/*ExtensionPointsBenchmarks-report-github.md
+      - name: Preserve benchmark measurements
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: outcome-extension-benchmarks
+          path: |
+            BenchmarkDotNet.Artifacts/results/*ExtensionPointsBenchmarks*
+            artifacts/benchmark.log
+          if-no-files-found: warn
+          retention-days: 14

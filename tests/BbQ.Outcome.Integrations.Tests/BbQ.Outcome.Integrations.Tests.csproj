@@ -15,6 +15,8 @@
     <ProjectReference Include="../../src/BbQ.Cqrs.Outcome/BbQ.Cqrs.Outcome.csproj" />
     <ProjectReference Include="../../src/BbQ.Cqrs.Outcome.FluentValidation/BbQ.Cqrs.Outcome.FluentValidation.csproj" />
     <ProjectReference Include="../../src/BbQ.Outcome.AspNetCore/BbQ.Outcome.AspNetCore.csproj" />
+    <ProjectReference Include="../../src/BbQ.Outcome.SystemTextJson/BbQ.Outcome.SystemTextJson.csproj" />
+    <ProjectReference Include="../../src/BbQ.Outcome.Diagnostics/BbQ.Outcome.Diagnostics.csproj" />
     <ProjectReference Include="../../src/BbQ.Cqrs.SourceGenerators/BbQ.Cqrs.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>
