@@ -1,6 +1,7 @@
-﻿using BbQ.Cqrs;
+using BbQ.Cqrs;
 using BbQ.Cqrs.DependencyInjection;
 using BbQ.Cqrs.Testing;
+using BbQ.Cqrs.Validation;
 using BbQ.Outcome;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -108,11 +109,14 @@ static class Program
     {
         Console.WriteLine("--- Scenario 2: Command with Validation ---");
 
-        // Setup
+        // Setup: the two-parameter behavior delegates response construction to a factory.
         var repository = new FakeUserRepository();
         var handler = new RenameUserHandler(repository);
         var validator = new RenameUserValidator();
-        var validationBehavior = new ValidationBehavior<RenameUser, Outcome<Unit>, Unit>(validator);
+        var failureFactory = new OutcomeValidationFailureFactory<Unit>(
+            new DelegateValidationIssueMapper<object?>(issue =>
+                new Error<AppError>(AppError.InvalidName, issue.Message, ErrorSeverity.Validation)));
+        var validationBehavior = new ValidationBehavior<RenameUser, Outcome<Unit>>([validator], failureFactory);
         var mediator = new TestMediator<RenameUser, Outcome<Unit>>(handler, [validationBehavior]);
 
         // Test 1: Invalid input (empty name)

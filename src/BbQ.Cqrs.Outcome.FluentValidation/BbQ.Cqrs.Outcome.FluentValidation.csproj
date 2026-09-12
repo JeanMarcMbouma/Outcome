@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <PackageId>BbQ.Cqrs.Outcome.FluentValidation</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Jean</Authors>
+    <Description>Async FluentValidation adapter for BbQ.Cqrs Outcome validation.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/JeanMarcMbouma/Outcome</RepositoryUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../BbQ.Cqrs.Outcome/BbQ.Cqrs.Outcome.csproj" />
+    <PackageReference Include="FluentValidation" Version="12.1.1" />
+    <None Include="README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+</Project>
