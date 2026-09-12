@@ -1,6 +1,9 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System.Text;
 
 namespace BbQ.Cqrs.SourceGenerators;
 
@@ -44,12 +47,12 @@ public sealed class OutcomeValidationRegistrationGenerator : IIncrementalGenerat
         {
             foreach (var iface in pair.Value.AllInterfaces)
             {
-                if (iface.OriginalDefinition.ToDisplayString() == "BbQ.Cqrs.Validation.IRequestValidator<TRequest>")
+                if (pair.Value.TypeKind == TypeKind.Class && IsContract(iface, "BbQ.Cqrs.Validation", "IRequestValidator`1"))
                 {
                     var service = iface.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
                     RegisterEnumerable(sb, service, pair.Key);
                 }
-                if (iface.OriginalDefinition.ToDisplayString() != "BbQ.Cqrs.IRequest<TResponse>" ||
+                if (!IsContract(iface, "BbQ.Cqrs", "IRequest`1") ||
                     iface.TypeArguments.Length != 1 || iface.TypeArguments[0] is not INamedTypeSymbol response ||
                     response.Name != "Outcome" || response.ContainingNamespace.ToDisplayString() != "BbQ.Outcome" ||
                     (response.Arity != 1 && response.Arity != 2))
@@ -71,6 +74,10 @@ public sealed class OutcomeValidationRegistrationGenerator : IIncrementalGenerat
         sb.AppendLine("return services;\n}\n}\n}");
         context.AddSource(assembly + ".OutcomeValidationRegistration.g.cs", sb.ToString());
     }
+
+    private static bool IsContract(INamedTypeSymbol symbol, string containingNamespace, string metadataName)
+        => symbol.OriginalDefinition.MetadataName == metadataName &&
+            symbol.ContainingNamespace.ToDisplayString() == containingNamespace;
 
     private static bool Accessible(INamedTypeSymbol symbol)
     {
