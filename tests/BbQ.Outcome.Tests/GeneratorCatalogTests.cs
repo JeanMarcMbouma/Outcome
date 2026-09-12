@@ -1,6 +1,5 @@
 using BbQ.Outcome;
 using NUnit.Framework;
-using System.ComponentModel;
 
 namespace BbQ.Outcome.Tests.CatalogOne
 {
@@ -9,7 +8,7 @@ namespace BbQ.Outcome.Tests.CatalogOne
     {
         [ErrorCode("USER_MISSING")]
         [ErrorResourceKey("Errors.UserMissing")]
-        [Description("A \"quoted\" user error")]
+        [System.ComponentModel.Description("A \"quoted\" user error")]
         [ErrorSeverity(ErrorSeverity.Warning)]
         Missing,
         /// <summary>A documented error.</summary>
