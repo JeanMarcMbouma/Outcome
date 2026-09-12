@@ -3,35 +3,27 @@ using System.Runtime.CompilerServices;
 namespace BbQ.Outcome
 {
     /// <summary>
-    /// A discriminated union (result type) that represents either a successful value of type <typeparamref name="T"/>
-    /// or a list of strongly-typed errors of type <typeparamref name="TError"/>.
-    /// Unlike <see cref="Outcome{T}"/> which stores errors as <c>object?</c>, this variant avoids boxing
-    /// by preserving the error type throughout the pipeline.
+    /// Either a successful value or a nonempty, structurally immutable list of typed errors.
     /// </summary>
-    /// <typeparam name="T">The type of the successful value.</typeparam>
-    /// <typeparam name="TError">The type of each error in the error list.</typeparam>
+    /// <remarks>
+    /// Construct instances with From, FromError, or FromErrors. A default instance is
+    /// uninitialized: its status is unsuccessful, but consuming its errors or deconstructing
+    /// it throws InvalidOperationException. Error objects themselves are not deep-cloned.
+    /// </remarks>
+    /// <typeparam name="T">The successful value type.</typeparam>
+    /// <typeparam name="TError">The error type; no interface constraint is required.</typeparam>
     public readonly struct Outcome<T, TError> : IOutcome<T, TError>
     {
         private readonly T? _value;
-        private readonly IReadOnlyList<TError> _errors;
+        private readonly IReadOnlyList<TError>? _errors;
 
-        /// <summary>
-        /// Gets a value indicating whether this outcome represents a successful operation.
-        /// When true, <see cref="Value"/> can be accessed safely.
-        /// When false, <see cref="Errors"/> can be accessed safely.
-        /// </summary>
+        /// <summary>True only for an explicitly constructed success.</summary>
         public bool IsSuccess { get; }
 
-        /// <summary>
-        /// Gets a value indicating whether this outcome represents a failed operation.
-        /// This is the logical inverse of <see cref="IsSuccess"/>.
-        /// </summary>
+        /// <summary>The inverse of IsSuccess; does not validate initialization.</summary>
         public bool IsError => !IsSuccess;
 
-        /// <summary>
-        /// Gets the successful value. Only accessible when <see cref="IsSuccess"/> is true.
-        /// </summary>
-        /// <exception cref="InvalidOperationException">Thrown when attempting to access the value of a failure outcome.</exception>
+        /// <summary>Gets the value; throws on failure or an uninitialized outcome.</summary>
         public T Value
         {
             get
@@ -42,115 +34,78 @@ namespace BbQ.Outcome
             }
         }
 
-        /// <summary>
-        /// Gets the strongly-typed list of errors. Only accessible when <see cref="IsSuccess"/> is false.
-        /// </summary>
-        /// <exception cref="InvalidOperationException">Thrown when attempting to access errors of a success outcome.</exception>
+        /// <summary>Gets the errors; throws on success or an uninitialized outcome.</summary>
         public IReadOnlyList<TError> Errors
         {
             get
             {
                 if (IsSuccess)
                     throw new InvalidOperationException("Cannot access Errors when Outcome is a success.");
-                return _errors;
+                return ErrorsUnchecked;
             }
         }
 
-        /// <summary>
-        /// Gets the successful value without validation checks.
-        /// Only safe to call after confirming <see cref="IsSuccess"/> is true.
-        /// </summary>
         internal T ValueUnchecked
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => _value!;
         }
 
-        /// <summary>
-        /// Gets the error list without validation checks.
-        /// Only safe to call after confirming <see cref="IsSuccess"/> is false.
-        /// </summary>
+        // The branch has already been checked, but default structs still need validation.
         internal IReadOnlyList<TError> ErrorsUnchecked
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => _errors;
+            get => _errors ?? throw new InvalidOperationException(
+                "Outcome is uninitialized. Use From, FromError, or FromErrors instead of default.");
         }
 
-        /// <summary>
-        /// Private constructor for creating a success outcome with a value.
-        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private Outcome(T value) => (_value, IsSuccess, _errors) = (value, true, Array.Empty<TError>());
 
-        /// <summary>
-        /// Private constructor for creating a failure outcome with errors.
-        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private Outcome(IReadOnlyList<TError> errors) => (_errors, _value, IsSuccess) = (errors, default, false);
+        private Outcome(ErrorCollection<TError> errors) => (_errors, _value, IsSuccess) = (errors, default, false);
 
-        /// <summary>
-        /// Creates a successful outcome containing the specified value.
-        /// </summary>
-        /// <param name="value">The value to wrap in a success outcome.</param>
-        /// <returns>An outcome representing success with the given value.</returns>
+        /// <summary>Creates a success. A null success value is permitted.</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Outcome<T, TError> From(T value) => new(value);
 
         /// <summary>
-        /// Creates a failure outcome containing the specified errors.
+        /// Creates a failure by snapshotting a nonempty list of non-null errors.
+        /// Library-owned immutable snapshots are reused when propagating a failure.
         /// </summary>
-        /// <param name="errors">A list of errors that occurred during the operation.</param>
-        /// <returns>An outcome representing failure with the given errors.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Outcome<T, TError> FromErrors(IReadOnlyList<TError> errors) => new(errors);
+        /// <exception cref="ArgumentNullException">The list is null.</exception>
+        /// <exception cref="ArgumentException">The list is empty or contains a null error.</exception>
+        public static Outcome<T, TError> FromErrors(IReadOnlyList<TError> errors)
+            => new(ErrorCollection<TError>.Snapshot(errors));
 
-        /// <summary>
-        /// Creates a failure outcome containing a single error.
-        /// </summary>
-        /// <param name="error">The error that occurred.</param>
-        /// <returns>An outcome representing failure with the given error.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Outcome<T, TError> FromError(TError error) => new([error]);
+        /// <summary>Creates a failure from a single non-null error.</summary>
+        public static Outcome<T, TError> FromError(TError error)
+            => new(ErrorCollection<TError>.Single(error));
 
-        /// <summary>
-        /// Implicitly converts a value of type <typeparamref name="T"/> to a success <see cref="Outcome{T, TError}"/>.
-        /// Enables ergonomic return statements like <c>return 42;</c>.
-        /// </summary>
+        /// <summary>Implicitly converts a value to a success.</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static implicit operator Outcome<T, TError>(T value) => new(value);
+        public static implicit operator Outcome<T, TError>(T value) => From(value);
 
-        /// <summary>
-        /// Implicitly converts a value of type <typeparamref name="TError"/> to a failure <see cref="Outcome{T, TError}"/>.
-        /// Enables ergonomic return statements like <c>return MyError.SomeError;</c>.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static implicit operator Outcome<T, TError>(TError error) => new([error]);
+        /// <summary>Implicitly converts a non-null error to a failure.</summary>
+        public static implicit operator Outcome<T, TError>(TError error) => FromError(error);
 
-        /// <summary>
-        /// Returns a human-readable string representation of the outcome.
-        /// </summary>
+        /// <summary>Returns a readable representation; an uninitialized outcome is invalid.</summary>
         public override string ToString()
-        {
-            return IsSuccess ? $"Success: {Value}" : $"Error: [{string.Join(", ", Errors)}]";
-        }
+            => IsSuccess ? $"Success: {Value}" : $"Error: [{string.Join(", ", Errors)}]";
 
-        /// <summary>
-        /// Deconstructs the outcome into three components: success flag, value, and errors.
-        /// </summary>
+        /// <summary>Deconstructs into status, value, and errors (null on success).</summary>
         public void Deconstruct(out bool isSuccess, out T? value, out IReadOnlyList<TError>? errors)
         {
             isSuccess = IsSuccess;
             value = IsSuccess ? _value : default;
-            errors = IsSuccess ? null : _errors;
+            errors = IsSuccess ? null : ErrorsUnchecked;
         }
 
-        /// <summary>
-        /// Deconstructs the outcome into two components: value and errors.
-        /// </summary>
+        /// <summary>Deconstructs into value and errors (an empty list on success).</summary>
         public void Deconstruct(out T? value, out IReadOnlyList<TError>? errors)
         {
             value = _value;
-            errors = _errors;
+            errors = ErrorsUnchecked;
         }
     }
 }
