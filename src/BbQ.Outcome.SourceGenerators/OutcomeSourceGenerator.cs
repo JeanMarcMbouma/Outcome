@@ -1,276 +1,169 @@
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
+using System.Xml;
+using System.Xml.Linq;
 
-namespace BbQ.Outcome.SourceGenerators
+namespace BbQ.Outcome.SourceGenerators;
+
+/// <summary>Generates error helpers and transport-neutral catalogs from annotated enums.</summary>
+[Generator]
+public sealed class OutcomeSourceGenerator : IIncrementalGenerator
 {
-    /// <summary>
-    /// Source generator that creates Error helper properties for enums marked with [QbqOutcome].
-    /// </summary>
-    [Generator]
-    public class OutcomeSourceGenerator : IIncrementalGenerator
+    private static readonly DiagnosticDescriptor InvalidDefinition = new(
+        "BBQOUT001", "Invalid error definition", "{0}", "BbQ.Outcome",
+        DiagnosticSeverity.Error, isEnabledByDefault: true);
+
+    public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        public void Initialize(IncrementalGeneratorInitializationContext context)
+        var enums = context.SyntaxProvider.ForAttributeWithMetadataName(
+            "BbQ.Outcome.QbqOutcomeAttribute",
+            static (node, _) => node is EnumDeclarationSyntax,
+            static (ctx, _) => (INamedTypeSymbol)ctx.TargetSymbol);
+        context.RegisterSourceOutput(enums, static (ctx, symbol) => Generate(ctx, symbol));
+    }
+
+    private static void Generate(SourceProductionContext context, INamedTypeSymbol symbol)
+    {
+        var names = new Stack<string>();
+        var publiclyAccessible = true;
+        for (INamedTypeSymbol? type = symbol; type != null; type = type.ContainingType)
         {
-            // Register a syntax receiver for enums with the QbqOutcome attribute
-            var enumDeclarations = context.SyntaxProvider
-                .CreateSyntaxProvider(
-                    predicate: static (s, _) => IsCandidateSyntax(s),
-                    transform: static (ctx, _) => GetEnumWithAttribute(ctx))
-                .Where(static m => m is not null);
-
-            context.RegisterSourceOutput(enumDeclarations,
-                static (spc, enumDecl) => Execute(spc, enumDecl!));
-        }
-
-        private static bool IsCandidateSyntax(SyntaxNode node)
-        {
-            return node is EnumDeclarationSyntax enumDecl &&
-                   enumDecl.AttributeLists.Count > 0;
-        }
-
-        private static EnumDeclarationSyntax? GetEnumWithAttribute(GeneratorSyntaxContext context)
-        {
-            var enumDecl = (EnumDeclarationSyntax)context.Node;
-
-            // Check if this enum has the QbqOutcome attribute
-            foreach (var attributeList in enumDecl.AttributeLists)
+            if (type.Arity != 0 || (type.DeclaredAccessibility != Accessibility.Public &&
+                type.DeclaredAccessibility != Accessibility.Internal &&
+                type.DeclaredAccessibility != Accessibility.ProtectedOrInternal))
             {
-                foreach (var attribute in attributeList.Attributes)
-                {
-                    var attributeName = GetAttributeName(attribute);
-                    if (attributeName == "QbqOutcome" || attributeName == "QbqOutcomeAttribute")
-                    {
-                        return enumDecl;
-                    }
-                }
-            }
-
-            return null;
-        }
-
-        private static string GetAttributeName(AttributeSyntax attribute)
-        {
-            return attribute.Name switch
-            {
-                IdentifierNameSyntax ins => ins.Identifier.ValueText,
-                QualifiedNameSyntax qns => qns.Right.Identifier.ValueText,
-                _ => string.Empty
-            };
-        }
-
-        private static void Execute(SourceProductionContext context, EnumDeclarationSyntax enumDecl)
-        {
-            // Check if the enum is within a namespace (either regular or file-scoped)
-            var parent = enumDecl.Parent;
-            NamespaceDeclarationSyntax? namespaceDecl = null;
-            FileScopedNamespaceDeclarationSyntax? fileScopedNamespaceDecl = null;
-            
-            while (parent != null)
-            {
-                if (parent is NamespaceDeclarationSyntax nsd)
-                {
-                    namespaceDecl = nsd;
-                    break;
-                }
-                if (parent is FileScopedNamespaceDeclarationSyntax fsnd)
-                {
-                    fileScopedNamespaceDecl = fsnd;
-                    break;
-                }
-                parent = parent.Parent;
-            }
-
-            // If no namespace found, skip generation
-            if (namespaceDecl == null && fileScopedNamespaceDecl == null)
-            {
+                Report(context, symbol, "Generated error enums must be accessible outside their containing type and cannot be nested in a generic type.");
                 return;
             }
+            publiclyAccessible &= type.DeclaredAccessibility == Accessibility.Public;
+            names.Push(type.Name);
+        }
 
-            var namespaceName = GetNamespaceName(enumDecl);
-            var enumName = enumDecl.Identifier.ValueText;
-            var enumMembers = enumDecl.Members;
-
-            var sb = new StringBuilder();
-            sb.AppendLine("// <auto-generated />");
-            sb.AppendLine("#nullable enable");
-            sb.AppendLine();
-            sb.AppendLine("using BbQ.Outcome;");
-            sb.AppendLine($"namespace {namespaceName}");
-            sb.AppendLine("{");
-            sb.AppendLine($"    /// <summary>");
-            sb.AppendLine($"    /// Error helper properties for {enumName} enum.");
-            sb.AppendLine($"    /// This class is auto-generated by the Outcome source generator.");
-            sb.AppendLine($"    /// </summary>");
-            sb.AppendLine($"    public static class {enumName}Errors");
-            sb.AppendLine("    {");
-
-            foreach (var member in enumMembers)
+        var typeName = symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        var helperName = string.Join("_", names) + "Errors";
+        var members = symbol.GetMembers().OfType<IFieldSymbol>().Where(f => f.HasConstantValue).ToArray();
+        var codes = new HashSet<string>(StringComparer.Ordinal);
+        var values = new HashSet<object>();
+        var definitions = new List<(IFieldSymbol Field, string Code, string Description, string Severity, string? Resource)>();
+        foreach (var field in members)
+        {
+            var codeAttribute = Attribute(field, "BbQ.Outcome.ErrorCodeAttribute");
+            var resourceAttribute = Attribute(field, "BbQ.Outcome.ErrorResourceKeyAttribute");
+            var code = codeAttribute == null ? field.Name : StringArgument(codeAttribute);
+            var resource = resourceAttribute == null ? null : StringArgument(resourceAttribute);
+            if (string.IsNullOrWhiteSpace(code) || (resourceAttribute != null && string.IsNullOrWhiteSpace(resource)))
             {
-                if (member is EnumMemberDeclarationSyntax enumMember)
-                {
-                    var memberName = enumMember.Identifier.ValueText;
-                    var description = ExtractDescription(enumMember);
-                    var severity = ExtractSeverity(enumMember);
-                    var propertyName = $"{memberName}Error";
-
-                    sb.AppendLine($"        /// <summary>");
-                    sb.AppendLine($"        /// Creates an Error for the {memberName} enum value.");
-                    sb.AppendLine($"        /// </summary>");
-                    sb.AppendLine($"        public static Error<{enumName}> {propertyName} =>");
-                    sb.AppendLine($"            new Error<{enumName}>(");
-                    sb.AppendLine($"                Code: {enumName}.{memberName},");
-                    sb.AppendLine($"                Description: \"{description}\",");
-                    sb.AppendLine($"                Severity: ErrorSeverity.{severity}");
-                    sb.AppendLine($"            );");
-                    sb.AppendLine();
-                }
+                Report(context, field, "External error codes and explicitly provided resource keys must be nonblank strings.");
+                return;
             }
+            if (!codes.Add(code!))
+            {
+                Report(context, field, "External error codes must be unique within an error enum: " + code);
+                return;
+            }
+            if (!values.Add(field.ConstantValue!))
+            {
+                Report(context, field, "Error enum aliases are ambiguous at runtime; each generated error must have a unique underlying value.");
+                return;
+            }
+            var severityAttribute = Attribute(field, "BbQ.Outcome.ErrorSeverityAttribute");
+            var severity = severityAttribute == null
+                ? "global::BbQ.Outcome.ErrorSeverity.Error"
+                : "(global::BbQ.Outcome.ErrorSeverity)" + Convert.ToInt32(severityAttribute.ConstructorArguments[0].Value, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture);
+            definitions.Add((field, code!, Description(field), severity, resource));
+        }
 
-            sb.AppendLine("    }");
+        var errorType = "global::BbQ.Outcome.Error<" + typeName + ">";
+        var sb = new StringBuilder("// <auto-generated />\n#nullable enable\n");
+        if (!symbol.ContainingNamespace.IsGlobalNamespace)
+            sb.Append("namespace ").Append(symbol.ContainingNamespace.ToDisplayString()).AppendLine(" {");
+        sb.Append(publiclyAccessible ? "public" : "internal").Append(" static class ").Append(helperName).AppendLine(" {");
+        foreach (var definition in definitions)
+        {
+            sb.Append("public static ").Append(errorType).Append(' ').Append(definition.Field.Name).Append("Error => new ")
+                .Append(errorType).Append('(').Append(typeName).Append(".@").Append(definition.Field.Name)
+                .Append(", ").Append(Literal(definition.Description)).Append(", ").Append(definition.Severity).AppendLine(");");
+        }
+        sb.Append("public static global::System.Collections.Generic.IReadOnlyList<").Append(errorType)
+            .Append("> All { get; } = global::System.Array.AsReadOnly(new ").Append(errorType).AppendLine("[] {");
+        foreach (var definition in definitions)
+            sb.Append(definition.Field.Name).AppendLine("Error,");
+        sb.AppendLine("});");
+        sb.Append("public static global::BbQ.Outcome.ErrorDescriptor Describe(").Append(typeName).AppendLine(" code) => code switch {");
+        foreach (var definition in definitions)
+        {
+            sb.Append(typeName).Append(".@").Append(definition.Field.Name)
+                .Append(" => new global::BbQ.Outcome.ErrorDescriptor(")
+                .Append(Literal(definition.Code)).Append(", ").Append(Literal(definition.Description))
+                .Append(", ").Append(definition.Severity).Append(", ResourceKey: ")
+                .Append(definition.Resource == null ? "null" : Literal(definition.Resource)).AppendLine("),");
+        }
+        sb.AppendLine("_ => throw new global::System.ArgumentOutOfRangeException(nameof(code), code, \"Unknown error code.\")\n};");
+        sb.Append("public static global::BbQ.Outcome.IErrorDescriptorProvider<").Append(errorType)
+            .Append("> DescriptorProvider { get; } = new global::BbQ.Outcome.DelegateErrorDescriptorProvider<")
+            .Append(errorType).AppendLine(">(error => Describe(error.Code) with { Description = error.Description, Severity = error.Severity });");
+        sb.AppendLine("}");
+        if (!symbol.ContainingNamespace.IsGlobalNamespace)
             sb.AppendLine("}");
 
-            context.AddSource($"{enumName}Errors.g.cs", sb.ToString());
-        }
-
-        private static string GetNamespaceName(EnumDeclarationSyntax enumDecl)
-        {
-            var parent = enumDecl.Parent;
-            while (parent != null)
-            {
-                if (parent is NamespaceDeclarationSyntax namespaceSyntax)
-                {
-                    return namespaceSyntax.Name.ToString();
-                }
-                if (parent is FileScopedNamespaceDeclarationSyntax fileScopedNamespace)
-                {
-                    return fileScopedNamespace.Name.ToString();
-                }
-                parent = parent.Parent;
-            }
-            return "BbQ.Outcome";
-        }
-
-        private static string ExtractDescription(EnumMemberDeclarationSyntax member)
-        {
-            // First, try to extract description from [Description] attribute
-            foreach (var attributeList in member.AttributeLists)
-            {
-                foreach (var attribute in attributeList.Attributes)
-                {
-                    var attributeName = GetAttributeName(attribute);
-                    if (attributeName == "Description" || attributeName == "DescriptionAttribute")
-                    {
-                        // Try to extract the description value from the attribute argument
-                        if (attribute.ArgumentList?.Arguments.Count > 0)
-                        {
-                            var arg = attribute.ArgumentList.Arguments[0];
-                            var argText = arg.Expression.ToString();
-                            
-                            // Remove quotes if it's a string literal
-                            if (argText.StartsWith("\"") && argText.EndsWith("\""))
-                            {
-                                return argText.Substring(1, argText.Length - 2);
-                            }
-                            return argText;
-                        }
-                    }
-                }
-            }
-
-            // Fall back to extracting description from XML documentation
-            var leadingTrivia = member.GetLeadingTrivia();
-            foreach (var trivia in leadingTrivia)
-            {
-                if (trivia.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia))
-                {
-                    var text = trivia.ToString();
-                    // Simple extraction: look for summary tags
-                    var lines = text.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
-                    var summaryLines = new List<string>();
-                    var inSummary = false;
-
-                    foreach (var line in lines)
-                    {
-                        var trimmed = line.Trim();
-                        if (trimmed.Contains("<summary>"))
-                        {
-                            inSummary = true;
-                            var content = trimmed.Replace("///", "").Replace("<summary>", "").Replace("</summary>", "").Trim();
-                            if (!string.IsNullOrEmpty(content))
-                                summaryLines.Add(content);
-                        }
-                        else if (trimmed.Contains("</summary>"))
-                        {
-                            inSummary = false;
-                        }
-                        else if (inSummary && !string.IsNullOrEmpty(trimmed))
-                        {
-                            var content = trimmed.Replace("///", "").Trim();
-                            if (!string.IsNullOrEmpty(content))
-                                summaryLines.Add(content);
-                        }
-                    }
-
-                    if (summaryLines.Count > 0)
-                    {
-                        var description = string.Join(" ", summaryLines).Trim();
-                        // Escape special characters for C# string literals
-                        description = description
-                            .Replace("\\", "\\\\")
-                            .Replace("\"", "\\\"")
-                            .Replace("\r", "\\r")
-                            .Replace("\n", "\\n")
-                            .Replace("\t", "\\t");
-                        return description;
-                    }
-                }
-            }
-
-            // Fallback: use member name
-            return member.Identifier.ValueText;
-        }
-
-        private static string ExtractSeverity(EnumMemberDeclarationSyntax member)
-        {
-            // Look for ErrorSeverity attribute on the enum member
-            foreach (var attributeList in member.AttributeLists)
-            {
-                foreach (var attribute in attributeList.Attributes)
-                {
-                    var attributeName = GetAttributeName(attribute);
-                    if (attributeName == "ErrorSeverity" || attributeName == "ErrorSeverityAttribute")
-                    {
-                        // Try to extract the severity value from the attribute argument
-                        if (attribute.ArgumentList?.Arguments.Count > 0)
-                        {
-                            var arg = attribute.ArgumentList.Arguments[0];
-                            var argText = arg.Expression.ToString();
-                            
-                            // Handle different formats: ErrorSeverity.Warning, "Warning", Warning
-                            if (argText.Contains("."))
-                            {
-                                // Format: ErrorSeverity.Warning
-                                return argText.Split('.').Last();
-                            }
-                            else if (argText.StartsWith("\"") && argText.EndsWith("\""))
-                            {
-                                // Format: "Warning"
-                                return argText.Trim('"');
-                            }
-                            else
-                            {
-                                // Format: Warning
-                                return argText;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Default to Error if no attribute is specified
-            return "Error";
-        }
+        var hint = BitConverter.ToString(Encoding.UTF8.GetBytes(typeName)).Replace("-", "") + ".Errors.g.cs";
+        context.AddSource(hint, sb.ToString());
     }
+
+    private static AttributeData? Attribute(IFieldSymbol field, string name)
+        => field.GetAttributes().FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == name);
+
+    private static string? StringArgument(AttributeData attribute)
+        => attribute.ConstructorArguments.Length == 0 ? null : attribute.ConstructorArguments[0].Value as string;
+
+    private static string Description(IFieldSymbol field)
+    {
+        var attribute = Attribute(field, "System.ComponentModel.DescriptionAttribute");
+        if (attribute != null)
+            return StringArgument(attribute) ?? field.Name;
+        var summary = ReadSummary(field.GetDocumentationCommentXml());
+        if (summary != null)
+            return summary;
+
+        // Compilations that do not emit documentation may use DocumentationMode.None.
+        // The original comment text is still available, even without structured XML trivia.
+        foreach (var reference in field.DeclaringSyntaxReferences)
+        {
+            var leading = reference.GetSyntax().GetLeadingTrivia().ToFullString();
+            var lines = leading.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None);
+            var xml = new StringBuilder("<member>");
+            foreach (var line in lines)
+            {
+                var trimmed = line.TrimStart();
+                if (trimmed.StartsWith("///", StringComparison.Ordinal))
+                    xml.AppendLine(trimmed.Substring(3));
+            }
+            xml.Append("</member>");
+            summary = ReadSummary(xml.ToString());
+            if (summary != null)
+                return summary;
+        }
+        return field.Name;
+    }
+
+    private static string? ReadSummary(string? xml)
+    {
+        if (string.IsNullOrWhiteSpace(xml))
+            return null;
+        try
+        {
+            var summary = XElement.Parse(xml!).Descendants("summary").FirstOrDefault()?.Value;
+            return string.IsNullOrWhiteSpace(summary) ? null : Regex.Replace(summary!, @"\s+", " ").Trim();
+        }
+        catch (XmlException) { return null; }
+    }
+
+    private static string Literal(string value)
+        => Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(value, quote: true);
+
+    private static void Report(SourceProductionContext context, ISymbol symbol, string message)
+        => context.ReportDiagnostic(Diagnostic.Create(InvalidDefinition, symbol.Locations.FirstOrDefault(), message));
 }
