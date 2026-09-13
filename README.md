@@ -1,241 +1,144 @@
-﻿# BbQ Libraries - Functional Result Types, CQRS & Events
+# BbQ Libraries — Outcome, CQRS & Events
 
-A comprehensive suite of modern C# libraries for functional error handling, command-query responsibility segregation, and event-driven architecture patterns.
+A modern .NET library suite for functional result handling, CQRS, and event-driven systems. All libraries target .NET 8, .NET 9, and .NET 10.
 
-## 📦 Packages
+## Packages
 
-### [BbQ.Outcome](./src/BbQ.Outcome/README.md)
-A modern C# functional result type for error-aware programming.
+### Outcome family
 
-- **Structured errors** with `Code`, `Description`, and `Severity`
-- **Async composition** with `BindAsync`, `MapAsync`, `CombineAsync`
-- **LINQ integration** with native `Select`/`SelectMany` support
-- **IAsyncEnumerable streaming** with `Select`, `Bind`, `Map`, `Where`, `Values`, `Errors` over async streams
-- **Source generator** support for auto-generating error helpers
-- **Multi-targeting** across `net8.0`, `net9.0`, and `net10.0`
-
-```csharp
-dotnet add package BbQ.Outcome
-```
-
-[📖 Full Documentation 📖](./src/BbQ.Outcome/README.md)
-
-### [BbQ.Cqrs](./src/BbQ.Cqrs/README.md)
-A lightweight, extensible CQRS implementation that integrates seamlessly with BbQ.Outcome.
-
-- **Type-safe mediator** for commands and queries
-- **Unified pipeline behaviors** for both regular and streaming requests
-- **Streaming handlers** for processing large datasets with `IAsyncEnumerable<T>`
-- **Specialized dispatchers** (`ICommandDispatcher`, `IQueryDispatcher`) for explicit CQRS separation
-- **Source generators** for automatic handler registration, behavior registration
-- **Test utilities** with `TestMediator` and `StubHandler`
-- **Comprehensive documentation** on all interfaces and classes
-- **Seamless integration** with `Outcome<T>` for error handling
-
-```csharp
-dotnet add package BbQ.Cqrs
-```
-
-[📖 Full Documentation 📖](./src/BbQ.Cqrs/README.md)
-
-### [BbQ.Events](./src/BbQ.Events/README.md)
-Event-driven architecture support with strongly-typed pub/sub and projections.
-
-- **Type-safe event publishing** with `IEventPublisher`
-- **Event handlers** (`IEventHandler<TEvent>`) for processing events one-by-one
-- **Event subscribers** (`IEventSubscriber<TEvent>`) for consuming event streams
-- **Projection support** for building read models and materialized views
-- **In-memory event bus** for single-process applications
-- **Thread-safe** implementation using `System.Threading.Channels`
-- **Storage-agnostic** design - extend for distributed scenarios
-- **Source generator support** - automatic handler/subscriber/projection discovery
-- **Fully independent** - works standalone or with BbQ.Cqrs
-
-```csharp
-dotnet add package BbQ.Events
-```
-
-[📖 Full Documentation 📖](./src/BbQ.Events/README.md)
-
-### Extension Packages
-
-| Package | Description | Documentation |
-|---------|-------------|---------------|
-| [BbQ.Events.SqlServer](./src/BbQ.Events.SqlServer/README.md) | SQL Server event store and checkpoint persistence | [📖 Docs](./src/BbQ.Events.SqlServer/README.md) |
-| [BbQ.Events.PostgreSql](./src/BbQ.Events.PostgreSql/README.md) | PostgreSQL event store and checkpoint persistence | [📖 Docs](./src/BbQ.Events.PostgreSql/README.md) |
-| [BbQ.Events.RabbitMQ](./src/BbQ.Events.RabbitMQ/README.md) | RabbitMQ distributed event bus | [📖 Docs](./src/BbQ.Events.RabbitMQ/README.md) |
-
-### Unreleased Outcome extensions — issue #60
-
-The source includes error-side composition, cancellation-aware callbacks, collection traversal, error catalogs, and five independently adoptable integration packages. These changes require a release before they are available from NuGet; development builds can use project references or locally packed packages.
+Released together from `outcome-v*` tags with the same version.
 
 | Package | Purpose |
-|---------|---------|
-| [BbQ.Cqrs.Outcome](./src/BbQ.Cqrs.Outcome/README.md) | Two-parameter validation behaviors and typed response factories |
-| [BbQ.Cqrs.Outcome.FluentValidation](./src/BbQ.Cqrs.Outcome.FluentValidation/README.md) | Asynchronous FluentValidation integration |
+|---|---|
+| [BbQ.Outcome](./src/BbQ.Outcome/README.md) | Core functional result type, typed errors, async composition, LINQ, streaming and generated error helpers |
+| `BbQ.Outcome.SourceGenerators` | Source generator for `[QbqOutcome]` error catalogs/helpers |
 | [BbQ.Outcome.AspNetCore](./src/BbQ.Outcome.AspNetCore/README.md) | Explicit HTTP status mapping and redacted Problem Details |
-| [BbQ.Outcome.SystemTextJson](./src/BbQ.Outcome.SystemTextJson/README.md) | Strict JSON contracts, allowlisted error types, and closed AOT-compatible metadata |
-| [BbQ.Outcome.Diagnostics](./src/BbQ.Outcome.Diagnostics/README.md) | Opt-in structured logging and Activity instrumentation |
-
-Read the [implementation and migration guide](./docs/extension-roadmap.md) before upgrading: invalid/default failures and mutable error-list ownership now have explicit contracts. The base Outcome and CQRS packages do not acquire HTTP, FluentValidation, or telemetry dependencies.
-
-## 🚀 Quick Start
-
-### Using BbQ.Outcome
-```csharp
-var result = await GetUserAsync(userId);
-
-return result.Match(
-    onSuccess: user => Ok(user),
-    onError: errors => BadRequest(new { errors })
-);
-```
-
-### Using BbQ.Outcome + CQRS
-```csharp
-// Define error codes
-[QbqOutcome]
-public enum UserErrorCode
-{
-    [Description("User not found")]
-    NotFound,
-    [Description("Email already in use")]
-    EmailAlreadyExists
-}
-
-// Define a command
-public class CreateUserCommand : ICommand<Outcome<User>>
-{
-    public string Email { get; set; }
-    public string Name { get; set; }
-}
-
-// Implement a handler
-public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, Outcome<User>>
-{
-    public async Task<Outcome<User>> Handle(CreateUserCommand request, CancellationToken ct)
-    {
-        // Implementation...
-    }
-}
-
-// Register and use
-services.AddBbQMediator(typeof(Program).Assembly);
-
-var result = await mediator.Send(new CreateUserCommand { Email = "test@example.com", Name = "Test" });
-```
-
-### Using Events
-```csharp
-// Register event bus
-services.AddInMemoryEventBus();
-services.AddYourAssemblyEventHandlers(); // Auto-discovers handlers
-
-// Define an event
-public record UserCreated(Guid Id, string Name);
-
-// Publish event
-await eventPublisher.Publish(new UserCreated(userId, userName));
-
-// Handle event (auto-discovered)
-public class SendWelcomeEmailHandler : IEventHandler<UserCreated>
-{
-    public Task Handle(UserCreated @event, CancellationToken ct)
-    {
-        // Send email...
-        return Task.CompletedTask;
-    }
-}
-```
-
-## 💾 Installation
+| [BbQ.Outcome.SystemTextJson](./src/BbQ.Outcome.SystemTextJson/README.md) | Strict System.Text.Json contracts and Native AOT-friendly converters |
+| [BbQ.Outcome.Diagnostics](./src/BbQ.Outcome.Diagnostics/README.md) | Opt-in structured logging and `Activity` instrumentation |
 
 ```bash
-# Core error handling
+# Stable core
 dotnet add package BbQ.Outcome
 
-# CQRS pattern support
+# Latest prerelease family packages
+dotnet add package BbQ.Outcome --prerelease
+dotnet add package BbQ.Outcome.AspNetCore --prerelease
+dotnet add package BbQ.Outcome.SystemTextJson --prerelease
+dotnet add package BbQ.Outcome.Diagnostics --prerelease
+```
+
+The core package remains independent of ASP.NET Core, JSON, logging, and telemetry dependencies. Install only the adapters your application needs.
+
+### CQRS family
+
+Released together from `cqrs-v*` tags with the same version.
+
+| Package | Purpose |
+|---|---|
+| [BbQ.Cqrs](./src/BbQ.Cqrs/README.md) | Mediator, commands, queries, pipelines, streaming and dispatchers |
+| `BbQ.Cqrs.SourceGenerators` | Compile-time handler and behavior registration |
+| [BbQ.Cqrs.Outcome](./src/BbQ.Cqrs.Outcome/README.md) | Type-safe Outcome validation behaviors and response factories |
+| [BbQ.Cqrs.Outcome.FluentValidation](./src/BbQ.Cqrs.Outcome.FluentValidation/README.md) | Async FluentValidation adapter for CQRS Outcome validation |
+
+```bash
+# Stable core
 dotnet add package BbQ.Cqrs
 
-# Event-driven architecture
-dotnet add package BbQ.Events
-
-# Extension packages (optional)
-dotnet add package BbQ.Events.SqlServer     # SQL Server event store & checkpoints
-dotnet add package BbQ.Events.PostgreSql    # PostgreSQL event store & checkpoints
-dotnet add package BbQ.Events.RabbitMQ      # RabbitMQ distributed event bus
+# Latest prerelease family packages
+dotnet add package BbQ.Cqrs --prerelease
+dotnet add package BbQ.Cqrs.Outcome --prerelease
+dotnet add package BbQ.Cqrs.Outcome.FluentValidation --prerelease
 ```
 
-## 🔗 Integration
+The CQRS core does not require Outcome or FluentValidation. The integration packages remain optional.
 
-These libraries work best together:
+### Events family
+
+| Package | Purpose |
+|---|---|
+| [BbQ.Events](./src/BbQ.Events/README.md) | Event publishing, handlers, subscribers, projections and replay |
+| [BbQ.Events.SqlServer](./src/BbQ.Events.SqlServer/README.md) | SQL Server event store and checkpoint persistence |
+| [BbQ.Events.PostgreSql](./src/BbQ.Events.PostgreSql/README.md) | PostgreSQL event store and checkpoint persistence |
+| [BbQ.Events.RabbitMQ](./src/BbQ.Events.RabbitMQ/README.md) | RabbitMQ distributed event bus |
+
+## Outcome highlights
+
+`Outcome<T>` and `Outcome<T, TError>` support success/error composition without exceptions as ordinary control flow.
 
 ```csharp
-// Error codes are auto-generated with source generator
-[QbqOutcome]
-public enum DomainErrors
-{
-    [Description("Invalid input")]
-    [ErrorSeverity(ErrorSeverity.Validation)]
-    ValidationFailed,
-
-    [Description("Not found")]
-    NotFound
-}
-
-// Commands/queries return Outcome<T>
-public class GetUserQuery : IQuery<Outcome<User>> { }
-
-// Handlers use auto-generated errors
-public class GetUserQueryHandler : IRequestHandler<GetUserQuery, Outcome<User>>
-{
-    public async Task<Outcome<User>> Handle(GetUserQuery request, CancellationToken ct)
-    {
-        var user = await _repository.GetAsync(request.UserId);
-        return user == null 
-            ? DomainErrorsErrors.NotFoundError.ToOutcome<User>()
-            : Outcome<User>.From(user);
-    }
-}
+var result = await repository.FindUser(userId)
+    .MapError(MapPersistenceError)
+    .Tap(user => audit.RecordUserRead(user.Id))
+    .TapError(errors => diagnostics.RecordFailure(errors));
 ```
 
-## ✨ Key Features
+The newer composition surface includes error-side mapping and recovery, observation hooks, cancellation-aware async operators, `Sequence`, `Zip`, `Traverse`, bounded `TraverseAsync`, and explicit `Try`/`TryAsync` exception boundaries. Public extension APIs include inline XML examples so their intended scenarios are visible directly in IntelliSense.
 
-| Feature | Outcome | CQRS | Events |
-|---------|---------|------|--------|
-| Structured error handling | ✅ | ✅ | - |
-| Async composition | ✅ | ✅ | ✅ |
-| IAsyncEnumerable streaming | ✅ | ✅ | ✅ |
-| Source-generated helpers | ✅ | ✅ | ✅ |
-| LINQ integration | ✅ | - | - |
-| Mediator pattern | - | ✅ | - |
-| Pipeline behaviors | - | ✅ | - |
-| Streaming handlers | - | ✅ | ✅ |
-| Type-safe commands/queries | - | ✅ | - |
-| Event publishing | - | - | ✅ |
-| Event handlers | - | - | ✅ |
-| Event subscribers | - | - | ✅ |
-| Projections & replay | - | - | ✅ |
-| Thread-safe in-memory bus | - | - | ✅ |
-| Storage-agnostic design | - | - | ✅ |
-| Fully independent | ✅ | ✅ | ✅ |
-| Test utilities | - | ✅ | - |
+See the [Outcome documentation](./src/BbQ.Outcome/README.md) and the [implementation/migration guide](./docs/extension-roadmap.md).
 
-## 📚 Documentation
+## CQRS + Outcome validation
 
-- **[BbQ.Outcome Documentation](./src/BbQ.Outcome/README.md)** - Complete guide to using BbQ.Outcome for functional error handling
-- **[BbQ.Cqrs Documentation](./src/BbQ.Cqrs/README.md)** - Complete guide to CQRS pattern implementation
-- **[BbQ.Events Documentation](./src/BbQ.Events/README.md)** - Complete guide to event-driven architecture
-- **[BbQ.Events.SqlServer Documentation](./src/BbQ.Events.SqlServer/README.md)** - SQL Server event store and checkpoint persistence
-- **[BbQ.Events.PostgreSql Documentation](./src/BbQ.Events.PostgreSql/README.md)** - PostgreSQL event store and checkpoint persistence
-- **[BbQ.Events.RabbitMQ Documentation](./src/BbQ.Events.RabbitMQ/README.md)** - RabbitMQ distributed event bus
-- **[Outcome Error Helper Properties](./src/BbQ.Outcome/README.md)** - Strongly typed error patterns with source generators
-- **[Extension implementation and migration](./docs/extension-roadmap.md)** - New APIs, optional packages, verification and compatibility notes
+Use `BbQ.Cqrs.Outcome` when requests return Outcome and validation failures should be created without unsafe casts or payload-type coupling.
 
-## 🤝 Contributing
+```csharp
+services.AddScoped<IRequestValidator<CreateUser>, CreateUserValidator>();
+services.AddValidationIssueMapper<AppError>(issue =>
+    new AppError(issue.Code, issue.Message, issue.MemberName));
+services.AddOutcomeValidation<CreateUser, User, AppError>();
+```
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+For FluentValidation:
 
-## 📄 License
+```csharp
+services.AddScoped<FluentValidation.IValidator<CreateUser>, CreateUserValidator>();
+services.AddFluentValidationRequest<CreateUser>();
+services.AddOutcomeValidation<CreateUser, User>();
+```
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+## ASP.NET Core
+
+`BbQ.Outcome.AspNetCore` maps domain errors to explicit HTTP policies while keeping transport concerns outside the core library.
+
+```csharp
+services.AddOutcomeHttpMapping<AppError>(options =>
+{
+    options.Rules["USER_MISSING"] = new(404, ExposeDescription: true);
+    options.Rules["EMAIL_CONFLICT"] = new(409, ExposeDescription: true);
+});
+
+return outcome.ToIResult(httpMapper);
+```
+
+## JSON and Native AOT
+
+`BbQ.Outcome.SystemTextJson` serializes only the active Outcome branch and rejects malformed/contradictory envelopes. It supports source-generated `JsonTypeInfo<T>` metadata and an explicit allowlist for heterogeneous error types.
+
+## Diagnostics
+
+`BbQ.Outcome.Diagnostics` adds opt-in logging and `Activity` observation without forcing a telemetry dependency into the core package.
+
+## Release model
+
+Package families are versioned and published together:
+
+- `outcome-vX.Y.Z[-prerelease]` publishes the complete Outcome family.
+- `cqrs-vX.Y.Z[-prerelease]` publishes the complete CQRS family.
+- Events/provider packages retain their existing release tags.
+
+Pre-release consumers should install with `--prerelease` or pin the exact preview version.
+
+## Documentation
+
+- [BbQ.Outcome](./src/BbQ.Outcome/README.md)
+- [BbQ.Outcome.AspNetCore](./src/BbQ.Outcome.AspNetCore/README.md)
+- [BbQ.Outcome.SystemTextJson](./src/BbQ.Outcome.SystemTextJson/README.md)
+- [BbQ.Outcome.Diagnostics](./src/BbQ.Outcome.Diagnostics/README.md)
+- [BbQ.Cqrs](./src/BbQ.Cqrs/README.md)
+- [BbQ.Cqrs.Outcome](./src/BbQ.Cqrs.Outcome/README.md)
+- [BbQ.Cqrs.Outcome.FluentValidation](./src/BbQ.Cqrs.Outcome.FluentValidation/README.md)
+- [BbQ.Events](./src/BbQ.Events/README.md)
+- [Outcome implementation and migration guide](./docs/extension-roadmap.md)
+
+## License
+
+MIT. See [LICENSE](./LICENSE).
