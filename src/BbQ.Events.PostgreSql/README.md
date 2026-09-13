@@ -90,11 +90,11 @@ CREATE TABLE bbq_projection_checkpoints (
     partition_key TEXT NULL DEFAULT NULL,
     position BIGINT NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT pk_bbq_projection_checkpoints PRIMARY KEY (projection_name, partition_key) NULLS NOT DISTINCT
+    CONSTRAINT pk_bbq_projection_checkpoints UNIQUE NULLS NOT DISTINCT (projection_name, partition_key)
 );
 ```
 
-**Note**: The `partition_key` column is nullable and defaults to `NULL` for non-partitioned projections. PostgreSQL allows nullable columns in composite primary keys with the `NULLS NOT DISTINCT` clause (PostgreSQL 15+). This ensures only one row with a NULL `partition_key` can exist per `projection_name`, which is the desired behavior for non-partitioned projections.
+**Note**: The `partition_key` column is nullable and defaults to `NULL` for non-partitioned projections. PostgreSQL 15+ supports nullable columns with a `UNIQUE NULLS NOT DISTINCT (projection_name, partition_key)` constraint. This ensures only one row with a NULL `partition_key` can exist per `projection_name`, which is the desired behavior for non-partitioned projections.
 
 ### Explicit Schema Initialization
 

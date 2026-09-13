@@ -96,17 +96,13 @@ internal sealed class DefaultProjectionEngine : IProjectionEngine
         catch (OperationCanceledException)
         {
             _logger.LogInformation("Projection engine stopping gracefully...");
-            
 
-            
             _logger.LogInformation("Projection engine stopped gracefully");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Projection engine encountered an error");
-            
 
-            
             throw;
         }
         finally
@@ -1051,7 +1047,7 @@ internal sealed class DefaultProjectionEngine : IProjectionEngine
     /// <summary>
     /// Processes a work item with error handling according to the projection's error handling strategy.
     /// </summary>
-    /// <returns>True if processing should continue, False if the worker should stop.</returns>
+    /// <returns>The terminal projection disposition.</returns>
     private Task<ProjectionDisposition> ProcessWorkItemWithErrorHandlingAsync(
         WorkItem workItem, ProjectionOptions options, string partitionKey, long currentPosition, CancellationToken ct)
         => ProcessWithPolicyAsync([workItem], options, partitionKey, currentPosition, token => ProcessWorkItemAsync(workItem, token), ct);

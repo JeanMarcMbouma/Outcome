@@ -65,6 +65,7 @@ public sealed class ProjectionFailureProcessor
         ProjectionErrorHandlingOptions options, IProjectionFailurePolicy? policy = null,
         IProjectionDeadLetterStore? deadLetters = null, CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
         options.Validate();
         policy ??= options.FailurePolicy ?? new DefaultProjectionFailurePolicy(options);
         deadLetters ??= options.DeadLetterStore;
@@ -81,6 +82,7 @@ public sealed class ProjectionFailureProcessor
                 recovered++;
             }
             // A partially persisted batch is retried as a whole; handlers must be idempotent.
+            ct.ThrowIfCancellationRequested();
             if (recovered == events.Count) return ProjectionDisposition.Quarantined;
         }
         var delay = options.InitialRetryDelayMs;
@@ -90,6 +92,7 @@ public sealed class ProjectionFailureProcessor
             try
             {
                 await handler(ct).ConfigureAwait(false);
+                ct.ThrowIfCancellationRequested();
                 return ProjectionDisposition.Projected;
             }
             catch (OperationCanceledException) { throw; }

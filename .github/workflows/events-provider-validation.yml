@@ -64,6 +64,7 @@ jobs:
         run: |
           dotnet build Outcome.slnx -c Release
           dotnet pack Outcome.slnx -c Release --no-build -o artifacts/packages
+          dotnet run --project scripts/SourceLinkVerification -c Release -- artifacts/packages
       - name: Audit dependency graph
         run: dotnet list Outcome.slnx package --vulnerable --include-transitive
       - uses: actions/upload-artifact@v7
