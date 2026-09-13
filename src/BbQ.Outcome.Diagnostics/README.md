@@ -2,6 +2,14 @@
 
 Optional adapters over `ILogger` and `System.Diagnostics.Activity`. The core Outcome package does not depend on this package, logging, or any telemetry exporter.
 
+## Installation
+
+This package ships with the Outcome family under the same `outcome-v*` version.
+
+```bash
+dotnet add package BbQ.Outcome.Diagnostics --prerelease
+```
+
 ```csharp
 using BbQ.Outcome.Diagnostics;
 using System.Diagnostics;
