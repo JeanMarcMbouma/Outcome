@@ -8,6 +8,10 @@ namespace Microsoft.Extensions.DependencyInjection;
 public static class OutcomeValidationServiceCollectionExtensions
 {
     /// <summary>Registers a heterogeneous outcome factory and one request validation behavior.</summary>
+    /// <example><code>
+    /// services.AddOutcomeValidation&lt;CreateUserCommand, User&gt;();
+    /// services.AddScoped&lt;IRequestValidator&lt;CreateUserCommand&gt;, CreateUserValidator&gt;();
+    /// </code></example>
     public static IServiceCollection AddOutcomeValidation<TRequest, T>(this IServiceCollection services)
         where TRequest : BbQ.Cqrs.IRequest<Outcome<T>>
     {
@@ -18,7 +22,11 @@ public static class OutcomeValidationServiceCollectionExtensions
         return services;
     }
 
-    /// <summary>Registers a typed outcome factory and request behavior. Register an issue mapper for TError.</summary>
+    /// <summary>Registers a typed outcome factory and request behavior. Register an issue mapper for <typeparamref name="TError"/>.</summary>
+    /// <example><code>
+    /// services.AddValidationIssueMapper&lt;AppError&gt;(issue => AppError.Validation(issue.Code, issue.Message));
+    /// services.AddOutcomeValidation&lt;CreateUserCommand, User, AppError&gt;();
+    /// </code></example>
     public static IServiceCollection AddOutcomeValidation<TRequest, T, TError>(this IServiceCollection services)
         where TRequest : BbQ.Cqrs.IRequest<Outcome<T, TError>>
     {
@@ -30,6 +38,10 @@ public static class OutcomeValidationServiceCollectionExtensions
     }
 
     /// <summary>Registers a thread-safe mapping function. Use a scoped service for stateful mappers.</summary>
+    /// <example><code>
+    /// services.AddValidationIssueMapper&lt;AppError&gt;(issue =>
+    ///     new AppError(issue.Code, issue.Message, issue.MemberName));
+    /// </code></example>
     public static IServiceCollection AddValidationIssueMapper<TError>(this IServiceCollection services,
         Func<ValidationIssue, TError> mapper)
     {

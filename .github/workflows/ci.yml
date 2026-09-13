@@ -3,10 +3,10 @@ name: CI
 on:
   push:
     branches:
-      - '**'   # run on all branches
+      - '**'
   pull_request:
     branches:
-      - '**'   # run on all PRs
+      - '**'
 
 permissions:
   contents: read
@@ -14,11 +14,12 @@ permissions:
 jobs:
   build-test:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 20
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
-
+      - name: Verify extension XML examples
+        run: python3 scripts/verify-outcome-xml-examples.py
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
@@ -26,12 +27,22 @@ jobs:
             8.0.x
             9.0.x
             10.0.x
-
       - name: Restore dependencies
         run: dotnet restore Outcome.slnx
-
       - name: Build
         run: dotnet build Outcome.slnx --configuration Release --no-restore
-
       - name: Run tests
-        run: dotnet test Outcome.slnx --configuration Release --no-build --verbosity normal
+        run: dotnet test Outcome.slnx --configuration Release --no-build --verbosity minimal --logger 'trx;LogFilePrefix=results'
+      - name: Summarize test evidence
+        if: always()
+        run: python3 scripts/summarize-outcome-tests.py
+      - name: Preserve test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: outcome-test-reports
+          path: |
+            tests/**/TestResults/*.trx
+            artifacts/test-summary.md
+          if-no-files-found: warn
+          retention-days: 14
