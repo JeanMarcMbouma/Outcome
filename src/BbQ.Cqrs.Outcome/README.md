@@ -2,6 +2,14 @@
 
 Optional validation integration for BbQ.Cqrs and BbQ.Outcome, targeting .NET 8, 9, and 10. Neither base library depends on this package.
 
+## Installation
+
+This package ships with the CQRS family under the same `cqrs-v*` version.
+
+```bash
+dotnet add package BbQ.Cqrs.Outcome --prerelease
+```
+
 ## Contracts
 
 `IRequestValidator<TRequest>` returns an ordered list of `ValidationIssue(Code, Message, MemberName)`. An empty list is valid. `ValidationBehavior<TRequest,TResponse>` runs validators sequentially, accumulates their issues, and invokes the handler exactly once only when validation succeeds. Sequential execution permits shared scoped dependencies such as a DbContext. Exceptions and cancellation are not converted to validation issues.
