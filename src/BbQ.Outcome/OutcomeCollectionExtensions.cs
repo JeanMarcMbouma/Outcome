@@ -4,6 +4,9 @@ namespace BbQ.Outcome;
 public static class OutcomeCollectionExtensions
 {
     /// <summary>Collects values if all succeed; otherwise accumulates all errors in input order.</summary>
+    /// <example><code>
+    /// var result = new[] { LoadUser(1), LoadUser(2), LoadUser(3) }.Sequence();
+    /// </code></example>
     public static Outcome<IReadOnlyList<T>, TError> Sequence<T, TError>(this IEnumerable<Outcome<T, TError>> source)
     {
         ArgumentNullException.ThrowIfNull(source);
@@ -24,6 +27,9 @@ public static class OutcomeCollectionExtensions
     }
 
     /// <summary>Collects heterogeneous outcomes, accumulating all errors in input order.</summary>
+    /// <example><code>
+    /// Outcome&lt;IReadOnlyList&lt;User&gt;&gt; result = users.Select(ValidateUser).Sequence();
+    /// </code></example>
     public static Outcome<IReadOnlyList<T>> Sequence<T>(this IEnumerable<Outcome<T>> source)
     {
         ArgumentNullException.ThrowIfNull(source);
@@ -31,6 +37,10 @@ public static class OutcomeCollectionExtensions
     }
 
     /// <summary>Combines differently typed values; failures are accumulated left then right.</summary>
+    /// <example><code>
+    /// var result = LoadUser(id).Zip(LoadPermissions(id));
+    /// result.Tap(pair => Use(pair.Left, pair.Right));
+    /// </code></example>
     public static Outcome<(TLeft Left, TRight Right), TError> Zip<TLeft, TRight, TError>(
         this Outcome<TLeft, TError> left, Outcome<TRight, TError> right)
     {
@@ -47,11 +57,17 @@ public static class OutcomeCollectionExtensions
     }
 
     /// <summary>Combines differently typed heterogeneous outcomes.</summary>
+    /// <example><code>
+    /// var result = LoadProfile(id).Zip(LoadSettings(id));
+    /// </code></example>
     public static Outcome<(TLeft Left, TRight Right)> Zip<TLeft, TRight>(
         this Outcome<TLeft> left, Outcome<TRight> right)
         => OutcomeInterop.Untyped(OutcomeInterop.Typed(left).Zip(OutcomeInterop.Typed(right)));
 
     /// <summary>Runs every operation sequentially and accumulates all domain failures.</summary>
+    /// <example><code>
+    /// var result = userIds.Traverse(id => repository.Find(id));
+    /// </code></example>
     public static Outcome<IReadOnlyList<TResult>, TError> Traverse<TInput, TResult, TError>(
         this IEnumerable<TInput> source, Func<TInput, Outcome<TResult, TError>> operation)
     {
@@ -61,6 +77,9 @@ public static class OutcomeCollectionExtensions
     }
 
     /// <summary>Runs every heterogeneous operation sequentially.</summary>
+    /// <example><code>
+    /// var result = commands.Traverse(command => handler.Handle(command));
+    /// </code></example>
     public static Outcome<IReadOnlyList<TResult>> Traverse<TInput, TResult>(
         this IEnumerable<TInput> source, Func<TInput, Outcome<TResult>> operation)
     {
@@ -75,6 +94,12 @@ public static class OutcomeCollectionExtensions
     /// sibling operations and all started tasks are observed before the method completes.
     /// Callbacks must cooperate with cancellation for prompt shutdown.
     /// </summary>
+    /// <example><code>
+    /// var result = await userIds.TraverseAsync(
+    ///     (id, ct) => repository.FindAsync(id, ct),
+    ///     maxConcurrency: 8,
+    ///     cancellationToken);
+    /// </code></example>
     public static async Task<Outcome<IReadOnlyList<TResult>, TError>> TraverseAsync<TInput, TResult, TError>(
         this IEnumerable<TInput> source,
         Func<TInput, CancellationToken, Task<Outcome<TResult, TError>>> operation,
@@ -107,15 +132,12 @@ public static class OutcomeCollectionExtensions
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             CancelSiblings();
-            // Internal cancellation may have been caused by a fault in an earlier factory.
-            // Observe that fault rather than replacing it with a cancellation exception.
             await Task.WhenAll(pending).ConfigureAwait(false);
             throw;
         }
         catch
         {
             CancelSiblings();
-            // Preserve the original failure, but never abandon started operations.
             try { await Task.WhenAll(pending).ConfigureAwait(false); } catch { }
             throw;
         }
@@ -128,12 +150,17 @@ public static class OutcomeCollectionExtensions
 
         void CancelSiblings()
         {
-            // A throwing user cancellation callback must not mask the operation failure.
             try { cancellation.Cancel(); } catch (AggregateException) { }
         }
     }
 
     /// <summary>Bounded, ordered, accumulate-all traversal for heterogeneous outcomes.</summary>
+    /// <example><code>
+    /// var result = await jobs.TraverseAsync(
+    ///     (job, ct) => RunJobAsync(job, ct),
+    ///     maxConcurrency: 4,
+    ///     cancellationToken);
+    /// </code></example>
     public static async Task<Outcome<IReadOnlyList<TResult>>> TraverseAsync<TInput, TResult>(
         this IEnumerable<TInput> source,
         Func<TInput, CancellationToken, Task<Outcome<TResult>>> operation,
