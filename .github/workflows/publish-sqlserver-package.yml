@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'sqlserver-v*'  # Triggers on tags like sqlserver-v0.1.0, sqlserver-v1.0.0
+  workflow_dispatch:
   workflow_call:         # Allow main.yml to call this workflow
 
 permissions:
@@ -45,6 +46,7 @@ jobs:
       run: |
         version="${GITHUB_REF_NAME#sqlserver-v}"
         expected=$(dotnet msbuild src/BbQ.Events.SqlServer/BbQ.Events.SqlServer.csproj -getProperty:Version)
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then version="$expected"; fi
         test "$version" = "$expected" || { echo "Tag version $version differs from project version $expected"; exit 1; }
         echo "version=$version" >> "$GITHUB_OUTPUT"
 
@@ -59,4 +61,5 @@ jobs:
         user: ${{ secrets.NUGET_USER }}
         
     - name: Push to NuGet
+      shell: bash
       run: dotnet nuget push ./artifacts/*.nupkg --api-key ${{steps.login.outputs.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json --skip-duplicate
