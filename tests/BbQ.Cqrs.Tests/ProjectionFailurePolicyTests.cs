@@ -62,6 +62,16 @@ public class ProjectionFailurePolicyTests
     }
 
     [Test]
+    public void CancellationDuringBackoff_StopsWithoutFallback()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var options = Options();
+        options.InitialRetryDelayMs = options.MaxRetryDelayMs = 10000;
+        var policy = new Policy(_ => { cancellation.Cancel(); return ProjectionErrorHandlingStrategy.Retry; });
+        Assert.CatchAsync<OperationCanceledException>(async () => await new ProjectionFailureProcessor().ExecuteAsync(Fail,
+            "p", "a", 0, Events("1"), options, policy, ct: cancellation.Token));
+    }
+    [Test]
     public async Task Quarantine_IsDurableBeforeReturnAndRecoveryAvoidsReprocessing()
     {
         var store = new MemoryStore();

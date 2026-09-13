@@ -44,11 +44,11 @@ public class ProjectionFailureEngineTests
             if (Fail) throw new IOException("Disk failed");
             Items.Add(entry);
         }
-        public Task<ProjectionDeadLetter?> GetAsync(string id, CancellationToken ct = default) => Task.FromResult<ProjectionDeadLetter?>(null);
+        public Task<ProjectionDeadLetter?> GetAsync(string id, CancellationToken ct = default) => Task.FromResult(Items.FirstOrDefault(item => item.Id == id));
         public async IAsyncEnumerable<ProjectionDeadLetter> ReadAsync([EnumeratorCancellation] CancellationToken ct = default)
         { foreach (var item in Items) { yield return item; await Task.Yield(); } }
     }
-    private static ServiceProvider Provider(bool batch, ProjectionErrorHandlingStrategy strategy, BlockingStore? letters = null)
+    private static ServiceProvider Provider(bool batch, ProjectionErrorHandlingStrategy strategy, BlockingStore? letters = null, IProjectionCheckpointStore? checkpoints = null)
     {
         ProjectionHandlerRegistry.Clear();
         var services = new ServiceCollection();
@@ -67,11 +67,31 @@ public class ProjectionFailureEngineTests
         }
         if (batch) services.AddProjection<Batch>(Configure);
         else services.AddProjection<Single>(Configure);
+        if (checkpoints != null) services.AddSingleton(checkpoints);
         services.AddProjectionEngine();
         return services.BuildServiceProvider();
     }
     [TearDown] public void Cleanup() => ProjectionHandlerRegistry.Clear();
 
+    private sealed class FailingCheckpoint : IProjectionCheckpointStore
+    {
+        public ValueTask<long?> GetCheckpointAsync(string name, CancellationToken ct = default) => ValueTask.FromResult<long?>(null);
+        public ValueTask SaveCheckpointAsync(string name, long position, CancellationToken ct = default) => ValueTask.FromException(new IOException("Checkpoint unavailable"));
+        public ValueTask ResetCheckpointAsync(string name, CancellationToken ct = default) => ValueTask.CompletedTask;
+    }
+    [Test]
+    public async Task CheckpointFailure_AfterPersistence_RestartRecoversQuarantine()
+    {
+        var letters = new BlockingStore();
+        letters.Release.TrySetResult();
+        using (var first = Provider(false, ProjectionErrorHandlingStrategy.Quarantine, letters, new FailingCheckpoint()))
+            Assert.ThrowsAsync<IOException>(async () => await first.GetRequiredService<IProjectionEngine>().RunAsync().WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.That(letters.Items.Count, Is.EqualTo(1));
+        using var restarted = Provider(false, ProjectionErrorHandlingStrategy.Quarantine, letters);
+        await restarted.GetRequiredService<IProjectionEngine>().RunAsync().WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.That(letters.Items.Count, Is.EqualTo(1), "Recovery must not persist another copy");
+        Assert.That(await restarted.GetRequiredService<IProjectionCheckpointStore>().GetCheckpointAsync("failure-test:_default"), Is.EqualTo(3));
+    }
     [TestCase(false)]
     [TestCase(true)]
     public async Task Skip_AdvancesCheckpointWithDistinctCounters(bool batch)

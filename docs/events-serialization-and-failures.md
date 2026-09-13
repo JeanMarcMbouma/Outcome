@@ -68,3 +68,5 @@ The four direct `Microsoft.SourceLink.GitHub` 8.0.0 references (Outcome and the 
 Advisory: https://github.com/advisories/GHSA-23fw-v26w-5fgq
 
 NuGet audit remains enabled. Run the full solution build/tests, package creation and existing Outcome AOT publish/run smoke. `Events provider validation` starts real SQL Server, PostgreSQL and RabbitMQ services and fails when a required service is missing. Local skipped provider tests are not evidence of durability.
+
+The real-service checks also correct PostgreSQL's nullable checkpoint uniqueness to a PostgreSQL 15+ "UNIQUE NULLS NOT DISTINCT" constraint. Existing SQL Server checkpoint tests use a nullable unique constraint instead of an invalid nullable primary key. Provider fixture setup failures are fatal when REQUIRE_EVENT_SERVICES=1. PostgreSQL tests use the provisioned service directly, removing their old Testcontainers/SSH.NET dependency.

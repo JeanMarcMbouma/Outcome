@@ -24,26 +24,22 @@ public sealed class SqlServerProjectionDeadLetterStore(string connectionString) 
             throw new ArgumentException("Dead-letter ID does not match its identity.", nameof(entry));
         await using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync(ct).ConfigureAwait(false);
-        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = "SELECT Body FROM dbo.BbQ_ProjectionDeadLetters WITH (UPDLOCK, HOLDLOCK) WHERE Id = @id";
+        command.CommandText = "INSERT INTO dbo.BbQ_ProjectionDeadLetters (Id, Body) VALUES (@id, @body)";
         command.Parameters.AddWithValue("@id", entry.Id);
-        var existingBody = await command.ExecuteScalarAsync(ct).ConfigureAwait(false) as string;
-        if (existingBody != null)
+        command.Parameters.AddWithValue("@body", JsonSerializer.Serialize(entry));
+        try
         {
-            var existing = JsonSerializer.Deserialize<ProjectionDeadLetter>(existingBody)!;
-            if (existing.ProjectionName != entry.ProjectionName || existing.PartitionKey != entry.PartitionKey ||
-                existing.EventId != entry.EventId || existing.Event != entry.Event)
-                throw new InvalidOperationException("Dead-letter identity collision with different event data.");
-        }
-        else
-        {
-            command.CommandText = "INSERT INTO dbo.BbQ_ProjectionDeadLetters (Id, Body) VALUES (@id, @body)";
-            command.Parameters.AddWithValue("@body", JsonSerializer.Serialize(entry));
+            // A single statement commits atomically. The unique key arbitrates competing deliveries.
             await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
         }
-        await transaction.CommitAsync(ct).ConfigureAwait(false);
+        catch (SqlException exception) when (exception.Number is 2601 or 2627)
+        {
+            var existing = await GetAsync(entry.Id, ct).ConfigureAwait(false);
+            if (existing == null || existing.ProjectionName != entry.ProjectionName || existing.PartitionKey != entry.PartitionKey ||
+                existing.EventId != entry.EventId || existing.Event != entry.Event)
+                throw new InvalidOperationException("Dead-letter identity collision with different event data.", exception);
+        }
     }
 
     public async Task<ProjectionDeadLetter?> GetAsync(string id, CancellationToken ct = default)

@@ -1,20 +1,18 @@
 using BbQ.Events.PostgreSql.Checkpointing;
 using Npgsql;
 using NUnit.Framework;
-using Testcontainers.PostgreSql;
 
 namespace BbQ.Events.PostgreSql.Tests;
 
 /// <summary>
 /// Integration tests for PostgreSqlProjectionCheckpointStore.
 /// 
-/// These tests use Testcontainers to spin up a PostgreSQL instance.
-/// Docker must be running for these tests to execute.
+/// These tests use TEST_POSTGRESQL_CONNECTION_STRING or a local PostgreSQL instance.
+/// CI provisions a real PostgreSQL service.
 /// </summary>
 [TestFixture]
 public class PostgreSqlProjectionCheckpointStoreTests
 {
-    private PostgreSqlContainer? _postgresContainer;
     private string? _connectionString;
     private PostgreSqlProjectionCheckpointStore? _store;
     private bool _canRunTests;
@@ -24,18 +22,8 @@ public class PostgreSqlProjectionCheckpointStoreTests
     {
         try
         {
-            // Start PostgreSQL container
-            _postgresContainer = new PostgreSqlBuilder()
-                .WithImage("postgres:16")
-                .WithDatabase("bbqeventstest")
-                .WithUsername("testuser")
-                .WithPassword("testpassword")
-                .Build();
-
-            await _postgresContainer.StartAsync();
-
-            _connectionString = _postgresContainer.GetConnectionString();
-
+            _connectionString = Environment.GetEnvironmentVariable("TEST_POSTGRESQL_CONNECTION_STRING")
+                ?? "Host=localhost;Database=bbqeventstest;Username=postgres";
             // Create the checkpoint table
             await using var connection = new NpgsqlConnection(_connectionString);
             await connection.OpenAsync();
@@ -47,7 +35,7 @@ public class PostgreSqlProjectionCheckpointStoreTests
                     partition_key TEXT NULL DEFAULT NULL,
                     position BIGINT NOT NULL,
                     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                    CONSTRAINT pk_bbq_projection_checkpoints PRIMARY KEY (projection_name, partition_key) NULLS NOT DISTINCT
+                    CONSTRAINT pk_bbq_projection_checkpoints UNIQUE NULLS NOT DISTINCT (projection_name, partition_key)
                 );";
             
             await command.ExecuteNonQueryAsync();
@@ -58,16 +46,8 @@ public class PostgreSqlProjectionCheckpointStoreTests
         {
             TestContext.WriteLine($"PostgreSQL container could not be started: {ex.Message}");
             TestContext.WriteLine("Tests will be skipped. Ensure Docker is running.");
+            if (Environment.GetEnvironmentVariable("REQUIRE_EVENT_SERVICES") == "1") throw;
             _canRunTests = false;
-        }
-    }
-
-    [OneTimeTearDown]
-    public async Task OneTimeTearDown()
-    {
-        if (_postgresContainer != null)
-        {
-            await _postgresContainer.DisposeAsync();
         }
     }
 

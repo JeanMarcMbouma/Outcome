@@ -72,7 +72,7 @@ public class SqlServerProjectionCheckpointStoreTests
                         PartitionKey NVARCHAR(200) NULL,
                         Position BIGINT NOT NULL,
                         LastUpdatedUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-                        PRIMARY KEY (ProjectionName, PartitionKey)
+                        UNIQUE (ProjectionName, PartitionKey)
                     );
                 END";
             
@@ -84,6 +84,7 @@ public class SqlServerProjectionCheckpointStoreTests
         {
             TestContext.WriteLine($"SQL Server not available: {ex.Message}");
             TestContext.WriteLine("Tests will be skipped. To run tests, ensure SQL Server or LocalDB is available.");
+            if (Environment.GetEnvironmentVariable("REQUIRE_EVENT_SERVICES") == "1") throw;
             _canRunTests = false;
         }
     }

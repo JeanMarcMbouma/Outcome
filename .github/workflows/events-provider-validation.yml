@@ -50,6 +50,10 @@ jobs:
           exit 1
       - name: Test real providers on all supported runtimes
         run: dotnet test tests/BbQ.Events.ProviderIntegration.Tests -c Release --logger 'trx;LogFilePrefix=providers'
+      - name: Test existing database provider suites against services
+        run: |
+          dotnet test tests/BbQ.Events.SqlServer.Tests -c Release --logger 'trx;LogFilePrefix=sqlserver'
+          dotnet test tests/BbQ.Events.PostgreSql.Tests -c Release --logger 'trx;LogFilePrefix=postgres'
       - name: Test projection policies and existing behavior
         run: dotnet test tests/BbQ.Cqrs.Tests -c Release --logger 'trx;LogFilePrefix=policies'
       - name: Publish and execute Native AOT smoke
