@@ -7,11 +7,21 @@ namespace BbQ.Outcome.SystemTextJson;
 /// Builds an explicit allowlist for heterogeneous error round trips. Identifiers are stable
 /// application contracts, not CLR type names. Build before concurrent serialization begins.
 /// </summary>
+/// <example><code>
+/// var registry = new OutcomeErrorTypeRegistryBuilder()
+///     .Register("validation", AppJsonContext.Default.ValidationError)
+///     .Register("not-found", AppJsonContext.Default.NotFoundError)
+///     .Build();
+/// </code></example>
 public sealed class OutcomeErrorTypeRegistryBuilder
 {
     private readonly Dictionary<string, ErrorTypeEntry> _byId = new(StringComparer.Ordinal);
     private readonly Dictionary<Type, ErrorTypeEntry> _byType = [];
 
+    /// <summary>Registers one exact runtime error type under a stable external identifier.</summary>
+    /// <example><code>
+    /// builder.Register("validation", AppJsonContext.Default.ValidationError);
+    /// </code></example>
     public OutcomeErrorTypeRegistryBuilder Register<TError>(string id, JsonTypeInfo<TError> typeInfo) where TError : notnull
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
@@ -24,11 +34,26 @@ public sealed class OutcomeErrorTypeRegistryBuilder
         return this;
     }
 
-    /// <summary>Creates a snapshot unaffected by subsequent registrations on this builder.</summary>
+    /// <summary>Creates an immutable snapshot unaffected by subsequent registrations on this builder.</summary>
+    /// <example><code>
+    /// var registry = builder.Build();
+    /// options.AddOutcomeConverter(AppJsonContext.Default.User, registry);
+    /// </code></example>
     public OutcomeErrorTypeRegistry Build() => new(_byId, _byType);
 }
 
-/// <summary>Immutable registry using exact runtime-type matches and no dynamic type loading.</summary>
+/// <summary>
+/// Immutable registry using exact runtime-type matches and no dynamic type loading.
+/// Pass an instance to the heterogeneous <c>AddOutcomeConverter</c> overload.
+/// </summary>
+/// <example><code>
+/// var registry = new OutcomeErrorTypeRegistryBuilder()
+///     .Register("validation", AppJsonContext.Default.ValidationError)
+///     .Build();
+///
+/// var options = new JsonSerializerOptions()
+///     .AddOutcomeConverter(AppJsonContext.Default.User, registry);
+/// </code></example>
 public sealed class OutcomeErrorTypeRegistry
 {
     private readonly Dictionary<string, ErrorTypeEntry> _byId;
