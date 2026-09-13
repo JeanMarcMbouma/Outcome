@@ -68,7 +68,7 @@ public static class OutcomeHttpExtensions
     /// <example><code>
     /// services.AddScoped&lt;IErrorDescriptorProvider&lt;AppError&gt;, AppErrorDescriptors&gt;();
     /// services.AddOutcomeHttpMapping&lt;AppError&gt;(options =>
-    ///     options.Map("user.not_found", StatusCodes.Status404NotFound));
+    ///     options.Rules["user.not_found"] = new HttpErrorRule(StatusCodes.Status404NotFound));
     /// </code></example>
     public static IServiceCollection AddOutcomeHttpMapping<TError>(this IServiceCollection services,
         Action<OutcomeHttpMappingOptions>? configure = null)
