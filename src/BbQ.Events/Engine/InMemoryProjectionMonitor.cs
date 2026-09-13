@@ -27,7 +27,7 @@ namespace BbQ.Events.Engine;
 /// Console.WriteLine($"Lag: {metrics?.Lag}, Events/sec: {metrics?.EventsPerSecond}");
 /// </code>
 /// </remarks>
-public sealed class InMemoryProjectionMonitor : IProjectionMonitor
+public sealed class InMemoryProjectionMonitor : IProjectionMonitor, IProjectionDispositionMonitor
 {
     private readonly ConcurrentDictionary<string, ProjectionMetrics> _metrics = new();
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _partitionsByProjection = new();
@@ -148,6 +148,15 @@ public sealed class InMemoryProjectionMonitor : IProjectionMonitor
     public IEnumerable<ProjectionMetrics> GetAllMetrics()
     {
         return _metrics.Values.ToList();
+    }
+
+    public void RecordDisposition(string projectionName, string partitionKey, long position, ProjectionDisposition disposition)
+    {
+        var key = GetKey(projectionName, partitionKey);
+        var metrics = _metrics.GetOrAdd(key, _ => new ProjectionMetrics { ProjectionName = projectionName, PartitionKey = partitionKey });
+        _partitionsByProjection.GetOrAdd(projectionName, _ => new()).TryAdd(key, 0);
+        if (disposition != ProjectionDisposition.Stopped) metrics.CurrentPosition = position;
+        metrics.IncrementDisposition(disposition);
     }
 
     private static string GetKey(string projectionName, string partitionKey)

@@ -82,13 +82,17 @@ public class ProjectionErrorHandlingOptionsTests
     }
 
     [Test]
-    public void ProjectionErrorHandlingStrategy_HasThreeStrategies()
+    public void ProjectionErrorHandlingStrategy_PreservesExistingValuesAndAddsQuarantine()
     {
         // Arrange & Act - Verify all strategies are available
         var strategies = Enum.GetValues<ProjectionErrorHandlingStrategy>();
         
         // Assert
-        Assert.That(strategies.Length, Is.EqualTo(3), "Should have exactly 3 strategies");
+        Assert.That(strategies.Length, Is.EqualTo(4));
+        Assert.That((int)ProjectionErrorHandlingStrategy.Retry, Is.EqualTo(0));
+        Assert.That((int)ProjectionErrorHandlingStrategy.Skip, Is.EqualTo(1));
+        Assert.That((int)ProjectionErrorHandlingStrategy.Stop, Is.EqualTo(2));
+        Assert.That(strategies, Contains.Item(ProjectionErrorHandlingStrategy.Quarantine));
         Assert.That(strategies, Contains.Item(ProjectionErrorHandlingStrategy.Retry));
         Assert.That(strategies, Contains.Item(ProjectionErrorHandlingStrategy.Skip));
         Assert.That(strategies, Contains.Item(ProjectionErrorHandlingStrategy.Stop));

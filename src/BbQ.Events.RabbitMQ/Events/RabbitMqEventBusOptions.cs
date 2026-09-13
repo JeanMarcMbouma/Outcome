@@ -1,3 +1,4 @@
+using BbQ.Events.Serialization;
 using System.Text.Json;
 using BbQ.Events.RabbitMQ.Internal;
 
@@ -106,4 +107,6 @@ public sealed class RabbitMqEventBusOptions
     /// If not provided, defaults to camelCase property naming.
     /// </remarks>
     public JsonSerializerOptions? JsonSerializerOptions { get; set; }
+    /// <summary>Shared serializer; null preserves the legacy wire format.</summary>
+    public IEventSerializer? EventSerializer { get; set; }
 }

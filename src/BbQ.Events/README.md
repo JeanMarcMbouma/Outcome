@@ -953,3 +953,5 @@ services.AddSingleton<IProjectionCheckpointStore, SqlCheckpointStore>();
 ## 📄 License
 
 This project is licensed under the MIT License.
+
+See [shared serialization, failure policies and quarantine operations](../../docs/events-serialization-and-failures.md) for versioned event envelopes, explicit legacy migration, durable SQL quarantine, checkpoint boundaries and replay.

@@ -1,3 +1,4 @@
+using BbQ.Events.Serialization;
 using System.Text.Json;
 
 namespace BbQ.Events.PostgreSql.Events;
@@ -19,6 +20,9 @@ public sealed class PostgreSqlEventStoreOptions
     /// If not provided, defaults to camelCase property naming.
     /// </remarks>
     public JsonSerializerOptions? JsonSerializerOptions { get; set; }
+
+    /// <summary>Shared serializer; null preserves the legacy wire format.</summary>
+    public IEventSerializer? EventSerializer { get; set; }
 
     /// <summary>
     /// Gets or sets whether to include metadata in stored events.

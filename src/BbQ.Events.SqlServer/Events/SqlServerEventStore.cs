@@ -1,3 +1,4 @@
+using BbQ.Events.Serialization;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using BbQ.Events.Events;
@@ -31,6 +32,7 @@ public sealed class SqlServerEventStore : IEventStore
 {
     private readonly SqlServerEventStoreOptions _options;
     private readonly JsonSerializerOptions _jsonOptions;
+    private readonly IEventSerializer _serializer;
 
     /// <summary>
     /// Gets the connection string used by this event store.
@@ -57,6 +59,7 @@ public sealed class SqlServerEventStore : IEventStore
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             WriteIndented = false
         };
+        _serializer = _options.EventSerializer ?? new LegacyJsonEventSerializer(_jsonOptions);
     }
 
     /// <summary>
@@ -87,8 +90,9 @@ public sealed class SqlServerEventStore : IEventStore
         await using var command = connection.CreateCommand();
         command.CommandText = SqlConstants.AppendEventSql;
 
-        var eventType = typeof(TEvent).FullName ?? typeof(TEvent).Name;
-        var eventData = SqlHelpers.SerializeToJson(@event, _jsonOptions);
+        var serialized = _serializer.Serialize(@event);
+        var eventType = serialized.TypeId;
+        var eventData = serialized.Data;
         
         command.AddParameter("@StreamName", stream);
         command.AddParameter("@EventType", eventType);
@@ -136,10 +140,9 @@ public sealed class SqlServerEventStore : IEventStore
 
             // Only deserialize if the event type matches
             // This allows for type filtering when reading from streams with multiple event types
-            var expectedType = typeof(TEvent).FullName ?? typeof(TEvent).Name;
-            if (eventType == expectedType)
+            if (_serializer.CanDeserialize<TEvent>(eventType))
             {
-                var @event = SqlHelpers.DeserializeFromJson<TEvent>(eventData, _jsonOptions);
+                var @event = _serializer.Deserialize<TEvent>(eventType, eventData);
                 yield return new StoredEvent<TEvent>(position, @event);
             }
         }
