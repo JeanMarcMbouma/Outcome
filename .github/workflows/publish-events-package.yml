@@ -39,13 +39,18 @@ jobs:
 
       - name: Extract version
         id: version
-        run: echo "version=${GITHUB_REF_NAME#events-v}" >> $GITHUB_OUTPUT
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#events-v}"
+          expected=$(dotnet msbuild src/BbQ.Events/BbQ.Events.csproj -getProperty:Version)
+          test "$version" = "$expected" || { echo "Tag version $version differs from project version $expected"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Pack BbQ.Events
-        run: dotnet pack src/BbQ.Events/BbQ.Events.csproj --configuration Release --no-build -o ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
+        run: dotnet pack src/BbQ.Events/BbQ.Events.csproj --configuration Release --no-build -o ./artifacts
 
       - name: Pack BbQ.Events.SourceGenerators
-        run: dotnet pack src/BbQ.Events.SourceGenerators/BbQ.Events.SourceGenerators.csproj --configuration Release --no-build -o ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
+        run: dotnet pack src/BbQ.Events.SourceGenerators/BbQ.Events.SourceGenerators.csproj --configuration Release --no-build -o ./artifacts
 
       - name: NuGet login (OIDC → temp API key)
         uses: NuGet/login@v1

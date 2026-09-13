@@ -38,10 +38,15 @@ jobs:
 
     - name: Extract version
       id: version
-      run: echo "version=${GITHUB_REF_NAME#rabbitmq-v}" >> $GITHUB_OUTPUT
+      shell: bash
+      run: |
+        version="${GITHUB_REF_NAME#rabbitmq-v}"
+        expected=$(dotnet msbuild src/BbQ.Events.RabbitMQ/BbQ.Events.RabbitMQ.csproj -getProperty:Version)
+        test "$version" = "$expected" || { echo "Tag version $version differs from project version $expected"; exit 1; }
+        echo "version=$version" >> "$GITHUB_OUTPUT"
 
     - name: Pack
-      run: dotnet pack src/BbQ.Events.RabbitMQ/BbQ.Events.RabbitMQ.csproj --configuration Release --no-build --output ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
+      run: dotnet pack src/BbQ.Events.RabbitMQ/BbQ.Events.RabbitMQ.csproj --configuration Release --no-build --output ./artifacts
       
     - name: NuGet login (OIDC → temp API key)
       uses: NuGet/login@v1

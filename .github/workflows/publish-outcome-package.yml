@@ -51,15 +51,20 @@ jobs:
 
       - name: Extract version
         id: version
-        run: echo "version=${GITHUB_REF_NAME#outcome-v}" >> $GITHUB_OUTPUT
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#outcome-v}"
+          expected=$(dotnet msbuild src/BbQ.Outcome/BbQ.Outcome.csproj -getProperty:Version)
+          test "$version" = "$expected" || { echo "Tag version $version differs from project version $expected"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Pack Outcome package family
         run: |
-          dotnet pack src/BbQ.Outcome/BbQ.Outcome.csproj --configuration Release --no-build -o ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
-          dotnet pack src/BbQ.Outcome.SourceGenerators/BbQ.Outcome.SourceGenerators.csproj --configuration Release --no-build -o ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
-          dotnet pack src/BbQ.Outcome.AspNetCore/BbQ.Outcome.AspNetCore.csproj --configuration Release --no-build -o ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
-          dotnet pack src/BbQ.Outcome.SystemTextJson/BbQ.Outcome.SystemTextJson.csproj --configuration Release --no-build -o ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
-          dotnet pack src/BbQ.Outcome.Diagnostics/BbQ.Outcome.Diagnostics.csproj --configuration Release --no-build -o ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
+          dotnet pack src/BbQ.Outcome/BbQ.Outcome.csproj --configuration Release --no-build -o ./artifacts
+          dotnet pack src/BbQ.Outcome.SourceGenerators/BbQ.Outcome.SourceGenerators.csproj --configuration Release --no-build -o ./artifacts
+          dotnet pack src/BbQ.Outcome.AspNetCore/BbQ.Outcome.AspNetCore.csproj --configuration Release --no-build -o ./artifacts
+          dotnet pack src/BbQ.Outcome.SystemTextJson/BbQ.Outcome.SystemTextJson.csproj --configuration Release --no-build -o ./artifacts
+          dotnet pack src/BbQ.Outcome.Diagnostics/BbQ.Outcome.Diagnostics.csproj --configuration Release --no-build -o ./artifacts
 
       - name: NuGet login (OIDC → temp API key)
         uses: NuGet/login@v1

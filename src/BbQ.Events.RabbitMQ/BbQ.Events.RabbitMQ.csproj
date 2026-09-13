@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <PackageId>BbQ.Events.RabbitMQ</PackageId>
-    <Version>0.1.0</Version>
+    <Version>1.2.0-preview.1</Version>
     <Authors>Jean</Authors>
     <Company>JM Mbouma</Company>
     <Description>RabbitMQ implementation of IEventBus for BbQ.Events, providing distributed pub/sub messaging with durable event delivery across multiple processes and services.</Description>

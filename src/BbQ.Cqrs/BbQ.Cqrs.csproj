@@ -1,10 +1,10 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFrameworks>net8.0;net9.0;net10.0;net481</TargetFrameworks>
 
     <PackageId>BbQ.Cqrs</PackageId>
-    <Version>1.0.0</Version>
+    <Version>1.3.0-preview.2</Version>
     <Authors>Jean</Authors>
     <Company>JM Mbouma</Company>
     <Description>A lightweight mediatior implementation.</Description>

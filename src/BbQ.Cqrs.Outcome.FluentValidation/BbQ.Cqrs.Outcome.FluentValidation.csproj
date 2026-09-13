@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <PackageId>BbQ.Cqrs.Outcome.FluentValidation</PackageId>
-    <Version>1.0.0</Version>
+    <Version>1.3.0-preview.2</Version>
     <Authors>Jean</Authors>
     <Description>Async FluentValidation adapter for BbQ.Cqrs Outcome validation.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

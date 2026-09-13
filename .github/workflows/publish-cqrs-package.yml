@@ -50,14 +50,19 @@ jobs:
 
       - name: Extract version
         id: version
-        run: echo "version=${GITHUB_REF_NAME#cqrs-v}" >> $GITHUB_OUTPUT
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#cqrs-v}"
+          expected=$(dotnet msbuild src/BbQ.Cqrs/BbQ.Cqrs.csproj -getProperty:Version)
+          test "$version" = "$expected" || { echo "Tag version $version differs from project version $expected"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Pack CQRS package family
         run: |
-          dotnet pack src/BbQ.Cqrs/BbQ.Cqrs.csproj --configuration Release --no-build -o ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
-          dotnet pack src/BbQ.Cqrs.SourceGenerators/BbQ.Cqrs.SourceGenerators.csproj --configuration Release --no-build -o ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
-          dotnet pack src/BbQ.Cqrs.Outcome/BbQ.Cqrs.Outcome.csproj --configuration Release --no-build -o ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
-          dotnet pack src/BbQ.Cqrs.Outcome.FluentValidation/BbQ.Cqrs.Outcome.FluentValidation.csproj --configuration Release --no-build -o ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
+          dotnet pack src/BbQ.Cqrs/BbQ.Cqrs.csproj --configuration Release --no-build -o ./artifacts
+          dotnet pack src/BbQ.Cqrs.SourceGenerators/BbQ.Cqrs.SourceGenerators.csproj --configuration Release --no-build -o ./artifacts
+          dotnet pack src/BbQ.Cqrs.Outcome/BbQ.Cqrs.Outcome.csproj --configuration Release --no-build -o ./artifacts
+          dotnet pack src/BbQ.Cqrs.Outcome.FluentValidation/BbQ.Cqrs.Outcome.FluentValidation.csproj --configuration Release --no-build -o ./artifacts
 
       - name: NuGet login (OIDC → temp API key)
         uses: NuGet/login@v1
