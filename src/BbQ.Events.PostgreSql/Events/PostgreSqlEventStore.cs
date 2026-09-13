@@ -1,3 +1,4 @@
+using BbQ.Events.Serialization;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using BbQ.Events.Events;
@@ -31,6 +32,7 @@ public sealed class PostgreSqlEventStore : IEventStore
 {
     private readonly PostgreSqlEventStoreOptions _options;
     private readonly JsonSerializerOptions _jsonOptions;
+    private readonly IEventSerializer _serializer;
     private static readonly string MachineName = Environment.MachineName;
 
     /// <summary>
@@ -58,6 +60,7 @@ public sealed class PostgreSqlEventStore : IEventStore
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             WriteIndented = false
         };
+        _serializer = _options.EventSerializer ?? new LegacyJsonEventSerializer(_jsonOptions);
     }
 
     /// <summary>
@@ -88,8 +91,9 @@ public sealed class PostgreSqlEventStore : IEventStore
         await using var command = connection.CreateCommand();
         command.CommandText = PostgreSqlConstants.AppendEventSqlSimplified;
 
-        var eventType = typeof(TEvent).FullName ?? typeof(TEvent).Name;
-        var eventData = PostgreSqlHelpers.SerializeToJson(@event, _jsonOptions);
+        var serialized = _serializer.Serialize(@event);
+        var eventType = serialized.TypeId;
+        var eventData = serialized.Data;
         
         command.AddParameter("@stream_name", stream);
         command.AddParameter("@event_type", eventType);
@@ -137,10 +141,9 @@ public sealed class PostgreSqlEventStore : IEventStore
 
             // Only deserialize if the event type matches
             // This allows for type filtering when reading from streams with multiple event types
-            var expectedType = typeof(TEvent).FullName ?? typeof(TEvent).Name;
-            if (eventType == expectedType)
+            if (_serializer.CanDeserialize<TEvent>(eventType))
             {
-                var @event = PostgreSqlHelpers.DeserializeFromJson<TEvent>(eventData, _jsonOptions);
+                var @event = _serializer.Deserialize<TEvent>(eventType, eventData);
                 yield return new StoredEvent<TEvent>(position, @event);
             }
         }

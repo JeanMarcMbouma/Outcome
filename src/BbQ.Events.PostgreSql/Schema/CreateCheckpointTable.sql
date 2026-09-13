@@ -7,7 +7,7 @@ CREATE TABLE bbq_projection_checkpoints (
     partition_key TEXT NULL DEFAULT NULL,
     position BIGINT NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT pk_bbq_projection_checkpoints PRIMARY KEY (projection_name, partition_key) NULLS NOT DISTINCT
+    CONSTRAINT pk_bbq_projection_checkpoints UNIQUE NULLS NOT DISTINCT (projection_name, partition_key)
 );
 
 -- Index for time-based queries (projection health monitoring)

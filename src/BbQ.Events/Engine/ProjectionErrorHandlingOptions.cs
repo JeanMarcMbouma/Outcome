@@ -13,6 +13,14 @@ namespace BbQ.Events.Engine;
 /// </remarks>
 public class ProjectionErrorHandlingOptions
 {
+    /// <summary>Optional per-projection policy; otherwise a DI policy or the compatibility policy is used.</summary>
+    public IProjectionFailurePolicy? FailurePolicy { get; set; }
+    /// <summary>Optional durable quarantine store.</summary>
+    public IProjectionDeadLetterStore? DeadLetterStore { get; set; }
+    /// <summary>Stable application event ID, required for quarantine (never a delivery counter).</summary>
+    public Func<object, string>? EventIdSelector { get; set; }
+    /// <summary>Serializes quarantine payloads using the application's shared event serializer.</summary>
+    public Func<object, BbQ.Events.Serialization.SerializedEvent>? SerializeDeadLetterEvent { get; set; }
     /// <summary>
     /// The strategy to use when an error occurs during event processing.
     /// </summary>
@@ -122,7 +130,7 @@ public class ProjectionErrorHandlingOptions
         if (FallbackStrategy == ProjectionErrorHandlingStrategy.Retry)
         {
             throw new System.InvalidOperationException(
-                "FallbackStrategy cannot be set to Retry. Use Skip or Stop instead.");
+                "FallbackStrategy cannot be set to Retry. Use Skip, Stop or Quarantine instead.");
         }
     }
 }

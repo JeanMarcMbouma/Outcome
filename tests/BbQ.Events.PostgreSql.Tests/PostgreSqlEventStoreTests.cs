@@ -124,6 +124,7 @@ public class PostgreSqlEventStoreTests
         {
             TestContext.WriteLine($"PostgreSQL not available: {ex.Message}");
             TestContext.WriteLine("Tests will be skipped. To run tests, ensure PostgreSQL is available.");
+            if (Environment.GetEnvironmentVariable("REQUIRE_EVENT_SERVICES") == "1") throw;
             _canRunTests = false;
         }
     }

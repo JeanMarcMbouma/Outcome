@@ -96,20 +96,18 @@ internal sealed class DefaultProjectionEngine : IProjectionEngine
         catch (OperationCanceledException)
         {
             _logger.LogInformation("Projection engine stopping gracefully...");
-            
-            // Await all partition workers to complete
-            await GracefulShutdownAsync().ConfigureAwait(false);
-            
+
             _logger.LogInformation("Projection engine stopped gracefully");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Projection engine encountered an error");
-            
-            // Attempt graceful shutdown even on error
-            await GracefulShutdownAsync().ConfigureAwait(false);
-            
+
             throw;
+        }
+        finally
+        {
+            await GracefulShutdownAsync().ConfigureAwait(false);
         }
     }
 
@@ -123,7 +121,7 @@ internal sealed class DefaultProjectionEngine : IProjectionEngine
         // Complete all channels to signal workers to stop
         foreach (var worker in _partitionWorkers.Values)
         {
-            worker.Channel.Writer.Complete();
+            worker.Channel.Writer.TryComplete();
         }
         
         // Wait for all workers to complete
@@ -675,7 +673,7 @@ internal sealed class DefaultProjectionEngine : IProjectionEngine
                 var shouldContinue = await ProcessWorkItemWithErrorHandlingAsync(
                     workItem, options, partitionKey, currentPosition, ct).ConfigureAwait(false);
                 
-                if (!shouldContinue)
+                if (shouldContinue == ProjectionDisposition.Stopped)
                 {
                     _logger.LogWarning(
                         "Stopping projection worker for {ProjectionName}:{PartitionKey} due to error handling policy",
@@ -685,8 +683,6 @@ internal sealed class DefaultProjectionEngine : IProjectionEngine
                 
                 currentPosition++;
                 eventsProcessedSinceCheckpoint++;
-                
-                _monitor?.RecordEventProcessed(options.ProjectionName, partitionKey, currentPosition);
                 _monitor?.RecordQueueDepth(options.ProjectionName, partitionKey, channel.Reader.Count);
                 
                 if (eventsProcessedSinceCheckpoint >= options.CheckpointBatchSize)
@@ -773,7 +769,7 @@ internal sealed class DefaultProjectionEngine : IProjectionEngine
                         var shouldContinue = await ProcessWorkItemWithErrorHandlingAsync(
                             workItem, options, partitionKey, currentPosition, ct).ConfigureAwait(false);
 
-                        if (!shouldContinue)
+                        if (shouldContinue == ProjectionDisposition.Stopped)
                         {
                             _logger.LogWarning(
                                 "Stopping projection worker for {ProjectionName}:{PartitionKey} due to error handling policy",
@@ -783,8 +779,6 @@ internal sealed class DefaultProjectionEngine : IProjectionEngine
 
                         currentPosition++;
                         eventsProcessedSinceCheckpoint++;
-
-                        _monitor?.RecordEventProcessed(options.ProjectionName, partitionKey, currentPosition);
                         _monitor?.RecordQueueDepth(options.ProjectionName, partitionKey, channel.Reader.Count);
 
                         if (eventsProcessedSinceCheckpoint >= options.CheckpointBatchSize)
@@ -866,8 +860,13 @@ internal sealed class DefaultProjectionEngine : IProjectionEngine
         try
         {
             // Group by (HandlerServiceType, EventType) so each handler gets the right typed list
-            var groups = batchItems
-                .GroupBy(w => (w.HandlerServiceType, w.EventType));
+            var groups = new List<List<WorkItem>>();
+            foreach (var item in batchItems)
+            {
+                if (groups.Count == 0 || groups[^1][0].HandlerServiceType != item.HandlerServiceType || groups[^1][0].EventType != item.EventType)
+                    groups.Add(new List<WorkItem>());
+                groups[^1].Add(item);
+            }
 
             foreach (var group in groups)
             {
@@ -875,7 +874,7 @@ internal sealed class DefaultProjectionEngine : IProjectionEngine
                 var shouldContinue = await ProcessBatchWithErrorHandlingAsync(
                     groupItems, options, partitionKey, currentPosition, ct).ConfigureAwait(false);
 
-                if (!shouldContinue)
+                if (shouldContinue == ProjectionDisposition.Stopped)
                 {
                     _logger.LogWarning(
                         "Stopping projection worker for {ProjectionName}:{PartitionKey} due to error handling policy",
@@ -886,8 +885,6 @@ internal sealed class DefaultProjectionEngine : IProjectionEngine
                 currentPosition += groupItems.Count;
                 eventsProcessedSinceCheckpoint += groupItems.Count;
             }
-
-            _monitor?.RecordEventProcessed(options.ProjectionName, partitionKey, currentPosition);
             _monitor?.RecordQueueDepth(options.ProjectionName, partitionKey, channel.Reader.Count);
 
             if (options.AutoCheckpoint)
@@ -989,121 +986,9 @@ internal sealed class DefaultProjectionEngine : IProjectionEngine
     /// All items in the list must share the same <see cref="WorkItem.HandlerServiceType"/>
     /// and <see cref="WorkItem.EventType"/>.
     /// </summary>
-    private async Task<bool> ProcessBatchWithErrorHandlingAsync(
-        List<WorkItem> batch,
-        ProjectionOptions options,
-        string partitionKey,
-        long currentPosition,
-        CancellationToken ct)
-    {
-        var errorHandling = options.ErrorHandling;
-        errorHandling.Validate();
-
-        if (errorHandling.Strategy != ProjectionErrorHandlingStrategy.Retry)
-        {
-            try
-            {
-                await InvokeBatchHandlerAsync(batch, ct).ConfigureAwait(false);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                return HandleBatchError(ex, options, partitionKey, currentPosition, batch.Count, errorHandling.Strategy, 1);
-            }
-        }
-
-        // Retry strategy
-        var attempt = 0;
-        var delay = errorHandling.InitialRetryDelayMs;
-
-        while (attempt < errorHandling.MaxRetryAttempts)
-        {
-            try
-            {
-                await InvokeBatchHandlerAsync(batch, ct).ConfigureAwait(false);
-
-                if (attempt > 0)
-                {
-                    _logger.LogInformation(
-                        "Successfully processed batch for {ProjectionName}:{PartitionKey} at position {Position} after {Attempts} retry attempt(s)",
-                        options.ProjectionName, partitionKey, currentPosition, attempt);
-                }
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                attempt++;
-
-                if (attempt >= errorHandling.MaxRetryAttempts)
-                {
-                    _logger.LogError(
-                        ex,
-                        "Failed to process batch for {ProjectionName}:{PartitionKey} at position {Position} after {MaxAttempts} attempts. Fallback: {FallbackStrategy}",
-                        options.ProjectionName, partitionKey, currentPosition,
-                        errorHandling.MaxRetryAttempts, errorHandling.FallbackStrategy);
-
-                    return HandleBatchError(ex, options, partitionKey, currentPosition, batch.Count, errorHandling.FallbackStrategy, attempt);
-                }
-
-                _logger.LogWarning(
-                    ex,
-                    "Error processing batch for {ProjectionName}:{PartitionKey} at position {Position}. Attempt {Attempt} of {MaxAttempts}. Retrying in {DelayMs}ms",
-                    options.ProjectionName, partitionKey, currentPosition,
-                    attempt, errorHandling.MaxRetryAttempts, delay);
-
-                try
-                {
-                    await Task.Delay(delay, ct).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
-
-                delay = Math.Min(delay * 2, errorHandling.MaxRetryDelayMs);
-            }
-        }
-
-        return false;
-    }
-
-    /// <summary>
-    /// Handles a batch processing error according to the specified strategy.
-    /// </summary>
-    private bool HandleBatchError(
-        Exception ex,
-        ProjectionOptions options,
-        string partitionKey,
-        long currentPosition,
-        int batchCount,
-        ProjectionErrorHandlingStrategy strategy,
-        int totalAttempts)
-    {
-        switch (strategy)
-        {
-            case ProjectionErrorHandlingStrategy.Skip:
-                _logger.LogError(
-                    ex,
-                    "Skipping failed batch of {BatchCount} events for {ProjectionName}:{PartitionKey} at position {Position} after {TotalAttempts} attempt(s)",
-                    batchCount, options.ProjectionName, partitionKey, currentPosition, totalAttempts);
-                return true;
-
-            case ProjectionErrorHandlingStrategy.Stop:
-                _logger.LogCritical(
-                    ex,
-                    "Stopping projection for {ProjectionName}:{PartitionKey} at position {Position} after {TotalAttempts} attempt(s). Batch size: {BatchCount}",
-                    options.ProjectionName, partitionKey, currentPosition, totalAttempts, batchCount);
-                return false;
-
-            default:
-                _logger.LogError(
-                    ex,
-                    "Unknown strategy {Strategy} for {ProjectionName}. Stopping.",
-                    strategy, options.ProjectionName);
-                return false;
-        }
-    }
+    private Task<ProjectionDisposition> ProcessBatchWithErrorHandlingAsync(
+        List<WorkItem> batch, ProjectionOptions options, string partitionKey, long currentPosition, CancellationToken ct)
+        => ProcessWithPolicyAsync(batch, options, partitionKey, currentPosition, token => InvokeBatchHandlerAsync(batch, token), ct);
 
     /// <summary>
     /// Invokes the batch handler with a typed list of events.
@@ -1162,187 +1047,37 @@ internal sealed class DefaultProjectionEngine : IProjectionEngine
     /// <summary>
     /// Processes a work item with error handling according to the projection's error handling strategy.
     /// </summary>
-    /// <returns>True if processing should continue, False if the worker should stop.</returns>
-    private async Task<bool> ProcessWorkItemWithErrorHandlingAsync(
-        WorkItem workItem,
-        ProjectionOptions options,
-        string partitionKey,
-        long currentPosition,
-        CancellationToken ct)
-    {
-        var errorHandling = options.ErrorHandling;
-        
-        // Validate configuration before use
-        errorHandling.Validate();
-        
-        // If strategy is not Retry, process once
-        if (errorHandling.Strategy != ProjectionErrorHandlingStrategy.Retry)
-        {
-            try
-            {
-                await ProcessWorkItemAsync(workItem, ct).ConfigureAwait(false);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                return await HandleProcessingErrorAsync(
-                    ex,
-                    workItem,
-                    options,
-                    partitionKey,
-                    currentPosition,
-                    errorHandling.Strategy,
-                    1).ConfigureAwait(false);
-            }
-        }
-        
-        // Retry strategy - attempt processing with exponential backoff
-        var attempt = 0;
-        var delay = errorHandling.InitialRetryDelayMs;
-        
-        while (attempt < errorHandling.MaxRetryAttempts)
-        {
-            try
-            {
-                await ProcessWorkItemAsync(workItem, ct).ConfigureAwait(false);
-                
-                // Success - log retry success if this wasn't the first attempt
-                if (attempt > 0)
-                {
-                    _logger.LogInformation(
-                        "Successfully processed event for {ProjectionName}:{PartitionKey} at position {Position} after {Attempts} retry attempt(s)",
-                        options.ProjectionName,
-                        partitionKey,
-                        currentPosition,
-                        attempt);
-                }
-                
-                return true;
-            }
-            catch (Exception ex)
-            {
-                attempt++;
-                
-                // If we've exhausted retries, use fallback strategy
-                if (attempt >= errorHandling.MaxRetryAttempts)
-                {
-                    _logger.LogError(
-                        ex,
-                        "Failed to process event for {ProjectionName}:{PartitionKey} at position {Position} after {MaxAttempts} attempts. Using fallback strategy: {FallbackStrategy}",
-                        options.ProjectionName,
-                        partitionKey,
-                        currentPosition,
-                        errorHandling.MaxRetryAttempts,
-                        errorHandling.FallbackStrategy);
-                    
-                    return await HandleProcessingErrorAsync(
-                        ex,
-                        workItem,
-                        options,
-                        partitionKey,
-                        currentPosition,
-                        errorHandling.FallbackStrategy,
-                        attempt).ConfigureAwait(false);
-                }
-                
-                // Log retry attempt with structured data
-                _logger.LogWarning(
-                    ex,
-                    "Error processing event for {ProjectionName}:{PartitionKey} at position {Position}. Attempt {Attempt} of {MaxAttempts}. Retrying in {DelayMs}ms",
-                    options.ProjectionName,
-                    partitionKey,
-                    currentPosition,
-                    attempt,
-                    errorHandling.MaxRetryAttempts,
-                    delay);
-                
-                // Wait before retrying
-                try
-                {
-                    await Task.Delay(delay, ct).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException)
-                {
-                    // Propagate cancellation instead of treating it as a retryable error
-                    throw;
-                }
-                
-                // Calculate next delay with exponential backoff
-                delay = Math.Min(delay * 2, errorHandling.MaxRetryDelayMs);
-            }
-        }
-        
-        // Should never reach here, but return false to be safe
-        return false;
-    }
+    /// <returns>The terminal projection disposition.</returns>
+    private Task<ProjectionDisposition> ProcessWorkItemWithErrorHandlingAsync(
+        WorkItem workItem, ProjectionOptions options, string partitionKey, long currentPosition, CancellationToken ct)
+        => ProcessWithPolicyAsync([workItem], options, partitionKey, currentPosition, token => ProcessWorkItemAsync(workItem, token), ct);
 
-    /// <summary>
-    /// Handles a processing error according to the specified strategy.
-    /// </summary>
-    /// <returns>True if processing should continue, False if the worker should stop.</returns>
-    private async Task<bool> HandleProcessingErrorAsync(
-        Exception ex,
-        WorkItem workItem,
-        ProjectionOptions options,
-        string partitionKey,
-        long currentPosition,
-        ProjectionErrorHandlingStrategy strategy,
-        int totalAttempts)
+    private async Task<ProjectionDisposition> ProcessWithPolicyAsync(IReadOnlyList<WorkItem> items,
+        ProjectionOptions options, string partition, long position, Func<CancellationToken, Task> handler, CancellationToken ct)
     {
-        switch (strategy)
+        using var scope = _serviceProvider.CreateScope();
+        var errors = options.ErrorHandling;
+        var events = items.Select(item => new ProjectionFailureEvent(errors.EventIdSelector?.Invoke(item.Event), item.Event, item.EventType)).ToArray();
+        // Reflection wraps synchronous handler exceptions; classifiers must see the original failure.
+        async Task Invoke(CancellationToken token)
         {
-            case ProjectionErrorHandlingStrategy.Skip:
-                // Log structured error and continue
-                _logger.LogError(
-                    ex,
-                    "Skipping failed event for {ProjectionName}:{PartitionKey} at position {Position} after {TotalAttempts} attempt(s). " +
-                    "Event type: {EventType}, Handler: {HandlerType}. Error: {ErrorMessage}",
-                    options.ProjectionName,
-                    partitionKey,
-                    currentPosition,
-                    totalAttempts,
-                    workItem.EventType.Name,
-                    workItem.HandlerServiceType.Name,
-                    ex.Message);
-                
-                return true; // Continue processing
-                
-            case ProjectionErrorHandlingStrategy.Stop:
-                // Log structured error and stop
-                _logger.LogCritical(
-                    ex,
-                    "Stopping projection worker for {ProjectionName}:{PartitionKey} at position {Position} after {TotalAttempts} attempt(s). " +
-                    "Event type: {EventType}, Handler: {HandlerType}. Error: {ErrorMessage}",
-                    options.ProjectionName,
-                    partitionKey,
-                    currentPosition,
-                    totalAttempts,
-                    workItem.EventType.Name,
-                    workItem.HandlerServiceType.Name,
-                    ex.Message);
-                
-                return false; // Stop worker
-                
-            case ProjectionErrorHandlingStrategy.Retry:
-                // This should not happen as Retry is handled in the calling method
-                _logger.LogError(
-                    ex,
-                    "Unexpected Retry strategy in error handler for {ProjectionName}:{PartitionKey} at position {Position}",
-                    options.ProjectionName,
-                    partitionKey,
-                    currentPosition);
-                return false;
-                
-            default:
-                _logger.LogError(
-                    ex,
-                    "Unknown error handling strategy {Strategy} for {ProjectionName}:{PartitionKey} at position {Position}. Stopping worker.",
-                    strategy,
-                    options.ProjectionName,
-                    partitionKey,
-                    currentPosition);
-                return false;
+            try { await handler(token).ConfigureAwait(false); }
+            catch (TargetInvocationException exception) when (exception.InnerException != null)
+            { System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(exception.InnerException).Throw(); }
         }
+        var result = await new ProjectionFailureProcessor().ExecuteAsync(Invoke, options.ProjectionName, partition,
+            position, events, errors, errors.FailurePolicy ?? scope.ServiceProvider.GetService<IProjectionFailurePolicy>(),
+            errors.DeadLetterStore ?? scope.ServiceProvider.GetService<IProjectionDeadLetterStore>(), ct).ConfigureAwait(false);
+        for (var index = 0; index < items.Count; index++)
+        {
+            if (result == ProjectionDisposition.Projected)
+                _monitor?.RecordEventProcessed(options.ProjectionName, partition, position + index + 1);
+            else if (_monitor is IProjectionDispositionMonitor dispositions)
+                dispositions.RecordDisposition(options.ProjectionName, partition, position + index + 1, result);
+        }
+        if (result != ProjectionDisposition.Projected)
+            _logger.LogWarning("Projection {Projection}:{Partition} at position {Position}: {Disposition}", options.ProjectionName, partition, position, result);
+        return result;
     }
 
     /// <summary>

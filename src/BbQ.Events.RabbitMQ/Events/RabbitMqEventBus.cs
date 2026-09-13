@@ -1,3 +1,4 @@
+using BbQ.Events.Serialization;
 // -------------------------------
 // RabbitMQ Event Bus Implementation
 // -------------------------------
@@ -45,6 +46,7 @@ internal sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
     private readonly ILogger<RabbitMqEventBus> _logger;
     private readonly RabbitMqEventBusOptions _options;
     private readonly JsonSerializerOptions _jsonOptions;
+    private readonly IEventSerializer _serializer;
     private readonly ConnectionFactory _connectionFactory;
 
     private readonly SemaphoreSlim _connectionLock = new(1, 1);
@@ -74,6 +76,7 @@ internal sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             WriteIndented = false
         };
+        _serializer = _options.EventSerializer ?? new LegacyJsonEventSerializer(_jsonOptions);
 
         _connectionFactory = CreateConnectionFactory();
     }
@@ -157,7 +160,7 @@ internal sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
                 {
                     var body = ea.Body.ToArray();
                     var json = Encoding.UTF8.GetString(body);
-                    var deserializedEvent = JsonSerializer.Deserialize<TEvent>(json, _jsonOptions);
+                    var deserializedEvent = _serializer.Deserialize<TEvent>(ea.BasicProperties.Type ?? GetRoutingKey(eventType), json);
 
                     if (deserializedEvent != null)
                     {
@@ -361,7 +364,8 @@ internal sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
 
             var eventType = typeof(TEvent);
             var routingKey = GetRoutingKey(eventType);
-            var json = JsonSerializer.Serialize(@event, _jsonOptions);
+            var serialized = _serializer.Serialize(@event);
+            var json = serialized.Data;
             var body = Encoding.UTF8.GetBytes(json);
 
             var properties = new BasicProperties
@@ -372,11 +376,11 @@ internal sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
                     : DeliveryModes.Transient,
                 MessageId = Guid.NewGuid().ToString(),
                 Timestamp = new AmqpTimestamp(DateTimeOffset.UtcNow.ToUnixTimeSeconds()),
-                Type = eventType.FullName ?? eventType.Name,
+                Type = serialized.TypeId,
             };
             properties.Headers = new Dictionary<string, object?>
             {
-                [RabbitMqConstants.EventTypeHeader] = eventType.FullName ?? eventType.Name
+                [RabbitMqConstants.EventTypeHeader] = serialized.TypeId
             };
 
             await channel.BasicPublishAsync(
@@ -481,8 +485,8 @@ internal sealed class RabbitMqEventBus : IEventBus, IAsyncDisposable
         }
     }
 
-    private static string GetRoutingKey(Type eventType)
+    private string GetRoutingKey(Type eventType)
     {
-        return eventType.FullName ?? eventType.Name;
+        return _serializer.GetTypeId(eventType);
     }
 }

@@ -1,0 +1,74 @@
+name: Events provider validation
+on:
+  push:
+    branches: ['fix/events-and-sourcelink']
+  pull_request:
+    paths: ['src/BbQ.Events*/**', 'tests/BbQ.Events*/**', 'tests/BbQ.Cqrs.Tests/**', 'global.json', '.github/workflows/events-provider-validation.yml']
+permissions:
+  contents: read
+jobs:
+  providers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: bbqeventstest
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U postgres" --health-interval 10s --health-timeout 5s --health-retries 10
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_SA_PASSWORD: Test_password123!
+        ports: ['1433:1433']
+      rabbitmq:
+        image: rabbitmq:4
+        ports: ['5672:5672']
+        options: --health-cmd "rabbitmq-diagnostics -q ping" --health-interval 10s --health-timeout 5s --health-retries 10
+    env:
+      REQUIRE_EVENT_SERVICES: '1'
+      TEST_SQLSERVER_CONNECTION_STRING: 'Server=localhost;Database=BbQEventsTest;User Id=sa;Password=Test_password123!;TrustServerCertificate=true'
+      TEST_POSTGRESQL_CONNECTION_STRING: 'Host=localhost;Database=bbqeventstest;Username=postgres;Password=testpassword'
+      TEST_RABBITMQ_CONNECTION_STRING: 'amqp://guest:guest@localhost:5672/'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+      - name: Create isolated SQL test database
+        run: |
+          for attempt in $(seq 1 30); do
+            if docker exec ${{ job.services.sqlserver.id }} /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'Test_password123!' -C -Q "IF DB_ID('BbQEventsTest') IS NULL CREATE DATABASE BbQEventsTest"; then exit 0; fi
+            sleep 2
+          done
+          exit 1
+      - name: Test real providers on all supported runtimes
+        run: dotnet test tests/BbQ.Events.ProviderIntegration.Tests -c Release --logger 'trx;LogFilePrefix=providers'
+      - name: Test existing database provider suites against services
+        run: |
+          dotnet test tests/BbQ.Events.SqlServer.Tests -c Release --logger 'trx;LogFilePrefix=sqlserver'
+          dotnet test tests/BbQ.Events.PostgreSql.Tests -c Release --logger 'trx;LogFilePrefix=postgres'
+      - name: Test projection policies and existing behavior
+        run: dotnet test tests/BbQ.Cqrs.Tests -c Release --logger 'trx;LogFilePrefix=policies'
+      - name: Publish and execute Native AOT smoke
+        run: |
+          dotnet publish samples/BbQ.Outcome.AotSmoke -c Release -r linux-x64 -o artifacts/aot
+          ./artifacts/aot/BbQ.Outcome.AotSmoke
+      - name: Build every target and create packages
+        run: |
+          dotnet build Outcome.slnx -c Release
+          dotnet pack Outcome.slnx -c Release --no-build -o artifacts/packages
+          dotnet run --project scripts/SourceLinkVerification -c Release -- artifacts/packages
+      - name: Audit dependency graph
+        run: dotnet list Outcome.slnx package --vulnerable --include-transitive
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: events-provider-results
+          path: tests/**/TestResults/*.trx

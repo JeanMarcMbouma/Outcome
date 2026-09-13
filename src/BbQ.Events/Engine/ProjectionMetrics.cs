@@ -225,6 +225,20 @@ public sealed class ProjectionMetrics
     /// <summary>
     /// Atomically increments the events processed counter and updates the last event time.
     /// </summary>
+    private long _eventsSkipped, _eventsQuarantined, _eventsStopped;
+    public long EventsSkipped { get { lock (_lock) return _eventsSkipped; } }
+    public long EventsQuarantined { get { lock (_lock) return _eventsQuarantined; } }
+    public long EventsStopped { get { lock (_lock) return _eventsStopped; } }
+    internal void IncrementDisposition(ProjectionDisposition disposition)
+    {
+        lock (_lock)
+        {
+            if (disposition == ProjectionDisposition.Skipped) _eventsSkipped++;
+            else if (disposition == ProjectionDisposition.Quarantined) _eventsQuarantined++;
+            else if (disposition == ProjectionDisposition.Stopped) _eventsStopped++;
+        }
+    }
+
     internal void IncrementEventsProcessed()
     {
         lock (_lock)
