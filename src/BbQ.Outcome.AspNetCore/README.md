@@ -2,6 +2,14 @@
 
 Optional HTTP adapter for .NET 8, 9, and 10. The core Outcome package remains free of ASP.NET dependencies.
 
+## Installation
+
+This package ships with the Outcome family under the same `outcome-v*` version.
+
+```bash
+dotnet add package BbQ.Outcome.AspNetCore --prerelease
+```
+
 ```csharp
 using BbQ.Outcome.AspNetCore;
 
