@@ -65,6 +65,20 @@ dotnet add package BbQ.Events
 | [BbQ.Events.PostgreSql](./src/BbQ.Events.PostgreSql/README.md) | PostgreSQL event store and checkpoint persistence | [📖 Docs](./src/BbQ.Events.PostgreSql/README.md) |
 | [BbQ.Events.RabbitMQ](./src/BbQ.Events.RabbitMQ/README.md) | RabbitMQ distributed event bus | [📖 Docs](./src/BbQ.Events.RabbitMQ/README.md) |
 
+### Unreleased Outcome extensions — issue #60
+
+The source includes error-side composition, cancellation-aware callbacks, collection traversal, error catalogs, and five independently adoptable integration packages. These changes require a release before they are available from NuGet; development builds can use project references or locally packed packages.
+
+| Package | Purpose |
+|---------|---------|
+| [BbQ.Cqrs.Outcome](./src/BbQ.Cqrs.Outcome/README.md) | Two-parameter validation behaviors and typed response factories |
+| [BbQ.Cqrs.Outcome.FluentValidation](./src/BbQ.Cqrs.Outcome.FluentValidation/README.md) | Asynchronous FluentValidation integration |
+| [BbQ.Outcome.AspNetCore](./src/BbQ.Outcome.AspNetCore/README.md) | Explicit HTTP status mapping and redacted Problem Details |
+| [BbQ.Outcome.SystemTextJson](./src/BbQ.Outcome.SystemTextJson/README.md) | Strict JSON contracts, allowlisted error types, and closed AOT-compatible metadata |
+| [BbQ.Outcome.Diagnostics](./src/BbQ.Outcome.Diagnostics/README.md) | Opt-in structured logging and Activity instrumentation |
+
+Read the [implementation and migration guide](./docs/extension-roadmap.md) before upgrading: invalid/default failures and mutable error-list ownership now have explicit contracts. The base Outcome and CQRS packages do not acquire HTTP, FluentValidation, or telemetry dependencies.
+
 ## 🚀 Quick Start
 
 ### Using BbQ.Outcome
@@ -216,6 +230,7 @@ public class GetUserQueryHandler : IRequestHandler<GetUserQuery, Outcome<User>>
 - **[BbQ.Events.PostgreSql Documentation](./src/BbQ.Events.PostgreSql/README.md)** - PostgreSQL event store and checkpoint persistence
 - **[BbQ.Events.RabbitMQ Documentation](./src/BbQ.Events.RabbitMQ/README.md)** - RabbitMQ distributed event bus
 - **[Outcome Error Helper Properties](./src/BbQ.Outcome/README.md)** - Strongly typed error patterns with source generators
+- **[Extension implementation and migration](./docs/extension-roadmap.md)** - New APIs, optional packages, verification and compatibility notes
 
 ## 🤝 Contributing
 
@@ -224,5 +239,3 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-
-

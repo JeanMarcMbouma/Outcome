@@ -1,5 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>latest</LangVersion>
@@ -7,17 +6,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <IsRoslynComponent>true</IsRoslynComponent>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
-    
-    <!-- Packaging settings for the analyzer -->
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <IncludeBuildOutput>true</IncludeBuildOutput>
-    
-    <!-- Critical: Output analyzer to the correct NuGet package path -->
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
-    
-    <!-- Package metadata -->
     <PackageId>BbQ.Outcome.SourceGenerators</PackageId>
     <Version>1.0.0</Version>
     <Authors>Jean</Authors>
@@ -30,14 +23,11 @@
     <LicenseExpression>MIT</LicenseExpression>
     <Title>BbQ.Outcome Source Generators</Title>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    
-    <!-- Source Link settings -->
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4">
       <PrivateAssets>all</PrivateAssets>
@@ -46,15 +36,10 @@
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" PrivateAssets="all" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
   </ItemGroup>
-
   <ItemGroup>
-    <!-- Include README in the NuGet package -->
     <None Include="README.md" Pack="true" PackagePath="" />
-  </ItemGroup>
-
-  <!-- Ensure analyzer is included in the correct NuGet package structure -->
-  <ItemGroup>
+    <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
     <None Include="$(OutputPath)BbQ.Outcome.SourceGenerators.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
   </ItemGroup>
-
 </Project>
