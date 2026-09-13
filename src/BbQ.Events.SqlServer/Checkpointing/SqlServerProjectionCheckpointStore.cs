@@ -99,7 +99,7 @@ public sealed class SqlServerProjectionCheckpointStore : IProjectionCheckpointSt
 
         await using var command = connection.CreateCommand();
         command.CommandText = @"
-            MERGE BbQ_ProjectionCheckpoints AS target
+            MERGE BbQ_ProjectionCheckpoints WITH (HOLDLOCK) AS target
             USING (SELECT @ProjectionName AS ProjectionName, @PartitionKey AS PartitionKey) AS source
             ON target.ProjectionName = source.ProjectionName 
                AND target.PartitionKey IS NULL 
