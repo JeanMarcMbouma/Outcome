@@ -2,6 +2,14 @@
 
 Optional, explicit System.Text.Json converters for .NET 8, 9, and 10. No JSON dependency is introduced into the core Outcome project. Closed converters consume `JsonTypeInfo<T>` rather than creating types or searching assemblies at runtime.
 
+## Installation
+
+This package ships with the Outcome family under the same `outcome-v*` version.
+
+```bash
+dotnet add package BbQ.Outcome.SystemTextJson --prerelease
+```
+
 ## Wire format
 
 Typed success: `{"isSuccess":true,"value":42}`
