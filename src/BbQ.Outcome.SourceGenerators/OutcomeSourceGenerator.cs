@@ -18,11 +18,14 @@ public sealed class OutcomeSourceGenerator : IIncrementalGenerator
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        var enums = context.SyntaxProvider.ForAttributeWithMetadataName(
-            "BbQ.Outcome.QbqOutcomeAttribute",
-            static (node, _) => node is EnumDeclarationSyntax,
-            static (ctx, _) => (INamedTypeSymbol)ctx.TargetSymbol);
-        context.RegisterSourceOutput(enums, static (ctx, symbol) => Generate(ctx, symbol));
+        // Resolve the attribute semantically for every annotated enum. This also covers
+        // aliases declared outside a nested namespace across supported Roslyn versions.
+        var enums = context.SyntaxProvider.CreateSyntaxProvider(
+            static (node, _) => node is EnumDeclarationSyntax declaration && declaration.AttributeLists.Count > 0,
+            static (ctx, ct) => ctx.SemanticModel.GetDeclaredSymbol((EnumDeclarationSyntax)ctx.Node, ct) as INamedTypeSymbol)
+            .Where(static symbol => symbol is not null && symbol.GetAttributes().Any(attribute =>
+                attribute.AttributeClass?.ToDisplayString() == "BbQ.Outcome.QbqOutcomeAttribute"));
+        context.RegisterSourceOutput(enums, static (ctx, symbol) => Generate(ctx, symbol!));
     }
 
     private static void Generate(SourceProductionContext context, INamedTypeSymbol symbol)

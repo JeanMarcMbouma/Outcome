@@ -1,499 +1,131 @@
-# BbQ.Cqrs Sample Scenarios
+# BbQ.Cqrs sample scenarios
 
-This document describes the sample scenarios demonstrating CQRS patterns with Outcome error handling.
+Run the sample application from the repository root:
 
-## Quick Start
-
-Run the samples:
-```bash
+```sh
 dotnet run --project src/BbQ.Cqrs.Samples
 ```
 
-Output:
-```
-=== BbQ.Cqrs Sample Scenarios ===
+`Program.cs` runs seven scenarios. The executable source is the authoritative complete example; snippets below show the key integration points rather than redefining its request/handler classes.
 
---- Scenario 1: Basic Query Handler ---
-? Found user: John Doe
+## 1. Basic query handler
 
---- Scenario 2: Command with Validation ---
-Test 1: Invalid input (empty name)
-? Expected validation error: New name must be non-empty
+`Scenario01_BasicQuery` sends `GetUserById` through `TestMediator<GetUserById, Outcome<UserDto>>` without behaviors. The handler reads `IUserRepository` and returns a successful DTO or a structured error.
 
-Test 2: Valid input
-? Successfully renamed user
-
---- Scenario 3: Strongly-Typed Error Handling ---
-All AppError instances:
-  - [Error] UserNotFound: User 123 not found
-  - [Validation] InvalidName: Name contains invalid characters
-
-First AppError: UserNotFound
-? Outcome contains AppError instances
-
-Validation errors: 1
-
---- Scenario 4: Retry Behavior for Transient Errors ---
-Sending query with retry behavior (3 max attempts)...
-? Failed after retries: Transient error - will be retried
-  Total time: ~200ms (expected ~200ms for 2 retries with 100ms delay)
-```
-
----
-
-## Scenario 1: Basic Query Handler
-
-**Location:** `Scenario01_BasicQuery()`
-
-**Demonstrates:**
-- Simple query definition (`GetUserById`)
-- Query handler implementation (`GetUserByIdHandler`)
-- Using `TestMediator` for unit testing
-- Pattern matching with `Switch()`
-- Error handling with type casting
-
-**Key Concepts:**
-- Queries are read-only operations
-- Handlers return `Outcome<T>` for error-aware results
-- `TestMediator` enables isolated handler testing
-- No behaviors in the pipeline (direct handler invocation)
-
-**Example Code:**
 ```csharp
-// Define query
-public class GetUserById : IQuery<Outcome<UserDto>>
-{
-    public string Id { get; set; }
-}
-
-// Implement handler
-public class GetUserByIdHandler : IRequestHandler<GetUserById, Outcome<UserDto>>
-{
-    public async Task<Outcome<UserDto>> Handle(GetUserById request, CancellationToken ct)
-    {
-        var (found, id, name) = await _repository.FindAsync(request.Id, ct);
-        return found 
-            ? Outcome<UserDto>.From(new UserDto { Id = id, Name = name })
-            : Outcome<UserDto>.FromError(
-                new Error<AppError>(
-                    AppError.UserNotFound,
-                    $"User '{request.Id}' not found"
-                )
-            );
-    }
-}
-
-// Test with mediator
 var mediator = new TestMediator<GetUserById, Outcome<UserDto>>(handler, []);
 var outcome = await mediator.Send(new GetUserById("123"));
-
 outcome.Switch(
-    onSuccess: user => Console.WriteLine($"User: {user.Name}"),
-    onError: errors => Console.WriteLine($"Error: {string.Join(", ", errors.OfType<Error<AppError>>().Select(e => e.Description))}")
-);
+    onSuccess: user => Console.WriteLine(user.Name),
+    onError: errors => Console.WriteLine(string.Join("; ",
+        errors.OfType<Error<AppError>>().Select(error => error.Description))));
 ```
 
----
+The error list in `Outcome<T>` is heterogeneous. Filter to a known type before accessing type-specific properties, or use `Outcome<T,TError>` in a fully typed pipeline.
 
-## Scenario 2: Command with Validation Behavior
+## 2. Command with validation
 
-**Location:** `Scenario02_CommandWithValidation()`
+`Scenario02_CommandWithValidation` validates `RenameUser` before invoking the handler. The sample now uses the optional `BbQ.Cqrs.Outcome` package rather than a three-parameter behavior or a cast to an arbitrary response type.
 
-**Demonstrates:**
-- Command definition (`RenameUser`)
-- Command handler implementation (`RenameUserHandler`)
-- Validation behavior in the pipeline
-- Error handling for validation failures
-- Pipeline behaviors wrapping handlers
-
-**Key Concepts:**
-- Commands modify state (create, update, delete)
-- Validation occurs in a behavior BEFORE the handler
-- Behaviors can short-circuit the pipeline
-- Multiple behaviors stack in execution order
-
-**Example Code:**
 ```csharp
-// Define command
-public class RenameUser : ICommand<Outcome<Unit>>
-{
-    public string Id { get; set; }
-    public string NewName { get; set; }
-}
+using BbQ.Cqrs.Validation;
 
-// Implement handler
-public class RenameUserHandler : IRequestHandler<RenameUser, Outcome<Unit>>
-{
-    public async Task<Outcome<Unit>> Handle(RenameUser request, CancellationToken ct)
-    {
-        var (found, id, _) = await _repo.FindAsync(request.Id, ct);
-        if (!found)
-            return Outcome<Unit>.FromError(
-                new Error<AppError>(AppError.UserNotFound, $"User '{request.Id}' not found")
-            );
-        
-        var trimmed = request.NewName?.Trim();
-        if (string.IsNullOrWhiteSpace(trimmed))
-            return Outcome<Unit>.FromError(
-                new Error<AppError>(AppError.InvalidName, "New name must be non-empty")
-            );
+var validator = new RenameUserValidator();
+var factory = new OutcomeValidationFailureFactory<Unit>(
+    new DelegateValidationIssueMapper<object?>(issue =>
+        new Error<AppError>(AppError.InvalidName, issue.Message, ErrorSeverity.Validation)));
+var validation = new ValidationBehavior<RenameUser, Outcome<Unit>>([validator], factory);
+var mediator = new TestMediator<RenameUser, Outcome<Unit>>(handler, [validation]);
 
-        await _repo.SaveAsync((id, trimmed!), ct);
-        return Outcome<Unit>.From(new Unit());
-    }
-}
-
-// Validation behavior
-public class ValidationBehavior<TRequest, TResponse, TPayload> 
-    : IPipelineBehavior<TRequest, TResponse>
-    where TRequest : IRequest<TResponse>
-    where TResponse : IOutcome<TPayload>
-{
-    public async Task<TResponse> Handle(
-        TRequest request,
-        CancellationToken ct,
-        Func<TRequest, CancellationToken, Task<TResponse>> next)
-    {
-        // Validate before handler
-        var result = await _validator.ValidateAsync(request, ct);
-        if (!result.IsValid)
-            throw new ValidationException(result.Errors);
-        
-        // Call next behavior or handler
-        return await next(request, ct);
-    }
-}
-
-// Register behaviors
-var mediator = new TestMediator<RenameUser, Outcome<Unit>>(
-    handler, 
-    [new ValidationBehavior<RenameUser, Outcome<Unit>, Unit>(validator)]
-);
+var invalid = await mediator.Send(new RenameUser("123", ""));
+// invalid.IsError is true; the handler was not called.
+var valid = await mediator.Send(new RenameUser("123", "Alice"));
+// The valid command reaches the handler.
 ```
 
----
+`RenameUserValidator` implements `IRequestValidator<RenameUser>` and returns ordered `ValidationIssue` objects. A nonempty issue list is converted into an Outcome failure; it does **not** throw `ValidationException` for ordinary invalid input. Validators run sequentially, support cancellation, and may share scoped dependencies. Unexpected exceptions remain exceptions.
 
-## Scenario 3: Strongly-Typed Error Handling
+For dependency injection, use closed registrations or the generated opt-in method:
 
-**Location:** `Scenario03_ErrorHandling()`
-
-**Demonstrates:**
-- Defining typed error enums with `[QbqOutcome]` source generator
-- Creating strongly-typed `Error<T>` instances
-- Filtering errors by type using LINQ
-- Inspecting error properties (Code, Description, Severity)
-- Pattern matching with type-safe errors
-
-**Key Concepts:**
-- Error codes are enum-based and source-generated
-- `Outcome<T>` can contain multiple errors of different types
-- LINQ with `OfType<T>` provides type-safe error queries
-- Errors have `Severity` for different handling strategies
-
-**Error Definition:**
 ```csharp
-[QbqOutcome]
-public enum AppError
-{
-    [Description("User not found")]
-    UserNotFound,
-    
-    [Description("Invalid name")]
-    [ErrorSeverity(ErrorSeverity.Validation)]
-    InvalidName,
-    
-    [Description("Transient error")]
-    Transient
-}
+services.AddScoped<IRequestValidator<RenameUser>, RenameUserValidator>();
+services.AddValidationIssueMapper<object?>(issue =>
+    new Error<AppError>(AppError.InvalidName, issue.Message, ErrorSeverity.Validation));
+services.AddOutcomeValidation<RenameUser, Unit>();
+// Alternatively, use the generated AddBbQCqrsSamplesOutcomeValidation() method.
 ```
 
-**Error Access Patterns:**
+Register the mediator and handlers separately. Typed `Outcome<T,TError>` factories require an `IValidationIssueMapper<TError>`; arbitrary application response types can implement `IValidationFailureFactory<TResponse>`. See the [validation package README](../BbQ.Cqrs.Outcome/README.md) and [FluentValidation adapter](../BbQ.Cqrs.Outcome.FluentValidation/README.md).
+
+## 3. Strongly typed error handling
+
+`Scenario03_ErrorHandling` demonstrates generated enum helpers, heterogeneous error collections, filtering, and severity inspection.
+
 ```csharp
-var outcome = Outcome<string>.FromErrors([
+var outcome = Outcome<string>.FromErrors(new object?[]
+{
     new Error<AppError>(AppError.UserNotFound, "User 123 not found"),
-    new Error<AppError>(AppError.InvalidName, "Name invalid"),
-    new Error<string>("UNTYPED", "Other error")
-]);
-
-// Get all errors of a type
+    new Error<AppError>(AppError.InvalidName, "Name invalid", ErrorSeverity.Validation),
+    new Error<string>("OTHER", "Another error")
+});
 var appErrors = outcome.Errors.OfType<Error<AppError>>().ToList();
-
-// Get first error of a type
-var firstAppError = outcome.Errors.OfType<Error<AppError>>().FirstOrDefault();
-
-// Check if errors exist
-if (outcome.Errors.OfType<Error<AppError>>().Any())
-{
-    // Handle AppError instances
-}
-
-// Filter by predicate
-var validationErrors = outcome.Errors
-    .OfType<Error<AppError>>()
-    .Where(e => e.Severity == ErrorSeverity.Validation)
-    .ToList();
+var validationErrors = appErrors.Where(error => error.Severity == ErrorSeverity.Validation).ToList();
 ```
 
----
+The new core extension `MapError` can translate errors at an architectural boundary instead of discarding their type. `MapErrors` maps an entire failure list, and `TapError` observes it without changing the result. Generated catalogs additionally support stable external codes and localization resource keys; see [async composition and catalogs](../../docs/async-and-error-catalogs.md).
 
-## Scenario 4: Advanced Behaviors - Retry
+## 4. Retry behavior
 
-**Location:** `Scenario04_RetryBehavior()`
+`Scenario04_RetryBehavior` wraps a stub handler with the existing sample `RetryBehavior<GetUserById, Outcome<UserDto>, UserDto>`. It retries only the sample's transient error code, using configured attempt and delay limits.
 
-**Demonstrates:**
-- Custom pipeline behavior implementation
-- Handling transient errors
-- Retry logic with configurable attempts and delay
-- Testing behaviors in isolation with `TestMediator`
-- Combining behaviors with handlers
-
-**Key Concepts:**
-- Retry behavior wraps the handler
-- Only retries on transient errors (identified by error code)
-- Configurable delays between attempts
-- Behaviors execute before/after handler logic
-
-**Retry Behavior Implementation:**
 ```csharp
-public class RetryBehavior<TRequest, TResponse, TPayload> 
-    : IPipelineBehavior<TRequest, TResponse>
-    where TRequest : IRequest<TResponse>
-    where TResponse : IOutcome<TPayload>
-{
-    public async Task<TResponse> Handle(
-        TRequest request,
-        CancellationToken ct,
-        Func<TRequest, CancellationToken, Task<TResponse>> next)
-    {
-        for (var attempt = 1; attempt <= _maxAttempts; attempt++)
-        {
-            var outcome = await next(request, ct);
-            
-            if (outcome.IsSuccess)
-                return outcome;
-            
-            // Check for transient errors
-            var isTransient = outcome.Errors?
-                .OfType<Error<AppError>>()
-                .Any(e => e.Code == AppError.Transient) ?? false;
-            
-            if (!isTransient || attempt == _maxAttempts)
-                return outcome;
-            
-            await Task.Delay(_delay, ct);
-        }
-        
-        return await next(request, ct);
-    }
-}
+var retry = new RetryBehavior<GetUserById, Outcome<UserDto>, UserDto>(
+    maxAttempts: 3, delay: TimeSpan.FromMilliseconds(100));
+var mediator = new TestMediator<GetUserById, Outcome<UserDto>>(handler, [retry]);
+var result = await mediator.Send(new GetUserById("42"));
 ```
 
-**Usage:**
-```csharp
-var retryBehavior = new RetryBehavior<GetUserById, Outcome<UserDto>, UserDto>(
-    maxAttempts: 3,
-    delay: TimeSpan.FromMilliseconds(100)
-);
+The three-parameter retry behavior remains a manually registered sample, not an automatically registered two-parameter generic behavior. Retrying a state-changing operation requires an application-level idempotency policy. Ordinary Outcome `Map`/`Bind` do not introduce retries or catch unexpected exceptions.
 
-var mediator = new TestMediator<GetUserById, Outcome<UserDto>>(
-    handler,
-    [retryBehavior]
-);
+## 5. Commands without a response payload
 
-var outcome = await mediator.Send(new GetUserById("42"));
-```
+`Scenario05_FireAndForgetCommand` demonstrates `IRequest` and a nongeneric request handler for notifications. Although the scenario uses the traditional “fire-and-forget” label, awaiting mediator dispatch still waits for handler completion. It does not create a durable background job or guarantee delivery after process termination.
 
----
+## 6. Separate command/query dispatchers
 
-## Common Patterns
+`Scenario06_DispatcherExample` invokes `DispatcherSample.RunExample`, showing `ICommandDispatcher` and `IQueryDispatcher` when applications prefer explicit command/query separation over a single mediator interface.
 
-### Pattern 1: Error Construction
-```csharp
-// Direct error construction
-return Outcome<User>.FromError(
-    new Error<AppError>(
-        AppError.UserNotFound,
-        "User not found",
-        ErrorSeverity.Error
-    )
-);
+## 7. Pub/sub integration
 
-// From single error
-return Outcome<User>.FromError(new Error<AppError>(AppError.NotFound, "Not found"));
+`Scenario07_PubSubIntegration` invokes `PubSubIntegrationSample.RunAsync`, showing command-triggered event publishing, event handlers, stream subscribers, and streaming request handlers. The standalone Events package owns the bus/projection contracts.
 
-// Multiple errors
-return Outcome<User>.FromErrors([
-    new Error<AppError>(AppError.InvalidEmail, "Email invalid"),
-    new Error<AppError>(AppError.InvalidName, "Name invalid")
-]);
-```
+## Testing the validation boundary
 
-### Pattern 2: Result Handling
-```csharp
-// Pattern matching with Switch
-outcome.Switch(
-    onSuccess: user => Console.WriteLine($"User: {user.Name}"),
-    onError: errors => Console.WriteLine($"Errors: {string.Join("; ", errors.Select(e => e.Description))}")
-);
-
-// Deconstruction
-var (success, value, errors) = outcome;
-if (success)
-{
-    Console.WriteLine($"Success: {value}");
-}
-else
-{
-    foreach (var error in errors!)
-        Console.WriteLine($"Error: {error.Description}");
-}
-```
-
-### Pattern 3: Chaining Operations
-```csharp
-// Using Bind for monadic composition
-return await GetUserAsync(userId)
-    .BindAsync(user => ValidateUserAsync(user))
-    .BindAsync(user => UpdateUserAsync(user));
-
-// Using Map for transformations
-var nameOutcome = await GetUserAsync(userId)
-    .MapAsync(user => user.Name);
-```
-
-### Pattern 4: Multiple Errors
-```csharp
-// Aggregate multiple validation errors
-var errors = new List<object>
-{
-    new Error<AppError>(AppError.InvalidName, "Name is empty"),
-    new Error<AppError>(AppError.InvalidEmail, "Email is invalid")
-};
-
-return Outcome<User>.FromErrors(errors);
-```
-
----
-
-## Testing Guide
-
-### Test a Handler in Isolation
 ```csharp
 [Test]
-public async Task Handler_WithValidInput_ReturnsSuccess()
+public async Task Invalid_name_returns_failure_without_invoking_handler()
 {
-    // Arrange
-    var handler = new GetUserByIdHandler(fakeRepository);
-    var mediator = new TestMediator<GetUserById, Outcome<UserDto>>(handler, []);
-
-    // Act
-    var outcome = await mediator.Send(new GetUserById("123"));
-
-    // Assert
-    Assert.That(outcome.IsSuccess, Is.True);
-    Assert.That(outcome.Value.Name, Is.EqualTo("John Doe"));
-}
-```
-
-### Test a Behavior in Isolation
-```csharp
-[Test]
-public async Task ValidationBehavior_WithInvalidInput_ReturnsValidationError()
-{
-    // Arrange
     var handler = new StubHandler<RenameUser, Outcome<Unit>>(
-        async (req, ct) => throw new InvalidOperationException("Should not reach handler")
-    );
-    var behavior = new ValidationBehavior<RenameUser, Outcome<Unit>, Unit>(validator);
+        (_, _) => throw new InvalidOperationException("Handler must not run"));
+    var factory = new OutcomeValidationFailureFactory<Unit>();
+    var behavior = new ValidationBehavior<RenameUser, Outcome<Unit>>(
+        [new RenameUserValidator()], factory);
     var mediator = new TestMediator<RenameUser, Outcome<Unit>>(handler, [behavior]);
 
-    // Act & Assert
-    Assert.ThrowsAsync<ValidationException>(
-        async () => await mediator.Send(new RenameUser("123", ""))
-    );
+    var result = await mediator.Send(new RenameUser("123", ""));
+    Assert.That(result.IsError, Is.True);
+    Assert.That(result.Errors.OfType<ValidationIssue>().Single().MemberName, Is.EqualTo("NewName"));
 }
 ```
 
-### Test Multiple Behaviors
-```csharp
-[Test]
-public async Task Pipeline_WithLoggingAndValidation_ExecutesInOrder()
-{
-    // Arrange
-    var loggingBehavior = new LoggingBehavior<CreateUser, Outcome<User>>(logger);
-    var validationBehavior = new ValidationBehavior<CreateUser, Outcome<User>, User>(validator);
-    var mediator = new TestMediator<CreateUser, Outcome<User>>(
-        handler,
-        [loggingBehavior, validationBehavior]  // Logging first, validation second
-    );
+The integration suite also verifies generated registrations, field/code preservation, typed and custom response factories, cancellation, HTTP redaction, JSON round trips, and a full validation-to-HTTP flow. See `tests/BbQ.Outcome.Integrations.Tests`.
 
-    // Act
-    var outcome = await mediator.Send(new CreateUser("test@example.com", "Test"));
+## Files and documentation
 
-    // Assert
-    // Verify logging was called
-    logger.Verify(x => x.Log(...), Times.Once);
-    // Verify validation was called
-    // Verify result
-}
-```
+`Program.cs` contains the scenario orchestration. `ValidationBehavior.cs` now contains the sample `RenameUserValidator`; the reusable behavior and response factories live in `src/BbQ.Cqrs.Outcome`. Query/command handlers, retry behavior, dispatcher examples, and pub/sub examples remain separate source files.
 
----
-
-## Project Structure
-
-```
-src/BbQ.Cqrs.Samples/
-??? Program.cs                          # Main entry point with all scenarios
-??? AppError.cs                         # Error enum with [QbqOutcome]
-??? IUserRepository.cs                  # Repository interface
-??? Unit.cs                             # Void type for commands with no return value
-??? UserDto.cs                          # User data transfer object
-?
-??? GetUserById.cs                      # Query definition
-??? GetUserByIdHandler.cs               # Query handler
-?
-??? RenameUser.cs                       # Command definition
-??? RenameUserHandler.cs                # Command handler
-??? RenameUserValidator.cs              # Fluent validator for RenameUser
-?
-??? ValidationBehavior.cs               # Generic validation pipeline behavior
-??? LoggingBehavior.cs                  # Generic logging pipeline behavior
-??? RetryBehavior.cs                    # Generic retry pipeline behavior
-```
-
----
-
-## Running Individual Scenarios
-
-To run only a specific scenario, you can modify `Program.cs` Main():
-
-```csharp
-static async Task Main()
-{
-    Console.WriteLine("=== BbQ.Cqrs Sample Scenarios ===\n");
-
-    // Comment out scenarios you don't want to run
-    await Scenario01_BasicQuery();
-    // await Scenario02_CommandWithValidation();
-    // await Scenario03_ErrorHandling();
-    // await Scenario04_RetryBehavior();
-}
-```
-
----
-
-## Learning Path
-
-1. **Start with Scenario 1** - Understand basic queries and handlers
-2. **Move to Scenario 2** - Learn how behaviors work in the pipeline
-3. **Explore Scenario 3** - Master strongly-typed error handling
-4. **Advanced: Scenario 4** - Understand complex behavior patterns
-
----
-
-## Related Documentation
-
-- [BbQ.Outcome Documentation](../../src/BbQ.Outcome/README.md)
-- [BbQ.Cqrs Documentation](../../src/BbQ.Cqrs/README.md)
-- [Outcome Error Helper Properties](../../src/BbQ.Outcome/README.md)
+- [CQRS documentation](../BbQ.Cqrs/README.md)
+- [Outcome documentation](../BbQ.Outcome/README.md)
+- [Extension implementation and migration](../../docs/extension-roadmap.md)
+- [Validation integration](../BbQ.Cqrs.Outcome/README.md)
+- [Events documentation](../BbQ.Events/README.md)
