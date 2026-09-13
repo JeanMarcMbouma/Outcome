@@ -1,54 +1,19 @@
-﻿using BbQ.Cqrs;
-using BbQ.Outcome;
+using BbQ.Cqrs.Validation;
 
 namespace BbQ.CQRS.Samples;
 
-public interface IRequestValidator<TRequest>
-{
-    Task<(bool IsValid, string Description)> ValidateAsync(TRequest request, CancellationToken ct);
-}
-
-
+// Response construction is provided by the optional BbQ.Cqrs.Outcome package.
+// No sample-specific behavior or cast from Outcome<T> to an arbitrary TResponse is needed.
 public sealed class RenameUserValidator : IRequestValidator<RenameUser>
 {
-    public Task<(bool IsValid, string Description)> ValidateAsync(RenameUser request, CancellationToken ct)
+    public Task<IReadOnlyList<ValidationIssue>> ValidateAsync(RenameUser request, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(request.NewName))
-            return Task.FromResult((false, "New name must be non-empty"));
-
-        if (request.NewName.Length > 50)
-            return Task.FromResult((false, "New name must be at most 50 characters"));
-
-        return Task.FromResult((true, string.Empty));
-    }
-}
-
-// Note: ValidationBehavior has 3 type parameters (TRequest, TResponse, TPayload) which makes it
-// incompatible with the source generator's automatic registration. Behaviors with more than 2
-// type parameters must be registered manually. The [Behavior] attribute should only be used on
-// behaviors that directly match IPipelineBehavior<TRequest, TResponse> with exactly 2 type parameters.
-public sealed class ValidationBehavior<TRequest, TResponse, TPayload>
-    : IPipelineBehavior<TRequest, TResponse>
-    where TRequest : IRequest<TResponse>
-    where TResponse : IOutcome<TPayload>
-{
-    private readonly IRequestValidator<TRequest> _validator;
-
-    public ValidationBehavior(IRequestValidator<TRequest> validator) => _validator = validator;
-
-    public async Task<TResponse> Handle(
-        TRequest request,
-        CancellationToken ct,
-        Func<TRequest, CancellationToken, Task<TResponse>> next)
-    {
-        var result = await _validator.ValidateAsync(request, ct);
-        if (!result.IsValid)
-        {
-            // Construct Outcome<TPayload> failure directly with your API (no reflection)
-            var failure = Outcome<TPayload>.FromError(new Error<AppError>(AppError.InvalidName, result.Description)) as IOutcome<TPayload>;
-            return (TResponse)failure;
-        }
-
-        return await next(request, ct);
+        ct.ThrowIfCancellationRequested();
+        IReadOnlyList<ValidationIssue> issues = string.IsNullOrWhiteSpace(request.NewName)
+            ? new[] { new ValidationIssue("INVALID_NAME", "New name must be non-empty", nameof(request.NewName)) }
+            : request.NewName.Length > 50
+                ? new[] { new ValidationIssue("INVALID_NAME", "New name must be at most 50 characters", nameof(request.NewName)) }
+                : Array.Empty<ValidationIssue>();
+        return Task.FromResult(issues);
     }
 }
