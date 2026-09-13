@@ -2,6 +2,14 @@
 
 Optional FluentValidation 12 integration for .NET 8, 9, and 10. This dependency is not added to the base Outcome or CQRS packages.
 
+## Installation
+
+This package ships with the CQRS family under the same `cqrs-v*` version.
+
+```bash
+dotnet add package BbQ.Cqrs.Outcome.FluentValidation --prerelease
+```
+
 ```csharp
 using BbQ.Cqrs.Validation.FluentValidation;
 
