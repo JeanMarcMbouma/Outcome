@@ -25,9 +25,10 @@ public static class OutcomeJsonExtensions
 
     /// <summary>Registers a closed converter for heterogeneous <see cref="Outcome{T}"/> values using an explicit error-type registry.</summary>
     /// <example><code>
-    /// var registry = new OutcomeErrorTypeRegistry()
-    ///     .Add("validation", AppJsonContext.Default.ValidationError)
-    ///     .Add("not-found", AppJsonContext.Default.NotFoundError);
+    /// var registry = new OutcomeErrorTypeRegistryBuilder()
+    ///     .Register("validation", AppJsonContext.Default.ValidationError)
+    ///     .Register("not-found", AppJsonContext.Default.NotFoundError)
+    ///     .Build();
     ///
     /// var options = new JsonSerializerOptions()
     ///     .AddOutcomeConverter(AppJsonContext.Default.User, registry);
