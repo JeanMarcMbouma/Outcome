@@ -10,20 +10,10 @@ public static class OutcomeCollectionExtensions
     public static Outcome<IReadOnlyList<T>, TError> Sequence<T, TError>(this IEnumerable<Outcome<T, TError>> source)
     {
         ArgumentNullException.ThrowIfNull(source);
-        var values = new List<T>();
-        List<TError>? errors = null;
+        var builder = new OutcomeCollectionBuilder<T, TError>(source.TryGetNonEnumeratedCount(out var count) ? count : 0);
         foreach (var outcome in source)
-        {
-            if (outcome.IsSuccess)
-                values.Add(outcome.ValueUnchecked);
-            else
-            {
-                errors ??= [];
-                errors.AddRange(outcome.ErrorsUnchecked);
-            }
-        }
-        return errors != null ? Outcome<IReadOnlyList<T>, TError>.FromErrors(errors)
-            : Outcome<IReadOnlyList<T>, TError>.From(values.AsReadOnly());
+            builder.Add(outcome);
+        return builder.BuildReadOnly();
     }
 
     /// <summary>Collects heterogeneous outcomes, accumulating all errors in input order.</summary>
@@ -33,7 +23,10 @@ public static class OutcomeCollectionExtensions
     public static Outcome<IReadOnlyList<T>> Sequence<T>(this IEnumerable<Outcome<T>> source)
     {
         ArgumentNullException.ThrowIfNull(source);
-        return OutcomeInterop.Untyped(Enumerable.Select(source, OutcomeInterop.Typed).Sequence());
+        var builder = new OutcomeCollectionBuilder<T, object?>(source.TryGetNonEnumeratedCount(out var count) ? count : 0);
+        foreach (var outcome in source)
+            builder.Add(OutcomeInterop.Typed(outcome));
+        return OutcomeInterop.Untyped(builder.BuildReadOnly());
     }
 
     /// <summary>Combines differently typed values; failures are accumulated left then right.</summary>
@@ -50,10 +43,12 @@ public static class OutcomeCollectionExtensions
             return Outcome<(TLeft, TRight), TError>.FromErrors(right.ErrorsUnchecked);
         if (right.IsSuccess)
             return Outcome<(TLeft, TRight), TError>.FromErrors(left.ErrorsUnchecked);
-        var errors = new List<TError>(left.ErrorsUnchecked.Count + right.ErrorsUnchecked.Count);
-        errors.AddRange(left.ErrorsUnchecked);
-        errors.AddRange(right.ErrorsUnchecked);
-        return Outcome<(TLeft, TRight), TError>.FromErrors(errors);
+        var leftErrors = left.ErrorsUnchecked;
+        var rightErrors = right.ErrorsUnchecked;
+        var errors = new TError[leftErrors.Count + rightErrors.Count];
+        for (var i = 0; i < leftErrors.Count; i++) errors[i] = leftErrors[i];
+        for (var i = 0; i < rightErrors.Count; i++) errors[leftErrors.Count + i] = rightErrors[i];
+        return Outcome<(TLeft, TRight), TError>.FromErrors(ErrorCollection<TError>.FromOwnedArray(errors));
     }
 
     /// <summary>Combines differently typed heterogeneous outcomes.</summary>
@@ -73,7 +68,10 @@ public static class OutcomeCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(operation);
-        return Enumerable.Select(source, operation).Sequence();
+        var builder = new OutcomeCollectionBuilder<TResult, TError>(source.TryGetNonEnumeratedCount(out var count) ? count : 0);
+        foreach (var input in source)
+            builder.Add(operation(input));
+        return builder.BuildReadOnly();
     }
 
     /// <summary>Runs every heterogeneous operation sequentially.</summary>
@@ -85,7 +83,10 @@ public static class OutcomeCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(operation);
-        return Enumerable.Select(source, operation).Sequence();
+        var builder = new OutcomeCollectionBuilder<TResult, object?>(source.TryGetNonEnumeratedCount(out var count) ? count : 0);
+        foreach (var input in source)
+            builder.Add(OutcomeInterop.Typed(operation(input)));
+        return OutcomeInterop.Untyped(builder.BuildReadOnly());
     }
 
     /// <summary>
@@ -111,7 +112,7 @@ public static class OutcomeCollectionExtensions
         cancellationToken.ThrowIfCancellationRequested();
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var pending = new List<Task<Outcome<TResult, TError>>>();
-        var results = new List<Outcome<TResult, TError>>();
+        var builder = new OutcomeCollectionBuilder<TResult, TError>(source.TryGetNonEnumeratedCount(out var count) ? count : 0);
         try
         {
             foreach (var input in source)
@@ -120,14 +121,16 @@ public static class OutcomeCollectionExtensions
                 pending.Add(Invoke(input));
                 if (pending.Count == maxConcurrency)
                 {
-                    results.AddRange(await Task.WhenAll(pending).ConfigureAwait(false));
+                    foreach (var result in await Task.WhenAll(pending).ConfigureAwait(false))
+                        builder.Add(result);
                     pending.Clear();
                 }
             }
             if (pending.Count != 0)
-                results.AddRange(await Task.WhenAll(pending).ConfigureAwait(false));
+                foreach (var result in await Task.WhenAll(pending).ConfigureAwait(false))
+                    builder.Add(result);
             cancellationToken.ThrowIfCancellationRequested();
-            return results.Sequence();
+            return builder.BuildReadOnly();
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {

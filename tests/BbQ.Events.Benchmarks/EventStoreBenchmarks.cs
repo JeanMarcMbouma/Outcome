@@ -10,6 +10,7 @@ namespace BbQ.Events.Benchmarks;
 [SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 8)]
 public class EventStoreBenchmarks
 {
+    private const int AppendBatchSize = 256;
     [Params(1_000, 10_000)]
     public int EventCount { get; set; }
 
@@ -26,16 +27,21 @@ public class EventStoreBenchmarks
         }
     }
 
-    [GlobalSetup(Target = nameof(AppendSingleEvent))]
+    // Iteration setup keeps retained events bounded. BenchmarkDotNet runs one
+    // invocation per iteration when iteration setup is present.
+    [IterationSetup(Target = nameof(AppendSingleEvent))]
     public void SetupAppend()
     {
         _store = new InMemoryEventStore();
     }
 
-    [Benchmark]
-    public Task<long> AppendSingleEvent()
+    [Benchmark(OperationsPerInvoke = AppendBatchSize)]
+    public async Task<long> AppendSingleEvent()
     {
-        return _store.AppendAsync("users", new TestEvent(Environment.TickCount));
+        long position = -1;
+        for (var i = 0; i < AppendBatchSize; i++)
+            position = await _store.AppendAsync("users", new TestEvent(i));
+        return position;
     }
 
     [Benchmark]

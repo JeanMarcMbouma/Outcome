@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <ParityAfterProject Condition="'$(ParityAfterProject)' == ''">../../artifacts/throughput-sources/After/After.csproj</ParityAfterProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" Version="0.15.6" />
+    <ProjectReference Include="../../artifacts/throughput-sources/Before/Before.csproj" />
+    <ProjectReference Include="$(ParityAfterProject)" />
+  </ItemGroup>
+</Project>

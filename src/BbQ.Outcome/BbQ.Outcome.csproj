@@ -6,7 +6,7 @@
 
     <!-- Package metadata -->
     <PackageId>BbQ.Outcome</PackageId>
-    <Version>1.2.0-preview.2</Version>
+    <Version>1.2.0-preview.3</Version>
     <Authors>Jean</Authors>
     <Company>JM Mbouma</Company>
     <Description>A modern C# functional result type with structured errors, async workflows, LINQ support, deconstruction, and Source Link.</Description>
