@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <PackageId>BbQ.Outcome.Diagnostics</PackageId>
-    <Version>1.2.0-preview.2</Version>
+    <Version>1.2.0-preview.3</Version>
     <Authors>Jean</Authors>
     <Description>Opt-in structured logging and Activity instrumentation for BbQ.Outcome.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

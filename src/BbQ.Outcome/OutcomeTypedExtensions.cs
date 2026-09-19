@@ -63,35 +63,29 @@ namespace BbQ.Outcome
             /// </summary>
             public static Outcome<IEnumerable<T>, TError> Combine(params Outcome<T, TError>[] outcomes)
             {
-                List<TError>? errors = null;
-                List<T>? values = null;
+                if (outcomes.Length == 0)
+                    return Outcome<IEnumerable<T>, TError>.From(Array.Empty<T>());
+                if (outcomes[0].IsError)
+                    return CombineErrors(outcomes, 0);
 
-                foreach (var item in outcomes)
+                // The successful path needs only its final array, not a builder/list.
+                var values = new T[outcomes.Length];
+                for (var i = 0; i < outcomes.Length; i++)
                 {
-                    if (item.IsSuccess)
-                    {
-                        values ??= new List<T>(outcomes.Length);
-                        values.Add(item.ValueUnchecked);
-                    }
-                    else
-                    {
-                        errors ??= [];
-                        var itemErrors = item.ErrorsUnchecked;
-                        for (var i = 0; i < itemErrors.Count; i++)
-                        {
-                            errors.Add(itemErrors[i]);
-                        }
-                    }
+                    if (outcomes[i].IsError)
+                        return CombineErrors(outcomes, i);
+                    values[i] = outcomes[i].ValueUnchecked;
                 }
+                return Outcome<IEnumerable<T>, TError>.From(values);
 
-                if (errors is { Count: > 0 })
+                static Outcome<IEnumerable<T>, TError> CombineErrors(Outcome<T, TError>[] items, int start)
                 {
-                    return Outcome<IEnumerable<T>, TError>.FromErrors(errors);
+                    var builder = new OutcomeCollectionBuilder<T, TError>(0);
+                    for (var i = start; i < items.Length; i++)
+                        builder.Add(items[i]);
+                    return builder.BuildEnumerable();
                 }
-
-                return Outcome<IEnumerable<T>, TError>.From(values ?? (IEnumerable<T>)Array.Empty<T>());
             }
-
             // ============ Async composition methods ============
 
             /// <summary>

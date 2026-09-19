@@ -13,6 +13,16 @@ This project contains BenchmarkDotNet performance benchmarks for core `BbQ.Event
   - `PublishWithActiveSubscriber`
   - `PublishWithTwoActiveSubscribers`
 
+`AppendSingleEvent` measures a batch of 256 appends, normalized per append with
+`OperationsPerInvoke`. Iteration setup replaces the store outside measurement;
+BenchmarkDotNet uses one invocation per iteration for this benchmark. This keeps
+retained events bounded instead of growing the store throughout pilot, warmup,
+and measurement. Allocations include event objects, returned tasks, stream/list
+growth, and amortized batch-method overhead. `EventCount` applies only to the read
+case; append results for its two parameter values are equivalent workloads.
+The small bounded batch is intended for allocation checks; use longer controlled
+workloads before drawing throughput conclusions from it.
+
 ## Run
 
 From repository root:
