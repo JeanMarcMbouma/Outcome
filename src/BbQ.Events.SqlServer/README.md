@@ -290,7 +290,7 @@ The event store uses SQL Server's transaction support to ensure:
 The checkpoint store uses SQL Server's `MERGE` statement for atomic upsert operations:
 
 ```sql
-MERGE BbQ_ProjectionCheckpoints AS target
+MERGE BbQ_ProjectionCheckpoints WITH (HOLDLOCK) AS target
 USING (SELECT @ProjectionName, @PartitionKey) AS source
 ON target.ProjectionName = source.ProjectionName 
    AND target.PartitionKey IS NULL

@@ -225,24 +225,38 @@ public class SqlServerProjectionCheckpointStoreTests
     }
 
     [Test]
+    [Repeat(20)]
     public async Task ParallelWrites_ToSameProjection_AreThreadSafe()
     {
         // Arrange
-        var projectionName = "TestProjection_ParallelWrites";
+        var projectionName = $"TestProjection_ParallelWrites_{Guid.NewGuid():N}";
         var iterations = 50;
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        // Act - Write from multiple threads
+        // Act - synchronize first writes so every repetition exercises the insert race.
         var tasks = Enumerable.Range(0, iterations)
-            .Select(async i => await _store!.SaveCheckpointAsync(projectionName, i))
+            .Select(async i =>
+            {
+                await start.Task;
+                await _store!.SaveCheckpointAsync(projectionName, i);
+            })
             .ToArray();
 
+        start.SetResult();
         await Task.WhenAll(tasks);
 
-        // Assert - Should have a valid checkpoint (last write wins)
+        // Assert - a single row survives and contains a valid checkpoint.
         var result = await _store!.GetCheckpointAsync(projectionName);
         Assert.That(result, Is.Not.Null);
         Assert.That(result, Is.GreaterThanOrEqualTo(0));
         Assert.That(result, Is.LessThan(iterations));
+
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT COUNT(*) FROM BbQ_ProjectionCheckpoints WHERE ProjectionName = @ProjectionName AND PartitionKey IS NULL";
+        command.Parameters.AddWithValue("@ProjectionName", projectionName);
+        Assert.That(await command.ExecuteScalarAsync(), Is.EqualTo(1));
     }
 
     [Test]
