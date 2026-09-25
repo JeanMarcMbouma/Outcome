@@ -34,10 +34,13 @@ jobs:
     - name: Build
       run: dotnet build src/BbQ.Events.SqlServer/BbQ.Events.SqlServer.csproj --configuration Release --no-restore
 
+    - name: Start SQL Server LocalDB
+      run: SqlLocalDB start MSSQLLocalDB
+
     - name: Test
       run: dotnet test tests/BbQ.Events.SqlServer.Tests/BbQ.Events.SqlServer.Tests.csproj --configuration Release --verbosity normal
-      continue-on-error: true  # Integration tests might fail without SQL Server
       env:
+        REQUIRE_EVENT_SERVICES: '1'
         TEST_SQLSERVER_CONNECTION_STRING: "Server=(localdb)\\mssqllocaldb;Database=BbQEventsTest;Integrated Security=true"
 
     - name: Extract version
