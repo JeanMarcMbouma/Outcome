@@ -10,6 +10,7 @@ BbQ.Outcome takes this idea further:
 
 - **Structured errors**: Rich `Error` record with `Code`, `Description`, and `Severity`.
 - **Async composition**: `BindAsync`, `MapAsync`, `CombineAsync` for natural async pipelines.
+- **Explicit retries**: Retry selected Outcome failures with cancellation-aware delays and no resilience-framework dependency.
 - **LINQ integration**: Native `Select`/`SelectMany` support for sync + async queries.
 - **IAsyncEnumerable streaming**: `Select`, `Bind`, `Map`, `Where`, `Values`, `Errors` over `IAsyncEnumerable<Outcome<T>>` streams.
 - **Deconstruction**: Tuple-style unpacking `(isSuccess, value, errors)` for ergonomic handling.
@@ -243,6 +244,42 @@ public async Task<Outcome<User>> GetAndValidateUserAsync(Guid userId)
         .BindAsync(user => EnrichUserAsync(user));
 }
 ```
+
+### Explicit retries
+
+Retries operate on an operation factory so each attempt actually re-executes the underlying work:
+
+```csharp
+var result = await Outcome.RetryAsync(
+    ct => repository.LoadAsync(userId, ct),
+    errors => errors.All(error =>
+        error.Code is StorageErrorCode.TemporarilyUnavailable
+                   or StorageErrorCode.RateLimited),
+    new RetryOptions
+    {
+        MaxAttempts = 4,
+        DelayGenerator = retry =>
+            TimeSpan.FromMilliseconds(100 * Math.Pow(2, retry - 1))
+    },
+    cancellationToken);
+```
+
+`MaxAttempts` includes the initial operation call. The retry predicate receives the complete error list, so the application decides whether mixed failures are safe to retry. On exhaustion the final failure is returned; previous failures are not accumulated.
+
+Exceptions are deliberately outside `RetryAsync`. Compose with `Outcome.TryAsync` when an exception-based dependency needs to participate in the same retry policy:
+
+```csharp
+var result = await Outcome.RetryAsync(
+    ct => Outcome.TryAsync<User, StorageError>(
+        innerCt => storageClient.LoadAsync(userId, innerCt),
+        MapStorageException,
+        ct),
+    errors => errors.All(IsTransient),
+    new RetryOptions { MaxAttempts = 3 },
+    cancellationToken);
+```
+
+Unrecognized exceptions and cancellation still propagate. There is no retry extension on an already-started `Task<Outcome<T>>`, because awaiting the same task cannot re-run its producer.
 
 ### Pattern Matching with Match
 
