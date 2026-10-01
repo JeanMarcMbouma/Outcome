@@ -28,7 +28,7 @@ public interface IExceptionMapper<TError>
 }
 
 /// <summary>Explicit boundaries for calling exception-based dependencies.</summary>
-public static class Outcome
+public static partial class Outcome
 {
     /// <summary>
     /// Wraps a value-producing operation. Cancellation exceptions are never converted;
