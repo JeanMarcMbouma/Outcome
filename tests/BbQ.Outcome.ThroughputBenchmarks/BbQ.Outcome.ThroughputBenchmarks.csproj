@@ -8,7 +8,7 @@
     <ParityAfterProject Condition="'$(ParityAfterProject)' == ''">../../artifacts/throughput-sources/After/After.csproj</ParityAfterProject>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="BenchmarkDotNet" Version="0.15.6" />
+    <PackageReference Include="BenchmarkDotNet" />
     <ProjectReference Include="../../artifacts/throughput-sources/Before/Before.csproj" />
     <ProjectReference Include="$(ParityAfterProject)" />
   </ItemGroup>

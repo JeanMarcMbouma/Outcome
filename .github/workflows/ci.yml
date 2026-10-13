@@ -33,6 +33,8 @@ jobs:
         run: dotnet build Outcome.slnx --configuration Release --no-restore
       - name: Run tests
         run: dotnet test Outcome.slnx --configuration Release --no-build --verbosity minimal --logger 'trx;LogFilePrefix=results'
+      - name: Verify NuGet packing with central versions
+        run: dotnet pack Outcome.slnx --configuration Release --no-build -o artifacts/packages
       - name: Summarize test evidence
         if: always()
         run: python3 scripts/summarize-outcome-tests.py
