@@ -142,3 +142,30 @@ Pre-release consumers should install with `--prerelease` or pin the exact previe
 ## License
 
 MIT. See [LICENSE](./LICENSE).
+
+## Dependency versions
+
+NuGet dependencies are managed centrally in `Directory.Packages.props` for all
+library, source generator, sample, test, and benchmark projects. Add a
+`PackageVersion` there and a versionless `PackageReference` in the consuming
+project. Keep project-specific asset metadata such as `PrivateAssets` on the
+reference. Per-project version overrides are disabled.
+
+Microsoft.Extensions packages share the 10.0.2 baseline, compatible with the
+existing .NET 8, 9, 10 and CQRS .NET Framework 4.8.1 targets. Source generators
+retain their .NET Standard 2.0 target and Roslyn 4.8.0 baseline. If a future
+dependency needs different versions by runtime, use `TargetFramework` conditions
+on the central `PackageVersion` entries and validate every affected target.
+
+Central versions retain NuGet's minimum-version semantics for consumers.
+Transitive pinning is disabled so packing does not promote centrally listed
+transitive packages into additional public dependencies.
+
+Validate changes with:
+
+```sh
+dotnet restore Outcome.slnx
+dotnet build Outcome.slnx -c Release --no-restore
+dotnet test Outcome.slnx -c Release --no-build
+dotnet pack Outcome.slnx -c Release --no-build -o artifacts/packages
+```

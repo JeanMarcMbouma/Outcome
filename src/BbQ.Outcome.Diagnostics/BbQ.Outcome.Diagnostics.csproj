@@ -14,7 +14,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../BbQ.Outcome/BbQ.Outcome.csproj" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <None Include="README.md" Pack="true" PackagePath="" />
   </ItemGroup>
 </Project>
