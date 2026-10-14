@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/CQRS/">
+    <Project Path="tests/BbQ.Cqrs.Outcome.Tests/BbQ.Cqrs.Outcome.Tests.csproj" />
     <Project Path="src/BbQ.Cqrs.Samples/BbQ.Cqrs.Samples.csproj" />
     <Project Path="src/BbQ.Cqrs.SourceGenerators/BbQ.Cqrs.SourceGenerators.csproj" />
     <Project Path="src/BbQ.Cqrs/BbQ.Cqrs.csproj" />
@@ -38,3 +39,4 @@
   <Project Path="tests/BbQ.Outcome.Tests/BbQ.Outcome.Tests.csproj" />
   <Project Path="tests/BbQ.Outcome.SourceGenerators.Tests/BbQ.Outcome.SourceGenerators.Tests.csproj" />
 </Solution>
+

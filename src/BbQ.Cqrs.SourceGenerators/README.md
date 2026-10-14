@@ -76,3 +76,30 @@ public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
 ```
 
 The source generator will automatically detect and register these components.
+
+
+## Mediator with Outcome validation
+
+When `BbQ.Cqrs.Outcome` is referenced, the generator also emits an intention-revealing composed
+registration method. For an assembly named `Ordering`:
+
+```csharp
+services.AddOrderingMediatorWithOutcomeValidation(
+    configureValidation: validation => validation.MapIssuesTo<AppError>(issue =>
+        new AppError(issue.Code, issue.Message, issue.MemberName)));
+```
+
+It registers scoped mediator services, command/query dispatchers, sender/streamer aliases, all
+accessible closed local handlers (including direct `IRequest<TResponse>` handlers), validators,
+and closed Outcome validation behaviors/factories. Multiple handler interfaces are supported.
+There is no runtime assembly scanning in this registration path. Custom pipeline behaviors remain
+explicit; existing `AddOrderingCqrs()` and `AddOrderingOutcomeValidation()` methods remain available.
+
+Omit configuration for `Outcome<T>` or `Outcome<T,ValidationIssue>`. Domain errors require a mapper
+or custom failure factory. Use `MapIssuesTo<TError,TMapper>()` for scoped mapping dependencies.
+Call each assembly's generated method for multiple projects; names remove punctuation from the
+assembly name. The registration method emits direct service descriptors suitable for Native AOT;
+this does not remove runtime reflection from mediator dispatch itself.
+
+For equivalent runtime discovery use
+`AddBbQMediatorWithOutcomeValidationFromAssemblies(assemblies, configureValidation)`.
