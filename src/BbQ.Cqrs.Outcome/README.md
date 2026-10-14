@@ -16,7 +16,69 @@ dotnet add package BbQ.Cqrs.Outcome --prerelease
 
 `IValidationFailureFactory<TResponse>` creates the application's response. The behavior does not know its payload type and does not cast a concrete Outcome to an arbitrary response. `OutcomeValidationFailureFactory<T>` preserves issues as heterogeneous errors by default. `OutcomeValidationFailureFactory<T,TError>` uses an `IValidationIssueMapper<TError>`. Applications may implement the factory for other response types.
 
-## Registration
+## Register mediator and validation together
+
+Choose one discovery path. Both register scoped mediator services and command/query dispatchers,
+sender/streamer aliases, handlers, request validators, and closed validation behaviors/factories
+for `Outcome<T>` and `Outcome<T,TError>` requests. Invalid requests return failed Outcomes before
+reaching their handlers. Neither path adds custom pipeline behaviors automatically.
+
+### Assembly scanning
+
+```csharp
+services.AddBbQMediatorWithOutcomeValidationFromAssemblies(
+    assemblies: [typeof(CreateUser).Assembly],
+    configureValidation: validation => validation.MapIssuesTo<AppError>(issue =>
+        new AppError(issue.Code, issue.Message, issue.MemberName)));
+```
+
+Supply the assemblies explicitly. Concrete closed request, handler and `IRequestValidator<TRequest>`
+types are discovered, including internal types. Abstract/open generic types are skipped.
+Handlers implementing multiple contracts are registered for each contract, including streaming
+and fire-and-forget handlers. Streaming requests do not receive request validation behaviors.
+The scanning API is annotated as requiring unreferenced code and dynamic code; use generated
+registration for trimming-sensitive applications.
+
+### Source-generated registration
+
+Reference `BbQ.Cqrs.SourceGenerators` as an analyzer. For an assembly named `Ordering`:
+
+```csharp
+services.AddOrderingMediatorWithOutcomeValidation(
+    configureValidation: validation => validation.MapIssuesTo<AppError>(issue =>
+        new AppError(issue.Code, issue.Message, issue.MemberName)));
+```
+
+This single generated method registers mediator infrastructure, every accessible closed local handler,
+and the validators/factories/behaviors emitted by `AddOrderingOutcomeValidation()`. No assembly scanning
+or reflective registration is emitted. Call each participating assembly's generated method when
+splitting handlers across projects. The method name uses the assembly name with punctuation removed.
+Inaccessible and open generic types still require explicit registration. Generated registration is
+suitable for Native AOT; mediator dispatch's existing runtime reflection is a separate concern.
+
+### Defaults and domain mappings
+
+Omit `configureValidation` for `Outcome<T>` (issues are preserved as heterogeneous errors) or
+`Outcome<T,ValidationIssue>` (an identity mapper is registered automatically). Domain error types
+require an explicit mapping once per error type, or a custom `IValidationFailureFactory<TResponse>`.
+Enable `ServiceProviderOptions.ValidateOnBuild` to detect missing mapper dependencies at startup.
+Mappings may also be registered after discovery, before building the service provider.
+
+For stateful mapping with scoped dependencies:
+
+```csharp
+services.AddOrderingMediatorWithOutcomeValidation(
+    configureValidation: validation => validation.MapIssuesTo<AppError, AppErrorMapper>());
+```
+
+`AppErrorMapper` implements `IValidationIssueMapper<AppError>`. Delegate mappers are singleton and
+must be thread-safe. Explicit configuration replaces an earlier mapping for that error type.
+Custom factories and mediator infrastructure registrations are preserved. Repeated calls, including
+mixing scanning with generated validation registration, do not duplicate identical handlers,
+validators, factories or validation behaviors. Discovered handlers/validators/behaviors are scoped.
+Register application dependencies separately.
+
+## Explicit registration
 
 ```csharp
 services.AddScoped<IRequestValidator<CreateUser>, CreateUserValidator>();
@@ -35,3 +97,4 @@ With `BbQ.Cqrs.SourceGenerators`, call `services.AddYourAssemblyNameOutcomeValid
 ## Compatibility
 
 The core CQRS package remains independent of Outcome and retains its existing target frameworks. This package only supports .NET 8+. No validation is added automatically just by referencing it: use explicit or generated registrations. Registering twice does not duplicate an identical validation behavior.
+

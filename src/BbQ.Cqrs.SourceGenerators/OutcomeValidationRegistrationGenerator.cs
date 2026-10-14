@@ -71,8 +71,36 @@ public sealed class OutcomeValidationRegistrationGenerator : IIncrementalGenerat
                     "global::BbQ.Cqrs.Validation.ValidationBehavior<" + pair.Key + ", " + responseName + ">");
             }
         }
-        sb.AppendLine("return services;\n}\n}\n}");
+        sb.AppendLine("return services;\n}");
+        if (compilation.GetTypeByMetadataName("BbQ.Cqrs.Validation.OutcomeValidationOptions") != null &&
+            compilation.GetTypeByMetadataName("BbQ.Cqrs.DependencyInjection.MediatorServiceCollectionExtensions") != null)
+            AppendMediatorRegistration(sb, assembly, method, types);
+        sb.AppendLine("}\n}");
         context.AddSource(assembly + ".OutcomeValidationRegistration.g.cs", sb.ToString());
+    }
+
+    private static void AppendMediatorRegistration(StringBuilder sb, string assembly, string validationMethod,
+        Dictionary<string, INamedTypeSymbol> types)
+    {
+        sb.AppendLine("/// <summary>Registers scoped mediator services, local handlers and validators, and Outcome validation without assembly scanning.</summary>");
+        sb.Append("public static global::Microsoft.Extensions.DependencyInjection.IServiceCollection Add")
+            .Append(assembly).AppendLine("MediatorWithOutcomeValidation(this global::Microsoft.Extensions.DependencyInjection.IServiceCollection services, global::System.Action<global::BbQ.Cqrs.Validation.OutcomeValidationOptions>? configureValidation = null) {");
+        sb.AppendLine("if (services is null) throw new global::System.ArgumentNullException(nameof(services));");
+        sb.AppendLine("global::BbQ.Cqrs.DependencyInjection.MediatorServiceCollectionExtensions.AddBbQMediatorServices(services);");
+        sb.AppendLine("configureValidation?.Invoke(new global::BbQ.Cqrs.Validation.OutcomeValidationOptions(services));");
+        foreach (var pair in types.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            if (pair.Value.TypeKind != TypeKind.Class) continue;
+            foreach (var iface in pair.Value.AllInterfaces)
+            {
+                if (IsContract(iface, "BbQ.Cqrs", "IRequestHandler`1") ||
+                    IsContract(iface, "BbQ.Cqrs", "IRequestHandler`2") ||
+                    IsContract(iface, "BbQ.Cqrs", "IStreamHandler`2"))
+                    RegisterEnumerable(sb, iface.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), pair.Key);
+            }
+        }
+        sb.Append(validationMethod).AppendLine("(services);");
+        sb.AppendLine("return services;\n}");
     }
 
     private static bool IsContract(INamedTypeSymbol symbol, string containingNamespace, string metadataName)
@@ -94,3 +122,4 @@ public sealed class OutcomeValidationRegistrationGenerator : IIncrementalGenerat
             .Append(service).Append(", ").Append(implementation).AppendLine(">());");
     }
 }
+
