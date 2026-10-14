@@ -93,12 +93,12 @@ With source-generated registration (assembly `Ordering`), use the equivalent
 Both paths register mediator services, handlers, validators and Outcome validation.
 See the [registration guide](./src/BbQ.Cqrs.Outcome/README.md) for defaults and scoped mappings.
 
-For FluentValidation, explicit registration remains available:
+For FluentValidation, use the companion from `BbQ.Cqrs.Outcome.FluentValidation`:
 
 ```csharp
-services.AddScoped<FluentValidation.IValidator<CreateUser>, CreateUserValidator>();
-services.AddFluentValidationRequest<CreateUser>();
-services.AddOutcomeValidation<CreateUser, User>();
+services.AddBbQMediatorWithOutcomeAndFluentValidationFromAssemblies(
+    assemblies: [typeof(CreateUser).Assembly]);
+// Or: services.AddOrderingMediatorWithOutcomeAndFluentValidation();
 ```
 
 ## ASP.NET Core

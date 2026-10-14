@@ -36,6 +36,7 @@ jobs:
           dotnet restore tests/BbQ.Cqrs.Tests/BbQ.Cqrs.Tests.csproj
           dotnet restore tests/BbQ.Cqrs.SourceGenerators.Tests/BbQ.Cqrs.SourceGenerators.Tests.csproj
           dotnet restore tests/BbQ.Cqrs.Outcome.Tests/BbQ.Cqrs.Outcome.Tests.csproj
+          dotnet restore tests/BbQ.Cqrs.Outcome.FluentValidation.Tests/BbQ.Cqrs.Outcome.FluentValidation.Tests.csproj
           dotnet restore tests/BbQ.Outcome.Integrations.Tests/BbQ.Outcome.Integrations.Tests.csproj
 
       - name: Build package family
@@ -50,6 +51,7 @@ jobs:
           dotnet test tests/BbQ.Cqrs.Tests/BbQ.Cqrs.Tests.csproj --configuration Release --verbosity normal
           dotnet test tests/BbQ.Cqrs.SourceGenerators.Tests/BbQ.Cqrs.SourceGenerators.Tests.csproj --configuration Release --verbosity normal
           dotnet test tests/BbQ.Cqrs.Outcome.Tests/BbQ.Cqrs.Outcome.Tests.csproj --configuration Release --verbosity normal
+          dotnet test tests/BbQ.Cqrs.Outcome.FluentValidation.Tests/BbQ.Cqrs.Outcome.FluentValidation.Tests.csproj --configuration Release --verbosity normal
           dotnet test tests/BbQ.Outcome.Integrations.Tests/BbQ.Outcome.Integrations.Tests.csproj --configuration Release --verbosity normal
 
       - name: Extract version
