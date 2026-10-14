@@ -78,6 +78,15 @@ mixing scanning with generated validation registration, do not duplicate identic
 validators, factories or validation behaviors. Discovered handlers/validators/behaviors are scoped.
 Register application dependencies separately.
 
+## Optional FluentValidation discovery
+
+For `AbstractValidator<TRequest>`/`IValidator<TRequest>` discovery, use the optional
+`BbQ.Cqrs.Outcome.FluentValidation` package's
+`AddBbQMediatorWithOutcomeAndFluentValidationFromAssemblies` or generated
+`Add{Assembly}MediatorWithOutcomeAndFluentValidation` companion. These compose the same setup
+with scoped FluentValidation validators and asynchronous adapters. The native registration methods
+remain unchanged. See the [FluentValidation guide](../BbQ.Cqrs.Outcome.FluentValidation/README.md).
+
 ## Explicit registration
 
 ```csharp

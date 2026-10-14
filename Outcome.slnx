@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/CQRS/">
+    <Project Path="tests/BbQ.Cqrs.Outcome.FluentValidation.Tests/BbQ.Cqrs.Outcome.FluentValidation.Tests.csproj" />
     <Project Path="tests/BbQ.Cqrs.Outcome.Tests/BbQ.Cqrs.Outcome.Tests.csproj" />
     <Project Path="src/BbQ.Cqrs.Samples/BbQ.Cqrs.Samples.csproj" />
     <Project Path="src/BbQ.Cqrs.SourceGenerators/BbQ.Cqrs.SourceGenerators.csproj" />

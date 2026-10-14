@@ -74,7 +74,11 @@ public sealed class OutcomeValidationRegistrationGenerator : IIncrementalGenerat
         sb.AppendLine("return services;\n}");
         if (compilation.GetTypeByMetadataName("BbQ.Cqrs.Validation.OutcomeValidationOptions") != null &&
             compilation.GetTypeByMetadataName("BbQ.Cqrs.DependencyInjection.MediatorServiceCollectionExtensions") != null)
+        {
             AppendMediatorRegistration(sb, assembly, method, types);
+            if (compilation.GetTypeByMetadataName("BbQ.Cqrs.Validation.FluentValidation.FluentValidationRequestValidator`1") != null)
+                AppendFluentValidationRegistration(sb, assembly, types);
+        }
         sb.AppendLine("}\n}");
         context.AddSource(assembly + ".OutcomeValidationRegistration.g.cs", sb.ToString());
     }
@@ -100,6 +104,36 @@ public sealed class OutcomeValidationRegistrationGenerator : IIncrementalGenerat
             }
         }
         sb.Append(validationMethod).AppendLine("(services);");
+        sb.AppendLine("return services;\n}");
+    }
+
+    private static void AppendFluentValidationRegistration(StringBuilder sb, string assembly,
+        Dictionary<string, INamedTypeSymbol> types)
+    {
+        sb.AppendLine("/// <summary>Registers mediator services, handlers, native and FluentValidation validators, and asynchronous Outcome validation without assembly scanning.</summary>");
+        sb.Append("public static global::Microsoft.Extensions.DependencyInjection.IServiceCollection Add")
+            .Append(assembly).AppendLine("MediatorWithOutcomeAndFluentValidation(this global::Microsoft.Extensions.DependencyInjection.IServiceCollection services, global::System.Action<global::BbQ.Cqrs.Validation.OutcomeValidationOptions>? configureValidation = null) {");
+        sb.Append("Add").Append(assembly).AppendLine("MediatorWithOutcomeValidation(services, configureValidation);");
+        var requests = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var pair in types.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            foreach (var iface in pair.Value.AllInterfaces)
+            {
+                if (pair.Value.TypeKind == TypeKind.Class && IsContract(iface, "FluentValidation", "IValidator`1"))
+                {
+                    RegisterEnumerable(sb, iface.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), pair.Key);
+                    requests.Add(iface.TypeArguments[0].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+                }
+                if (IsContract(iface, "BbQ.Cqrs", "IRequest`1") &&
+                    iface.TypeArguments[0] is INamedTypeSymbol response && response.Name == "Outcome" &&
+                    response.ContainingNamespace.ToDisplayString() == "BbQ.Outcome" &&
+                    (response.Arity == 1 || response.Arity == 2))
+                    requests.Add(pair.Key);
+            }
+        }
+        foreach (var request in requests.OrderBy(request => request, StringComparer.Ordinal))
+            RegisterEnumerable(sb, "global::BbQ.Cqrs.Validation.IRequestValidator<" + request + ">",
+                "global::BbQ.Cqrs.Validation.FluentValidation.FluentValidationRequestValidator<" + request + ">");
         sb.AppendLine("return services;\n}");
     }
 

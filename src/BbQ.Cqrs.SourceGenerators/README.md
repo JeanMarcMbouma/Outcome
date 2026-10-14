@@ -103,3 +103,18 @@ this does not remove runtime reflection from mediator dispatch itself.
 
 For equivalent runtime discovery use
 `AddBbQMediatorWithOutcomeValidationFromAssemblies(assemblies, configureValidation)`.
+
+### Optional FluentValidation discovery
+
+When `BbQ.Cqrs.Outcome.FluentValidation` is referenced, a companion method is emitted:
+
+```csharp
+services.AddOrderingMediatorWithOutcomeAndFluentValidation(
+    configureValidation: validation => validation.MapIssuesTo<AppError>(MapIssue));
+```
+
+It composes mediator/Outcome registration with scoped local `FluentValidation.IValidator<TRequest>`
+registrations and one asynchronous adapter per discovered request. Native validators coexist with
+FluentValidation validators. The original generated method does not enable FluentValidation discovery.
+See the [FluentValidation guide](../BbQ.Cqrs.Outcome.FluentValidation/README.md) for runtime scanning,
+multiple validators, factory registrations, scoped mappings and async/cancellation semantics.

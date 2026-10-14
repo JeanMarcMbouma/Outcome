@@ -4,6 +4,7 @@ This preview simplifies mediator and Outcome validation setup (#81).
 
 - `AddBbQMediatorWithOutcomeValidationFromAssemblies(assemblies, configureValidation)` registers mediator services, handlers, validators and Outcome validation from explicitly supplied assemblies.
 - Generated `Add{Assembly}MediatorWithOutcomeValidation(configureValidation)` provides equivalent setup with direct registrations and no runtime assembly scanning.
+- Optional `AddBbQMediatorWithOutcomeAndFluentValidationFromAssemblies` and generated `Add{Assembly}MediatorWithOutcomeAndFluentValidation` discover scoped FluentValidation validators and add asynchronous per-request adapters. Native validators coexist; multiple FluentValidation validators run sequentially.
 - Shared `MapIssuesTo<TError>` configuration maps validation issues to domain errors. `MapIssuesTo<TError,TMapper>` supports scoped mapper dependencies.
 - Registration preserves custom factories and mediator infrastructure and avoids duplicate identical handlers, validators, factories and validation behaviors.
 - Generated setup includes direct requests, commands, queries, streaming and fire-and-forget handlers. Existing explicit registration APIs remain available.
