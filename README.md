@@ -31,7 +31,8 @@ The core package remains independent of ASP.NET Core, JSON, logging, and telemet
 
 ### CQRS family
 
-Released together from `cqrs-v*` tags with the same version.
+Released together from `cqrs-v*` tags with the same version. The next prepared release is
+[`1.3.0-preview.4`](docs/release-cqrs-1.3.0-preview.4.md).
 
 | Package | Purpose |
 |---|---|
@@ -81,13 +82,18 @@ See the [Outcome documentation](./src/BbQ.Outcome/README.md) and the [implementa
 Use `BbQ.Cqrs.Outcome` when requests return Outcome and validation failures should be created without unsafe casts or payload-type coupling.
 
 ```csharp
-services.AddScoped<IRequestValidator<CreateUser>, CreateUserValidator>();
-services.AddValidationIssueMapper<AppError>(issue =>
-    new AppError(issue.Code, issue.Message, issue.MemberName));
-services.AddOutcomeValidation<CreateUser, User, AppError>();
+services.AddBbQMediatorWithOutcomeValidationFromAssemblies(
+    assemblies: [typeof(CreateUser).Assembly],
+    configureValidation: validation => validation.MapIssuesTo<AppError>(issue =>
+        new AppError(issue.Code, issue.Message, issue.MemberName)));
 ```
 
-For FluentValidation:
+With source-generated registration (assembly `Ordering`), use the equivalent
+`services.AddOrderingMediatorWithOutcomeValidation(configureValidation: ...)`.
+Both paths register mediator services, handlers, validators and Outcome validation.
+See the [registration guide](./src/BbQ.Cqrs.Outcome/README.md) for defaults and scoped mappings.
+
+For FluentValidation, explicit registration remains available:
 
 ```csharp
 services.AddScoped<FluentValidation.IValidator<CreateUser>, CreateUserValidator>();
@@ -169,3 +175,4 @@ dotnet build Outcome.slnx -c Release --no-restore
 dotnet test Outcome.slnx -c Release --no-build
 dotnet pack Outcome.slnx -c Release --no-build -o artifacts/packages
 ```
+
