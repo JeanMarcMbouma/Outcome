@@ -20,6 +20,11 @@ public static class MediatorOutcomeValidationServiceCollectionExtensions
     /// For trimming or Native AOT use the generated Add{Assembly}MediatorWithOutcomeValidation method.
     /// Supply mappings for domain error types, or a custom failure factory. ValidateOnBuild detects missing dependencies.
     /// </remarks>
+    /// <example><code>
+    /// services.AddBbQMediatorWithOutcomeValidationFromAssemblies(
+    ///     assemblies: [typeof(CreateUser).Assembly],
+    ///     configureValidation: validation => validation.MapIssuesTo&lt;string&gt;(issue => issue.Code));
+    /// </code></example>
     [RequiresUnreferencedCode("Assembly scanning requires preserved request, handler and validator types. Use generated registration for trimming.")]
     [RequiresDynamicCode("Assembly scanning constructs closed validation types. Use generated registration for Native AOT.")]
     public static IServiceCollection AddBbQMediatorWithOutcomeValidationFromAssemblies(

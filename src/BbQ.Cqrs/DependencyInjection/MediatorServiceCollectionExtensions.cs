@@ -7,6 +7,7 @@ namespace BbQ.Cqrs.DependencyInjection;
 public static class MediatorServiceCollectionExtensions
 {
     /// <summary>Registers scoped mediator, command/query dispatchers, sender and streamer, preserving application overrides.</summary>
+    /// <example><code>services.AddBbQMediatorServices();</code></example>
     public static IServiceCollection AddBbQMediatorServices(this IServiceCollection services)
     {
         if (services is null) throw new ArgumentNullException(nameof(services));

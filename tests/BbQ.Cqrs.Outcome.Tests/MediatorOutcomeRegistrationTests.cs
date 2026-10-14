@@ -7,7 +7,23 @@ using NUnit.Framework;
 namespace BbQ.Cqrs.Outcome.Tests;
 
 public sealed record ValidatedRequest(string Name) : ICommand<Outcome<int, ValidationIssue>>;
-public sealed record DomainRequest : IRequest<Outcome<int, string>>;
+public sealed record DomainRequest(string Name) : IRequest<Outcome<int, string>>;
+public sealed record RegisteredNotice : ICommand;
+public sealed record RegisteredStream : IStreamQuery<int>;
+public sealed class RegisteredNoticeHandler : IRequestHandler<RegisteredNotice>
+{
+    public Task Handle(RegisteredNotice request, CancellationToken ct) => Task.CompletedTask;
+}
+public sealed class RegisteredStreamHandler : IStreamHandler<RegisteredStream, int>
+{
+    public async IAsyncEnumerable<int> Handle(RegisteredStream request,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    {
+        await Task.Yield();
+        ct.ThrowIfCancellationRequested();
+        yield return 42;
+    }
+}
 public sealed class NameValidator : IRequestValidator<ValidatedRequest>
 {
     public Task<IReadOnlyList<ValidationIssue>> ValidateAsync(ValidatedRequest request, CancellationToken ct)
@@ -35,11 +51,13 @@ public sealed record RegistrationDomainRequest(string Name) : ICommand<Outcome<i
 public sealed record RegistrationMixedRequest(string Name) : IQuery<Outcome<int>>;
 
 public sealed class RegistrationValidators(RegistrationExecution execution)
-    : IRequestValidator<RegistrationDomainRequest>, IRequestValidator<RegistrationMixedRequest>
+    : IRequestValidator<RegistrationDomainRequest>, IRequestValidator<RegistrationMixedRequest>, IRequestValidator<DomainRequest>
 {
     public Task<IReadOnlyList<ValidationIssue>> ValidateAsync(RegistrationDomainRequest request, CancellationToken ct)
         => Validate(request.Name);
     public Task<IReadOnlyList<ValidationIssue>> ValidateAsync(RegistrationMixedRequest request, CancellationToken ct)
+        => Validate(request.Name);
+    public Task<IReadOnlyList<ValidationIssue>> ValidateAsync(DomainRequest request, CancellationToken ct)
         => Validate(request.Name);
     private Task<IReadOnlyList<ValidationIssue>> Validate(string name)
     {
@@ -66,7 +84,10 @@ public sealed class RegistrationHandlers(RegistrationExecution execution)
         return Task.FromResult(Outcome<int>.From(42));
     }
     public Task<Outcome<int, string>> Handle(DomainRequest request, CancellationToken ct)
-        => Task.FromResult(Outcome<int, string>.From(42));
+    {
+        execution.HandlerCalls++;
+        return Task.FromResult(Outcome<int, string>.From(42));
+    }
 }
 
 public sealed class ScopedIssueMapper(RegistrationExecution execution) : IValidationIssueMapper<string>
@@ -107,13 +128,28 @@ public sealed class MediatorOutcomeRegistrationTests
         Assert.That(typed.Errors, Is.EqualTo(new[] { "REQUIRED" }));
         var mixed = await mediator.Send(new RegistrationMixedRequest(""));
         Assert.That(mixed.Errors[0], Is.TypeOf<ValidationIssue>());
+        Assert.That((await mediator.Send(new DomainRequest(""))).Errors[0], Is.EqualTo("REQUIRED"));
         Assert.That(execution.HandlerCalls, Is.Zero);
         Assert.That((await mediator.Send(new ValidatedRequest("valid"))).Value, Is.EqualTo(42));
         Assert.That((await mediator.Send(new RegistrationDomainRequest("valid"))).Value, Is.EqualTo(42));
         Assert.That((await mediator.Send(new RegistrationMixedRequest("valid"))).Value, Is.EqualTo(42));
-        Assert.That(execution.HandlerCalls, Is.EqualTo(3));
-        Assert.That(execution.ValidatorCalls, Is.EqualTo(4));
+        Assert.That((await mediator.Send(new DomainRequest("valid"))).Value, Is.EqualTo(42));
+        Assert.That(execution.HandlerCalls, Is.EqualTo(4));
+        Assert.That(execution.ValidatorCalls, Is.EqualTo(6));
         Assert.That(scope.ServiceProvider.GetRequiredService<IRequestHandler<DomainRequest, Outcome<int, string>>>(), Is.Not.Null);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task StreamingAndFireAndForgetHandlersAreIncluded(bool generated)
+    {
+        using var provider = Build(generated);
+        using var scope = provider.CreateScope();
+        var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+        await mediator.Send(new RegisteredNotice());
+        var items = new List<int>();
+        await foreach (var item in mediator.Stream(new RegisteredStream())) items.Add(item);
+        Assert.That(items, Is.EqualTo(new[] { 42 }));
     }
 
     [TestCase(false)]
@@ -122,16 +158,17 @@ public sealed class MediatorOutcomeRegistrationTests
     {
         var services = new ServiceCollection();
         services.AddScoped<RegistrationExecution>();
-        services.AddValidationIssueMapper<string>(issue => issue.Code);
-        Register(services, generated);
-        Register(services, generated);
-        Register(services, !generated);
+        Register(services, generated, validation => validation.MapIssuesTo<string>(issue => issue.Code));
+        Register(services, generated, validation => validation.MapIssuesTo<string>(issue => issue.Code));
+        Register(services, !generated, validation => validation.MapIssuesTo<string>(issue => issue.Code));
         services.AddBbQCqrsOutcomeTestsOutcomeValidation();
         services.AddOutcomeValidation<ValidatedRequest, int, ValidationIssue>();
         using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
         using var scope = provider.CreateScope();
         var sp = scope.ServiceProvider;
         Assert.That(sp.GetServices<IMediator>().Count(), Is.EqualTo(1));
+        Assert.That(sp.GetServices<IValidationIssueMapper<string>>().Count(), Is.EqualTo(1));
+        Assert.That(sp.GetServices<IValidationFailureFactory<Outcome<int, ValidationIssue>>>().Count(), Is.EqualTo(1));
         Assert.That(sp.GetServices<IRequestHandler<ValidatedRequest, Outcome<int, ValidationIssue>>>().Count(), Is.EqualTo(1));
         Assert.That(sp.GetServices<IRequestValidator<ValidatedRequest>>().Count(), Is.EqualTo(1));
         Assert.That(sp.GetServices<IPipelineBehavior<ValidatedRequest, Outcome<int, ValidationIssue>>>().Count(), Is.EqualTo(1));

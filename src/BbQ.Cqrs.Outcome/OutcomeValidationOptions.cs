@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -9,13 +10,15 @@ public sealed class OutcomeValidationOptions
     private readonly IServiceCollection _services;
 
     /// <summary>Creates configuration for the specified service collection; used by generated registration methods.</summary>
+    /// <example><code>var validation = new OutcomeValidationOptions(services);</code></example>
     public OutcomeValidationOptions(IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
         _services = services;
     }
 
-    /// <summary>Maps validation issues to domain errors. The delegate must be thread-safe.</summary>
+    /// <summary>Maps validation issues to domain errors, replacing an earlier mapping. The delegate must be thread-safe.</summary>
+    /// <example><code>validation.MapIssuesTo&lt;string&gt;(issue => issue.Code);</code></example>
     public OutcomeValidationOptions MapIssuesTo<TError>(Func<ValidationIssue, TError> mapper)
     {
         ArgumentNullException.ThrowIfNull(mapper);
@@ -23,8 +26,9 @@ public sealed class OutcomeValidationOptions
         return this;
     }
 
-    /// <summary>Registers a scoped mapper implementation, which may depend on other scoped services.</summary>
-    public OutcomeValidationOptions MapIssuesTo<TError, TMapper>()
+    /// <summary>Registers a scoped mapper implementation, replacing an earlier mapping; supports scoped dependencies.</summary>
+    /// <example><code>validation.MapIssuesTo&lt;AppError, AppErrorMapper&gt;();</code></example>
+    public OutcomeValidationOptions MapIssuesTo<TError, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TMapper>()
         where TMapper : class, IValidationIssueMapper<TError>
     {
         _services.Replace(ServiceDescriptor.Scoped<IValidationIssueMapper<TError>, TMapper>());
