@@ -34,6 +34,8 @@ jobs:
           dotnet restore src/BbQ.Cqrs.Outcome/BbQ.Cqrs.Outcome.csproj
           dotnet restore src/BbQ.Cqrs.Outcome.FluentValidation/BbQ.Cqrs.Outcome.FluentValidation.csproj
           dotnet restore tests/BbQ.Cqrs.Tests/BbQ.Cqrs.Tests.csproj
+          dotnet restore tests/BbQ.Cqrs.SourceGenerators.Tests/BbQ.Cqrs.SourceGenerators.Tests.csproj
+          dotnet restore tests/BbQ.Cqrs.Outcome.Tests/BbQ.Cqrs.Outcome.Tests.csproj
           dotnet restore tests/BbQ.Outcome.Integrations.Tests/BbQ.Outcome.Integrations.Tests.csproj
 
       - name: Build package family
@@ -46,6 +48,8 @@ jobs:
       - name: Test CQRS package family
         run: |
           dotnet test tests/BbQ.Cqrs.Tests/BbQ.Cqrs.Tests.csproj --configuration Release --verbosity normal
+          dotnet test tests/BbQ.Cqrs.SourceGenerators.Tests/BbQ.Cqrs.SourceGenerators.Tests.csproj --configuration Release --verbosity normal
+          dotnet test tests/BbQ.Cqrs.Outcome.Tests/BbQ.Cqrs.Outcome.Tests.csproj --configuration Release --verbosity normal
           dotnet test tests/BbQ.Outcome.Integrations.Tests/BbQ.Outcome.Integrations.Tests.csproj --configuration Release --verbosity normal
 
       - name: Extract version
@@ -53,8 +57,10 @@ jobs:
         shell: bash
         run: |
           version="${GITHUB_REF_NAME#cqrs-v}"
-          expected=$(dotnet msbuild src/BbQ.Cqrs/BbQ.Cqrs.csproj -getProperty:Version)
-          test "$version" = "$expected" || { echo "Tag version $version differs from project version $expected"; exit 1; }
+          for project in BbQ.Cqrs BbQ.Cqrs.SourceGenerators BbQ.Cqrs.Outcome BbQ.Cqrs.Outcome.FluentValidation; do
+            expected=$(dotnet msbuild "src/$project/$project.csproj" -getProperty:Version)
+            test "$version" = "$expected" || { echo "Tag version $version differs from $project version $expected"; exit 1; }
+          done
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Pack CQRS package family
@@ -75,3 +81,4 @@ jobs:
 
       - name: Push symbols
         run: dotnet nuget push ./artifacts/*.snupkg --api-key ${{steps.login.outputs.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json --skip-duplicate
+

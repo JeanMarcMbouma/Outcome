@@ -5,7 +5,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <PackageId>BbQ.Cqrs.Outcome</PackageId>
-    <Version>1.3.0-preview.2</Version>
+    <Version>1.3.0-preview.4</Version>
+    <PackageReleaseNotes>Adds composed mediator and Outcome validation registration through assembly scanning or source generators, shared issue mapping and scoped, idempotent registrations. See https://github.com/JeanMarcMbouma/Outcome/blob/master/docs/release-cqrs-1.3.0-preview.4.md</PackageReleaseNotes>
     <Authors>Jean</Authors>
     <Description>Optional type-safe validation behaviors and response factories for BbQ.Cqrs and BbQ.Outcome.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -18,3 +19,4 @@
     <None Include="README.md" Pack="true" PackagePath="" />
   </ItemGroup>
 </Project>
+
