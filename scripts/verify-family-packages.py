@@ -12,6 +12,7 @@ for project in Path("src").glob("BbQ.*/*.csproj"):
     if package_id and version:
         versions[package_id] = version
 
+expected = {name for name in versions if name.startswith(("BbQ.Outcome", "BbQ.Cqrs"))}
 found = set()
 for path in Path("artifacts/packages").glob("*.nupkg"):
     with ZipFile(path) as package:
@@ -19,7 +20,7 @@ for path in Path("artifacts/packages").glob("*.nupkg"):
         root = ET.fromstring(package.read(manifest))
         ns = {"n": root.tag.partition("}")[0].lstrip("{")}
         package_id = root.findtext("n:metadata/n:id", namespaces=ns)
-        if not package_id.startswith(("BbQ.Outcome", "BbQ.Cqrs")):
+        if package_id not in expected:
             continue
         version = root.findtext("n:metadata/n:version", namespaces=ns)
         if version != versions[package_id]:
@@ -36,7 +37,6 @@ for path in Path("artifacts/packages").glob("*.nupkg"):
                 raise SystemExit(f"{package_id}: stable package depends on preview {dependency_id} {minimum}")
         found.add(package_id)
 
-expected = {name for name in versions if name.startswith(("BbQ.Outcome", "BbQ.Cqrs"))}
 if found != expected:
     raise SystemExit(f"Family package set mismatch: missing {expected-found}, unexpected {found-expected}")
 print(f"FAMILY_PASS: {len(found)} package versions and internal dependency minimums match their projects.")
