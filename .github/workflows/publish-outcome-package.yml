@@ -47,6 +47,7 @@ jobs:
       - name: Test Outcome package family
         run: |
           dotnet test tests/BbQ.Outcome.Tests/BbQ.Outcome.Tests.csproj --configuration Release --verbosity normal
+          dotnet test tests/BbQ.Outcome.SourceGenerators.Tests/BbQ.Outcome.SourceGenerators.Tests.csproj --configuration Release --verbosity normal
           dotnet test tests/BbQ.Outcome.Integrations.Tests/BbQ.Outcome.Integrations.Tests.csproj --configuration Release --verbosity normal
 
       - name: Extract version
@@ -54,8 +55,10 @@ jobs:
         shell: bash
         run: |
           version="${GITHUB_REF_NAME#outcome-v}"
-          expected=$(dotnet msbuild src/BbQ.Outcome/BbQ.Outcome.csproj -getProperty:Version)
-          test "$version" = "$expected" || { echo "Tag version $version differs from project version $expected"; exit 1; }
+          for project in BbQ.Outcome BbQ.Outcome.SourceGenerators BbQ.Outcome.AspNetCore BbQ.Outcome.SystemTextJson BbQ.Outcome.Diagnostics; do
+            expected=$(dotnet msbuild "src/$project/$project.csproj" -getProperty:Version)
+            test "$version" = "$expected" || { echo "Tag version $version differs from $project version $expected"; exit 1; }
+          done
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Pack Outcome package family

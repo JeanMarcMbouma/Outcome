@@ -6,7 +6,8 @@
 
     <!-- Package metadata -->
     <PackageId>BbQ.Outcome</PackageId>
-    <Version>1.2.0-preview.4</Version>
+    <Version>1.2.0</Version>
+    <PackageReleaseNotes>General availability: typed and heterogeneous results, async composition, dependency-free retries, generated error helpers and optional HTTP, JSON and diagnostics integrations. See https://github.com/JeanMarcMbouma/Outcome/blob/master/docs/release-outcome-1.2.0.md</PackageReleaseNotes>
     <Authors>Jean</Authors>
     <Company>JM Mbouma</Company>
     <Description>A modern C# functional result type with structured errors, async workflows, LINQ support, deconstruction, and Source Link.</Description>

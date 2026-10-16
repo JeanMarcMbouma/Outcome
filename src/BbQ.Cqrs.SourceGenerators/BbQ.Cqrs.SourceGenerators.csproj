@@ -18,8 +18,8 @@
     
     <!-- Package metadata -->
     <PackageId>BbQ.Cqrs.SourceGenerators</PackageId>
-    <Version>1.3.0-preview.4</Version>
-    <PackageReleaseNotes>Adds composed mediator and Outcome validation registration through assembly scanning or source generators, optional FluentValidation discovery, shared issue mapping and scoped, idempotent registrations. See https://github.com/JeanMarcMbouma/Outcome/blob/master/docs/release-cqrs-1.3.0-preview.4.md</PackageReleaseNotes>
+    <Version>1.3.0</Version>
+    <PackageReleaseNotes>General availability: composed mediator and Outcome validation registration through assembly scanning or source generation, optional asynchronous FluentValidation integration and scoped issue mapping. See https://github.com/JeanMarcMbouma/Outcome/blob/master/docs/release-cqrs-1.3.0.md</PackageReleaseNotes>
     <Authors>Jean</Authors>
     <Company>JM Mbouma</Company>
     <Description>Source generators for BbQ.Cqrs - Automatically generates handler registration and boilerplate code for CQRS pattern.</Description>
