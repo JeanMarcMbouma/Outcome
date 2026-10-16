@@ -50,12 +50,25 @@ The CQRS core does not require Outcome or FluentValidation. The integration pack
 
 ### Events family
 
+The GA release is [`1.2.0`](docs/release-events-1.2.0.md). All five packages are
+versioned and published together from `events-v*` tags.
+
 | Package | Purpose |
 |---|---|
 | [BbQ.Events](./src/BbQ.Events/README.md) | Event publishing, handlers, subscribers, projections and replay |
+| `BbQ.Events.SourceGenerators` | Compile-time event handler, subscriber and projection registration |
 | [BbQ.Events.SqlServer](./src/BbQ.Events.SqlServer/README.md) | SQL Server event store and checkpoint persistence |
 | [BbQ.Events.PostgreSql](./src/BbQ.Events.PostgreSql/README.md) | PostgreSQL event store and checkpoint persistence |
 | [BbQ.Events.RabbitMQ](./src/BbQ.Events.RabbitMQ/README.md) | RabbitMQ distributed event bus |
+
+```sh
+dotnet add package BbQ.Events --version 1.2.0
+dotnet add package BbQ.Events.SqlServer --version 1.2.0
+dotnet add package BbQ.Events.PostgreSql --version 1.2.0
+dotnet add package BbQ.Events.RabbitMQ --version 1.2.0
+```
+
+Install only the providers your application needs.
 
 ## Outcome highlights
 
@@ -124,7 +137,8 @@ Package families are versioned and published together:
 
 - `outcome-vX.Y.Z[-prerelease]` publishes the complete Outcome family.
 - `cqrs-vX.Y.Z[-prerelease]` publishes the complete CQRS family.
-- Events/provider packages retain their existing release tags.
+- `events-vX.Y.Z[-prerelease]` publishes all five Events packages after mandatory real-provider validation.
+- Legacy provider-specific tags remain available for individual provider releases.
 
 Use Outcome `1.2.0` and CQRS `1.3.0` for stable installations. Upgrade all packages
 within each family together. CQRS Outcome integrations depend on stable Outcome

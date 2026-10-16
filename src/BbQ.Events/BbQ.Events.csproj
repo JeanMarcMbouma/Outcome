@@ -4,7 +4,8 @@
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
 
     <PackageId>BbQ.Events</PackageId>
-    <Version>1.2.0-preview.1</Version>
+    <Version>1.2.0</Version>
+    <PackageReleaseNotes>General availability of the Events 1.2.0 family: event publishing, projections, replay, generated registration and optional SQL Server, PostgreSQL and RabbitMQ providers. See https://github.com/JeanMarcMbouma/Outcome/blob/master/docs/release-events-1.2.0.md</PackageReleaseNotes>
     <Authors>Jean</Authors>
     <Company>JM Mbouma</Company>
     <Description>Event-driven architecture support with strongly-typed pub/sub for BbQ libraries.</Description>

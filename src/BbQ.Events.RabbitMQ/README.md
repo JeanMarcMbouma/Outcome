@@ -6,6 +6,9 @@ This package provides a production-ready, distributed event bus implementation f
 - **Distributed Pub/Sub**: Cross-process event publishing and subscription via RabbitMQ
 - **IEventBus**: Drop-in replacement for the in-memory event bus
 
+All five Events packages share version `1.2.0` and are released together. See the
+[GA release notes](../../docs/release-events-1.2.0.md) for upgrade and provider guidance.
+
 ## Features
 
 - ✅ **Distributed Messaging**: Events are delivered across multiple processes and services
@@ -20,7 +23,7 @@ This package provides a production-ready, distributed event bus implementation f
 ## Installation
 
 ```bash
-dotnet add package BbQ.Events.RabbitMQ
+dotnet add package BbQ.Events.RabbitMQ --version 1.2.0
 ```
 
 ## Prerequisites

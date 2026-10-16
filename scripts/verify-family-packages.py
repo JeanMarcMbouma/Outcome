@@ -1,4 +1,4 @@
-"""Verify packed Outcome/CQRS versions and internal dependency minimums."""
+"""Verify packed Outcome/CQRS/Events versions and internal dependency minimums."""
 from pathlib import Path
 import re
 import xml.etree.ElementTree as ET
@@ -12,7 +12,7 @@ for project in Path("src").glob("BbQ.*/*.csproj"):
     if package_id and version:
         versions[package_id] = version
 
-expected = {name for name in versions if name.startswith(("BbQ.Outcome", "BbQ.Cqrs"))}
+expected = {name for name in versions if name.startswith(("BbQ.Outcome", "BbQ.Cqrs", "BbQ.Events"))}
 found = set()
 for path in Path("artifacts/packages").glob("*.nupkg"):
     with ZipFile(path) as package:
@@ -30,7 +30,7 @@ for path in Path("artifacts/packages").glob("*.nupkg"):
             if dependency_id not in versions:
                 continue
             requirement = dependency.attrib["version"]
-            minimum = re.split(r"[,\\]]", requirement.lstrip("[("))[0].strip()
+            minimum = re.split(r"[,\]]", requirement.lstrip("[("))[0].strip()
             if minimum != versions[dependency_id]:
                 raise SystemExit(f"{package_id}: {dependency_id} minimum {minimum}, expected {versions[dependency_id]}")
             if "-" not in version and "-" in minimum:

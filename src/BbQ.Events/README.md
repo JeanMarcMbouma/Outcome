@@ -2,6 +2,9 @@
 
 Event-driven architecture support with strongly-typed pub/sub and projections for BbQ libraries.
 
+All five Events packages share version `1.2.0` and are released together. See the
+[GA release notes](../../docs/release-events-1.2.0.md) for upgrade and provider guidance.
+
 ## ✨ Features
 
 - **Type-safe event publishing** with `IEventPublisher`
@@ -22,7 +25,7 @@ Event-driven architecture support with strongly-typed pub/sub and projections fo
 ## 📦 Installation
 
 ```bash
-dotnet add package BbQ.Events
+dotnet add package BbQ.Events --version 1.2.0
 ```
 
 ## 📈 Performance Benchmarks

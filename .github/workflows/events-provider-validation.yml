@@ -1,5 +1,6 @@
 name: Events provider validation
 on:
+  workflow_call:
   push:
     branches: ['fix/events-and-sourcelink']
   pull_request:
@@ -54,6 +55,8 @@ jobs:
         run: |
           dotnet test tests/BbQ.Events.SqlServer.Tests -c Release --logger 'trx;LogFilePrefix=sqlserver'
           dotnet test tests/BbQ.Events.PostgreSql.Tests -c Release --logger 'trx;LogFilePrefix=postgres'
+      - name: Test RabbitMQ configuration
+        run: dotnet test tests/BbQ.Events.RabbitMQ.Tests -c Release --logger 'trx;LogFilePrefix=rabbitmq'
       - name: Test projection policies and existing behavior
         run: dotnet test tests/BbQ.Cqrs.Tests -c Release --logger 'trx;LogFilePrefix=policies'
       - name: Publish and execute Native AOT smoke
@@ -64,6 +67,7 @@ jobs:
         run: |
           dotnet build Outcome.slnx -c Release
           dotnet pack Outcome.slnx -c Release --no-build -o artifacts/packages
+          python3 scripts/verify-family-packages.py
           dotnet run --project scripts/SourceLinkVerification -c Release -- artifacts/packages
       - name: Audit dependency graph
         run: dotnet list Outcome.slnx package --vulnerable --include-transitive
