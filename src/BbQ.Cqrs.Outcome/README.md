@@ -7,7 +7,7 @@ Optional validation integration for BbQ.Cqrs and BbQ.Outcome, targeting .NET 8, 
 This package ships with the CQRS family under the same `cqrs-v*` version.
 
 ```bash
-dotnet add package BbQ.Cqrs.Outcome --prerelease
+dotnet add package BbQ.Cqrs.Outcome --version 1.3.0
 ```
 
 ## Contracts

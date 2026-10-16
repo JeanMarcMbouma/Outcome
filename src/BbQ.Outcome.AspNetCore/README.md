@@ -7,7 +7,7 @@ Optional HTTP adapter for .NET 8, 9, and 10. The core Outcome package remains fr
 This package ships with the Outcome family under the same `outcome-v*` version.
 
 ```bash
-dotnet add package BbQ.Outcome.AspNetCore --prerelease
+dotnet add package BbQ.Outcome.AspNetCore --version 1.2.0
 ```
 
 ```csharp

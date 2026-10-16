@@ -7,7 +7,7 @@ Optional adapters over `ILogger` and `System.Diagnostics.Activity`. The core Out
 This package ships with the Outcome family under the same `outcome-v*` version.
 
 ```bash
-dotnet add package BbQ.Outcome.Diagnostics --prerelease
+dotnet add package BbQ.Outcome.Diagnostics --version 1.2.0
 ```
 
 ```csharp

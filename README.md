@@ -6,7 +6,8 @@ A modern .NET library suite for functional result handling, CQRS, and event-driv
 
 ### Outcome family
 
-Released together from `outcome-v*` tags with the same version.
+Released together from `outcome-v*` tags with the same version. The GA release is
+[`1.2.0`](docs/release-outcome-1.2.0.md).
 
 | Package | Purpose |
 |---|---|
@@ -17,22 +18,19 @@ Released together from `outcome-v*` tags with the same version.
 | [BbQ.Outcome.Diagnostics](./src/BbQ.Outcome.Diagnostics/README.md) | Opt-in structured logging and `Activity` instrumentation |
 
 ```bash
-# Stable core
-dotnet add package BbQ.Outcome
-
-# Latest prerelease family packages
-dotnet add package BbQ.Outcome --prerelease
-dotnet add package BbQ.Outcome.AspNetCore --prerelease
-dotnet add package BbQ.Outcome.SystemTextJson --prerelease
-dotnet add package BbQ.Outcome.Diagnostics --prerelease
+# Stable family packages
+dotnet add package BbQ.Outcome --version 1.2.0
+dotnet add package BbQ.Outcome.AspNetCore --version 1.2.0
+dotnet add package BbQ.Outcome.SystemTextJson --version 1.2.0
+dotnet add package BbQ.Outcome.Diagnostics --version 1.2.0
 ```
 
 The core package remains independent of ASP.NET Core, JSON, logging, and telemetry dependencies. Install only the adapters your application needs.
 
 ### CQRS family
 
-Released together from `cqrs-v*` tags with the same version. The next prepared release is
-[`1.3.0-preview.4`](docs/release-cqrs-1.3.0-preview.4.md).
+Released together from `cqrs-v*` tags with the same version. The GA release is
+[`1.3.0`](docs/release-cqrs-1.3.0.md).
 
 | Package | Purpose |
 |---|---|
@@ -42,13 +40,10 @@ Released together from `cqrs-v*` tags with the same version. The next prepared r
 | [BbQ.Cqrs.Outcome.FluentValidation](./src/BbQ.Cqrs.Outcome.FluentValidation/README.md) | Async FluentValidation adapter for CQRS Outcome validation |
 
 ```bash
-# Stable core
-dotnet add package BbQ.Cqrs
-
-# Latest prerelease family packages
-dotnet add package BbQ.Cqrs --prerelease
-dotnet add package BbQ.Cqrs.Outcome --prerelease
-dotnet add package BbQ.Cqrs.Outcome.FluentValidation --prerelease
+# Stable family packages
+dotnet add package BbQ.Cqrs --version 1.3.0
+dotnet add package BbQ.Cqrs.Outcome --version 1.3.0
+dotnet add package BbQ.Cqrs.Outcome.FluentValidation --version 1.3.0
 ```
 
 The CQRS core does not require Outcome or FluentValidation. The integration packages remain optional.
@@ -131,7 +126,9 @@ Package families are versioned and published together:
 - `cqrs-vX.Y.Z[-prerelease]` publishes the complete CQRS family.
 - Events/provider packages retain their existing release tags.
 
-Pre-release consumers should install with `--prerelease` or pin the exact preview version.
+Use Outcome `1.2.0` and CQRS `1.3.0` for stable installations. Upgrade all packages
+within each family together. CQRS Outcome integrations depend on stable Outcome
+`1.2.0`. Existing preview release notes remain available as historical records.
 
 ## Documentation
 

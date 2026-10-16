@@ -7,7 +7,7 @@ Optional, explicit System.Text.Json converters for .NET 8, 9, and 10. No JSON de
 This package ships with the Outcome family under the same `outcome-v*` version.
 
 ```bash
-dotnet add package BbQ.Outcome.SystemTextJson --prerelease
+dotnet add package BbQ.Outcome.SystemTextJson --version 1.2.0
 ```
 
 ## Wire format
