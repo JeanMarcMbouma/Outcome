@@ -6,6 +6,9 @@ This package provides production-ready, durable implementations for:
 - **Event Store**: Full event sourcing with IEventStore for PostgreSQL
 - **Checkpoint Store**: Projection checkpoint persistence with IProjectionCheckpointStore
 
+All five Events packages share version `1.2.0` and are released together. See the
+[GA release notes](../../docs/release-events-1.2.0.md) for upgrade and provider guidance.
+
 ## Features
 
 - ✅ **Durable Event Store**: Sequential event persistence with stream isolation
@@ -21,7 +24,7 @@ This package provides production-ready, durable implementations for:
 ## Installation
 
 ```bash
-dotnet add package BbQ.Events.PostgreSql
+dotnet add package BbQ.Events.PostgreSql --version 1.2.0
 ```
 
 ## Database Schema

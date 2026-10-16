@@ -18,7 +18,8 @@
     
     <!-- Package metadata -->
     <PackageId>BbQ.Events.SourceGenerators</PackageId>
-    <Version>1.2.0-preview.1</Version>
+    <Version>1.2.0</Version>
+    <PackageReleaseNotes>General availability of the Events 1.2.0 family: event publishing, projections, replay, generated registration and optional SQL Server, PostgreSQL and RabbitMQ providers. See https://github.com/JeanMarcMbouma/Outcome/blob/master/docs/release-events-1.2.0.md</PackageReleaseNotes>
     <Authors>Jean</Authors>
     <Company>JM Mbouma</Company>
     <Description>Source generators for BbQ.Events - Automatically discovers and registers event handlers and subscribers.</Description>

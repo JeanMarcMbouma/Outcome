@@ -2,6 +2,9 @@
 
 Source generators for BbQ.Events - Automatically discovers and registers event handlers, subscribers, and projection handlers.
 
+All five Events packages share version `1.2.0` and are released together. See the
+[GA release notes](../../docs/release-events-1.2.0.md) for upgrade and provider guidance.
+
 ## Overview
 
 This package contains Roslyn source generators that automatically discover implementations of `IEventHandler<TEvent>`, `IEventSubscriber<TEvent>`, `IProjectionHandler<TEvent>`, `IPartitionedProjectionHandler<TEvent>`, and `IProjectionBatchHandler<TEvent>` in your project and generate registration code.
@@ -16,7 +19,11 @@ This package contains Roslyn source generators that automatically discover imple
 
 ## Installation
 
-This package is automatically included when you reference BbQ.Events.
+This package is part of the Events 1.2.0 GA family and is automatically included when you reference BbQ.Events.
+
+```sh
+dotnet add package BbQ.Events.SourceGenerators --version 1.2.0
+```
 
 ## Usage
 
